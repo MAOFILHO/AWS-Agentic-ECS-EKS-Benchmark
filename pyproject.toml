@@ -1,0 +1,10 @@
+[project]
+name = "agentic-platform-advisor"
+version = "0.0.0"
+description = "ECS vs EKS agent benchmark"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+exclude-newer = "7 days"

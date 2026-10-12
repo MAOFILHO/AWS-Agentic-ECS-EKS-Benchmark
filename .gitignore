@@ -7,3 +7,12 @@
 .claude/super-board/upgrade.json
 .DS_Store
 .claude/settings.json.bak-*
+
+# Benchmark output: only the published sample run is tracked
+results/*
+!results/.gitkeep
+!results/sample/
+
+# Local env file and virtualenv
+.env
+.venv

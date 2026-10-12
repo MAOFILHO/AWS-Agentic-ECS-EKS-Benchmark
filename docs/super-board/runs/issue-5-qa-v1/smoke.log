@@ -1,0 +1,4 @@
+# live smoke: uvicorn workload.app:app, LLM_MODE unset (mock), MOCK_LATENCY_MS=200
+GET /healthz -> 200 {"status":"ok"}
+GET /readyz -> 200 {"status":"ready"}
+POST /triage -> 200 time_total=0.209274s {"category":"billing","reply":"Thanks for reaching out. Refunds for duplicate charges post within 5 business days."}

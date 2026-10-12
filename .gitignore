@@ -13,6 +13,8 @@ results/*
 !results/.gitkeep
 !results/sample/
 
-# Local env file and virtualenv
+# Local env files (the example stays tracked) and virtualenv
 .env
+.env.*
+!.env.example
 .venv

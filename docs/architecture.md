@@ -8,24 +8,24 @@ Stacks are created in layer order and deleted in reverse. EKS cells add a Helm r
 
 ```mermaid
 flowchart TD
-    dev["Laptop: SSO profile"] --> boot["00-bootstrap: OIDC role, budget, ECR, cost tags"]
-    ci["GitHub Actions: OIDC"] --> img["Build image once per commit"]
+    dev["Laptop<br/>SSO profile"] --> boot["00-bootstrap<br/>OIDC role<br/>budget, ECR<br/>cost tags"]
+    ci["GitHub<br/>Actions<br/>OIDC"] --> img["Build image<br/>once per<br/>commit"]
     boot --> img
-    img --> ecr[("ECR private repo")]
-    boot --> net["10-network: VPC, subnets, NAT, endpoints"]
-    net --> harness["20-harness: k6 ECS cluster"]
-    net --> ecs["30-ecs: cluster, service, ALB, autoscaling"]
-    net --> eks["40-eks: cluster, add-ons, node group or Fargate profile"]
-    eks --> lbc["41-eks-lbc-iam: Pod Identity role"]
-    lbc --> helm["Helm: workload chart with Ingress and HPA"]
+    img --> ecr[("ECR<br/>private repo")]
+    boot --> net["10-network<br/>VPC, subnets<br/>NAT<br/>endpoints"]
+    net --> harness["20-harness<br/>k6 ECS<br/>cluster"]
+    net --> ecs["30-ecs<br/>cluster<br/>service, ALB<br/>autoscaling"]
+    net --> eks["40-eks<br/>cluster<br/>add-ons<br/>node group<br/>or Fargate<br/>profile"]
+    eks --> lbc["41-eks-lbc-iam<br/>Pod Identity<br/>role"]
+    lbc --> helm["Helm<br/>workload<br/>chart<br/>Ingress, HPA"]
     ecr --> ecs
     ecr --> helm
-    ecs --> ready{"Healthy behind ALB?"}
+    ecs --> ready{"Healthy<br/>behind<br/>ALB?"}
     helm --> ready
     ready -->|yes| load["Load test"]
     ready -->|no| down["Teardown"]
     load --> down
-    down --> gone["Helm releases, then LBs, then stacks in reverse"]
+    down --> gone["1. Helm<br/>releases<br/>2. LBs<br/>3. stacks in<br/>reverse"]
 ```
 
 ## 2. Agent graph
@@ -34,21 +34,21 @@ The advisor is a LangGraph graph with a Pydantic state and a SQLite checkpointer
 
 ```mermaid
 flowchart TD
-    start(["advisor run"]) --> planner["planner: run matrix and cost estimate"]
-    planner --> gate{"approval_gate: interrupt"}
-    gate -->|no| stop(["Stop, no spend"])
-    gate -->|yes| deployer["deployer: change sets, Helm"]
-    deployer --> loadr["load_runner: k6 RunTask in harness"]
-    loadr --> collector["collector: CloudWatch, ALB, events"]
-    collector --> analyst["analyst: deterministic metrics.json"]
-    analyst --> reporter["reporter: LLM narrative from metrics.json"]
-    reporter --> check{"Every number in metrics.json?"}
+    start(["advisor run"]) --> planner["planner<br/>run matrix<br/>cost estimate"]
+    planner --> gate{"approval<br/>gate<br/>interrupt"}
+    gate -->|no| stop(["Stop<br/>no spend"])
+    gate -->|yes| deployer["deployer<br/>change sets<br/>Helm"]
+    deployer --> loadr["load_runner<br/>k6 RunTask<br/>in harness"]
+    loadr --> collector["collector<br/>CloudWatch<br/>ALB, events"]
+    collector --> analyst["analyst<br/>deterministic<br/>metrics.json"]
+    analyst --> reporter["reporter<br/>LLM narrative<br/>from<br/>metrics.json"]
+    reporter --> check{"Every<br/>number in<br/>metrics.json?"}
     check -->|no| reporter
-    check -->|yes| teardown["teardown: verify nothing tagged remains"]
+    check -->|yes| teardown["teardown<br/>verify<br/>nothing tagged<br/>remains"]
     deployer -. "failure" .-> teardown
     loadr -. "failure" .-> teardown
     collector -. "failure" .-> teardown
-    teardown --> done(["Report and actual spend"])
+    teardown --> done(["Report<br/>actual spend"])
 ```
 
 ## 3. Benchmark data flow
@@ -57,17 +57,17 @@ Raw data is written once. Every figure in the report traces back to a raw file.
 
 ```mermaid
 flowchart LR
-    k6["k6 summaries"] --> raw[("results/run-id/raw/")]
-    cw["CloudWatch and Container Insights"] --> raw
-    alb["ALB metrics"] --> raw
-    ev["ECS task and Kubernetes pod events"] --> raw
-    price["Pricing API"] --> cost["Cost model"]
+    k6["k6<br/>summaries"] --> raw[("results/<br/>run-id/raw/")]
+    cw["CloudWatch<br/>Container<br/>Insights"] --> raw
+    alb["ALB<br/>metrics"] --> raw
+    ev["ECS task<br/>and K8s pod<br/>events"] --> raw
+    price["Pricing<br/>API"] --> cost["Cost<br/>model"]
     raw --> analyst["analyst"]
     cost --> analyst
     analyst --> metrics[("metrics.json")]
     metrics --> reporter["reporter"]
-    reporter --> report["report.md and report.html"]
-    metrics --> web["web viewer"]
-    ce["Cost Explorer, next day"] --> rec["advisor reconcile"]
+    reporter --> report["report.md<br/>report.html"]
+    metrics --> web["web<br/>viewer"]
+    ce["Cost<br/>Explorer<br/>next day"] --> rec["advisor<br/>reconcile"]
     metrics --> rec
 ```

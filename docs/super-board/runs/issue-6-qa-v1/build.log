@@ -1,0 +1,63 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 741B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim
+#2 ...
+
+#3 [auth] library/python:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for ghcr.io/astral-sh/uv:0.11
+#4 DONE 0.6s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-slim
+#2 DONE 0.7s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 83B done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 7.33kB done
+#6 DONE 0.0s
+
+#7 FROM ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7
+#7 resolve ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7 0.0s done
+#7 DONE 0.0s
+
+#8 [stage-0 1/7] FROM docker.io/library/python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
+#8 resolve docker.io/library/python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 0.0s done
+#8 DONE 0.0s
+
+#9 [stage-0 5/7] RUN uv pip install --system --no-cache -r requirements.txt
+#9 CACHED
+
+#10 [stage-0 2/7] COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /usr/local/bin/uv
+#10 CACHED
+
+#11 [stage-0 6/7] RUN useradd --system --uid 10001 --no-create-home app
+#11 CACHED
+
+#12 [stage-0 3/7] WORKDIR /srv
+#12 CACHED
+
+#13 [stage-0 4/7] COPY requirements.txt .
+#13 CACHED
+
+#14 [stage-0 7/7] COPY --chown=app:app . workload/
+#14 CACHED
+
+#15 exporting to image
+#15 exporting layers done
+#15 exporting manifest sha256:0e651cb0e04a2060d602821c194a57bc47a55b94f50073016ecefed80b694283 done
+#15 exporting config sha256:64faca0e9144ba50c9579e528f85ed89900cdeee1a53fe3462878ff7458c7bad done
+#15 exporting attestation manifest sha256:de6022a2236151360fde32d4612eb2330fe8294b8b659961bf874598e7b06248 done
+#15 exporting manifest list sha256:c9fa912bf0f97560dd541a9927b562811d35e6553eb37ad11e74b4c350b0a854 done
+#15 naming to docker.io/library/qa6:latest done
+#15 unpacking to docker.io/library/qa6:latest done
+#15 DONE 0.0s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/38ilvxwdf28dx6fo72v4cud9m

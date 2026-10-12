@@ -1,0 +1,12 @@
+## AC2 mock /triage
+HTTP 200
+{"category":"account","reply":"Thanks for reaching out. Passwords reset from the sign-in page via the 'Forgot password' link."}
+## AC3 bedrock /healthz (no creds)
+{"status":"ok"}
+HTTP 200
+## AC4 uid
+10001
+10001
+OCI runtime exec failed: exec failed: unable to start container process: exec: "ps": executable file not found in $PATH
+User=10001
+Uid:	10001	10001	10001	10001

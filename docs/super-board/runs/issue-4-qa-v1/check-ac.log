@@ -1,0 +1,23 @@
+PASS AC1 infra/cfn/.gitkeep tracked
+PASS AC1 infra/helm/workload/.gitkeep tracked
+PASS AC1 workload/.gitkeep tracked
+PASS AC1 advisor/.gitkeep tracked
+PASS AC1 loadtests/.gitkeep tracked
+PASS AC1 runs/.gitkeep tracked
+PASS AC1 results/.gitkeep tracked
+PASS AC1 web/.gitkeep tracked
+PASS AC1 tests/.gitkeep tracked
+PASS AC2 uv sync exit 0
+PASS AC2 interpreter is 3.12
+PASS AC3 make bootstrap prints message
+PASS AC3 make bootstrap recipe exit 1 (make exit 2)
+PASS AC3 make benchmark prints message
+PASS AC3 make benchmark recipe exit 1 (make exit 2)
+PASS AC3 make teardown prints message
+PASS AC3 make teardown recipe exit 1 (make exit 2)
+PASS AC3 make report prints message
+PASS AC3 make report recipe exit 1 (make exit 2)
+PASS AC4 .venv listed
+PASS AC4 local env file listed
+PASS AC4 results/x ignored
+PASS AC4 results/sample/x not ignored

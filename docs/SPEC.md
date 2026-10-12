@@ -38,8 +38,8 @@ Fargate is a compute backend, not an orchestrator. The matrix has two axes:
 | **EKS** | `eks-fargate` (Fargate profile) | `eks-ec2` (managed node group) |
 
 - Default run: `ecs-fargate` vs `eks-ec2`, the choice most teams face.
-- Full run: all four cells.
-- Equal capacity in every cell: same vCPU and memory per replica, same min and max replicas,
+- Full run: all four cells. `eks-fargate` runs only in the full run (Decision 8).
+- Equal capacity in every cell: same vCPU and memory per replica (the lowest-cost SKU that fits the workload, Decision 2), same min and max replicas,
   same autoscaling target (CPU 60%).
 - Known limits, documented in the report: EKS on Fargate has slower pod start and no
   DaemonSets, so Container Insights runs as a sidecar (ADOT) there.
@@ -53,8 +53,8 @@ Fargate is a compute backend, not an orchestrator. The matrix has two axes:
 |---|---|
 | Endpoints | `POST /triage`, `GET /healthz`, `GET /readyz` |
 | `LLM_MODE=mock` | fixed-latency fake LLM, default 0 ms. Measures platform overhead only. |
-| `LLM_MODE=bedrock` | real Bedrock call, model id is a parameter. Measures end to end. |
-| Telemetry | OpenTelemetry traces, Prometheus-style metrics, request id in every log line |
+| `LLM_MODE=bedrock` | real Bedrock call, model id read from `BEDROCK_MODEL_ID` (Decision 3). Measures end to end. |
+| Telemetry | OpenTelemetry traces, Prometheus-style metrics, request id in every log line. Agent traces go to Langfuse (Decision 4). |
 | Image | one image in ECR per commit, used by every cell |
 
 ## 6. Load profiles
@@ -97,7 +97,7 @@ The analyst computes all of these in deterministic Python (ADR 0004). Each figur
 - Cost Explorer lags about 24 h, so it is a next-day check only: `advisor reconcile <run-id>`,
   using the cost-allocation tag `run-id`.
 - Shared costs (NAT gateway, harness cluster, VPC endpoints) are reported on their own line,
-  not spread across cells.
+  not spread across cells. One NAT gateway per run (Decision 6).
 
 ## 9. Architecture summary
 
@@ -114,8 +114,8 @@ Diagrams live in `docs/architecture.md`.
 
 - All AWS resources are CloudFormation. All Kubernetes objects are Helm. No console step.
 - No IAM access keys and no root user.
-- Bootstrap stack holds an AWS Budgets alarm.
-- Every benchmark stack has a `ttl-hours` tag. Teardown runs in a `finally` path.
+- Bootstrap stack holds an AWS Budgets alarm: USD 15.00 per month, alert email from the `BudgetEmail` parameter (Decision 1).
+- Every benchmark stack has a `ttl-hours` tag, default 4 (Decision 5). Teardown runs in a `finally` path.
 - A scheduled janitor workflow deletes any stack past its TTL.
 - Kubernetes version and EKS AMI are resolved at deploy time from SSM public parameters and
   pinned only in the run record.
@@ -143,13 +143,15 @@ Diagrams live in `docs/architecture.md`.
 | Bedrock throttling in `bedrock` mode | latency reflects quota, not platform | default runs use `mock`; record throttle counts |
 | Docker Hub rate limits | failed deploys | mirror base images into ECR |
 
-## 13. Open questions
+## 13. Decisions
 
-1. Budget alarm threshold for the bootstrap stack: what monthly amount, and who gets the email?
-2. Default replica sizing: is 0.5 vCPU / 1 GB per replica, min 2, max 10 right for the matrix?
-3. Default Bedrock model id for `LLM_MODE=bedrock`, and is model access already enabled in the account?
-4. Tracing backend: LangSmith if a key is present, else off? Or self-host Langfuse from the start?
-5. Default `ttl-hours` for benchmark stacks: 4 hours?
-6. Should the NAT gateway be one per run (cheaper) or one per AZ (closer to production)?
-7. Which AWS account and region host the published sample run?
-8. Should `eks-fargate` be in the default run, or only in the full run?
+The owner answered the eight open questions. Each answer is final for v1.
+
+1. **Budget alarm.** USD 15.00 per month. The alert email is the CloudFormation parameter `BudgetEmail`. The address is never written into a committed file, because the repo is public.
+2. **Replica size.** The lowest-cost SKU that fits the workload, the same in every cell. Phase 3 and 4 cards set the exact SKU.
+3. **Bedrock model.** The lowest-cost text model available in `us-east-1`, read from `BEDROCK_MODEL_ID`. Model access is not yet confirmed.
+4. **Tracing.** Langfuse. The owner supplies the keys through the local env file and GitHub secrets. No key is committed.
+5. **`ttl-hours`.** 4.
+6. **NAT gateway.** One per run (lowest cost).
+7. **Sample run.** `us-east-1`, in the owner's own AWS account (SSO profile).
+8. **Default run.** `ecs-fargate` vs `eks-ec2`. `eks-fargate` runs only in the full run.

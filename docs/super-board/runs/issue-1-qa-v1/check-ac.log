@@ -1,0 +1,8 @@
+PASS AC1 last section: ## 13. Open questions (8 non-blank lines)
+PASS AC2 docs/adr/0001-cloudformation-plus-helm.md
+PASS AC2 docs/adr/0002-fargate-as-matrix-axis.md
+PASS AC2 docs/adr/0003-mock-llm-mode.md
+PASS AC2 docs/adr/0004-deterministic-analyst-llm-reporter.md
+PASS AC2 docs/adr/0005-oidc-no-access-keys.md
+PASS AC3 3 mermaid blocks
+PASS AC4 diff touches only docs/

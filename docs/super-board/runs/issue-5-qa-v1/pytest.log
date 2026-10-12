@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-5-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-5-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 8 items
+
+tests/test_workload.py::test_triage_mock_returns_category_and_reply PASSED [ 12%]
+tests/test_workload.py::test_health_and_ready PASSED                     [ 25%]
+tests/test_workload.py::test_mock_latency_delays_triage PASSED           [ 37%]
+tests/test_workload.py::test_mock_is_default_mode_with_zero_latency PASSED [ 50%]
+tests/test_workload.py::test_bedrock_calls_client_once_per_request_with_model_id PASSED [ 62%]
+tests/test_workload_env.py::test_triage_env_mock_mode_returns_category_and_reply PASSED [ 75%]
+tests/test_workload_env.py::test_bedrock_env_uses_boto3_client_and_model_id PASSED [ 87%]
+tests/test_workload_env.py::test_triage_rejects_body_without_text PASSED [100%]
+
+============================== 8 passed in 1.16s ===============================

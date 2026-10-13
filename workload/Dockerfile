@@ -12,7 +12,7 @@ RUN useradd --system --uid 10001 --no-create-home app
 COPY --chown=app:app . workload/
 USER 10001
 
-# Default region; IaC overrides it. Bedrock mode also needs BEDROCK_MODEL_ID.
+# Default region; IaC overrides it. Bedrock mode reads BEDROCK_MODEL_ID, default amazon.nova-micro-v1:0.
 ENV AWS_DEFAULT_REGION=us-east-1
 
 EXPOSE 8080

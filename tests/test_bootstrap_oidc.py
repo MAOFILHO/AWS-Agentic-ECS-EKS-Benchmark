@@ -49,14 +49,94 @@ def test_deploy_role_trusts_only_this_repository():
             assert sub.startswith(f"repo:{REPO}:"), sub
 
 
-def test_no_statement_allows_every_action_on_every_resource():
+def _statements():
+    """Every (resource name, statement) in role inline policies and managed policies."""
     for name, res in _resources().items():
-        if res["Type"] != "AWS::IAM::Role":
+        props = res.get("Properties", {})
+        if res["Type"] == "AWS::IAM::Role":
+            docs = [p["PolicyDocument"] for p in props.get("Policies", [])]
+        elif res["Type"] == "AWS::IAM::ManagedPolicy":
+            docs = [props["PolicyDocument"]]
+        else:
             continue
-        for policy in res["Properties"].get("Policies", []):
-            for st in policy["PolicyDocument"]["Statement"]:
-                both = "*" in _as_list(st["Action"]) and "*" in _as_list(st["Resource"])
-                assert not both, f"{name}/{st.get('Sid')}"
+        for doc in docs:
+            for st in doc["Statement"]:
+                yield name, st
+
+
+def _deploy_statements():
+    return [st for name, st in _statements() if name == "DeployRole"]
+
+
+BOUNDARY = {"Ref": "StackRoleBoundary"}
+BOUNDARY_ACTIONS = {
+    "iam:CreateRole",
+    "iam:PutRolePolicy",
+    "iam:DeleteRolePolicy",
+    "iam:AttachRolePolicy",
+    "iam:DetachRolePolicy",
+}
+
+
+def test_no_statement_allows_every_action_on_every_resource():
+    statements = list(_statements())
+    assert any(name == "StackRoleBoundary" for name, _ in statements)
+    for name, st in statements:
+        both = "*" in _as_list(st["Action"]) and "*" in _as_list(st["Resource"])
+        assert not both, f"{name}/{st.get('Sid')}"
+
+
+def test_stack_role_writes_require_the_boundary():
+    allows = [st for st in _deploy_statements() if st["Effect"] == "Allow"]
+    seen = set()
+    for st in allows:
+        actions = BOUNDARY_ACTIONS & set(_as_list(st["Action"]))
+        if not actions:
+            continue
+        seen |= actions
+        boundary = st.get("Condition", {}).get("ArnEquals", {}).get("iam:PermissionsBoundary")
+        assert boundary == BOUNDARY, f"{st.get('Sid')} has no boundary condition"
+    assert seen == BOUNDARY_ACTIONS
+
+
+def test_attach_role_policy_is_limited_to_named_aws_policies():
+    attach = [
+        st
+        for st in _deploy_statements()
+        if st["Effect"] == "Allow" and "iam:AttachRolePolicy" in _as_list(st["Action"])
+    ]
+    assert attach
+    for st in attach:
+        arns = _as_list(st["Condition"]["ArnEquals"]["iam:PolicyARN"])
+        assert arns
+        for arn in arns:
+            text = arn["Sub"] if isinstance(arn, dict) else arn
+            assert ":iam::aws:policy/" in text and "*" not in text, text
+
+
+def test_deploy_role_iam_rights_stay_on_the_project_path():
+    for st in _deploy_statements():
+        if st["Effect"] != "Allow":
+            continue
+        if not any(a.startswith("iam:") for a in _as_list(st["Action"])):
+            continue
+        if _as_list(st["Action"]) == ["iam:CreateServiceLinkedRole"]:
+            continue
+        for res in _as_list(st["Resource"]):
+            text = res["Sub"] if isinstance(res, dict) else res
+            assert "/agentic-platform-advisor/" in text, f"{st.get('Sid')}: {text}"
+
+
+def test_deploy_role_cannot_edit_or_drop_the_boundary():
+    denies = [st for st in _deploy_statements() if st["Effect"] == "Deny"]
+    assert any(st["Resource"] == BOUNDARY and st["Action"] == "iam:*" for st in denies)
+    removal = {
+        a
+        for st in denies
+        for a in _as_list(st["Action"])
+        if a in {"iam:DeleteRolePermissionsBoundary", "iam:PutRolePermissionsBoundary"}
+    }
+    assert removal == {"iam:DeleteRolePermissionsBoundary", "iam:PutRolePermissionsBoundary"}
 
 
 def test_no_tracked_text_file_holds_an_account_id():

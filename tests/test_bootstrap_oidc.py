@@ -224,3 +224,20 @@ def test_role_trust_uses_the_existing_or_the_created_provider():
     }
     sub = statement["Condition"]["StringEquals"]["token.actions.githubusercontent.com:sub"]
     assert sub == f"repo:{REPO}:ref:refs/heads/main"
+
+
+def test_existing_provider_arn_pattern_accepts_only_the_github_provider():
+    pattern = re.compile(
+        _template()["Parameters"]["ExistingOidcProviderArn"]["AllowedPattern"]
+    )
+    account = "1" * 12  # built at runtime: no account id may sit in a tracked file
+    good = f"arn:aws:iam::{account}:oidc-provider/token.actions.githubusercontent.com"
+    assert pattern.fullmatch("")
+    assert pattern.fullmatch(good)
+    for bad in (
+        f"arn:aws:iam::{account}:oidc-provider/accounts.google.com",
+        f"arn:aws:iam::{account}:oidc-provider/token.actions.githubusercontent.com.evil",
+        f"arn:aws:iam::{account}:role/token.actions.githubusercontent.com",
+        "*",
+    ):
+        assert not pattern.fullmatch(bad), bad

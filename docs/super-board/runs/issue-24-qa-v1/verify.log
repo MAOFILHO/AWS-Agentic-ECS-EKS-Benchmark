@@ -1,0 +1,30 @@
+# head b57ec62 + QA test change
+$ uv run --locked ruff check
+All checks passed!
+exit=0
+$ uv run --locked pytest -v
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-24-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-24-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 14 items
+
+tests/test_network_template.py::test_exactly_one_nat_gateway PASSED      [  7%]
+tests/test_network_template.py::test_defines_required_endpoints PASSED   [ 14%]
+tests/test_network_template.py::test_us_east_1e_only_in_exclusion_comment PASSED [ 21%]
+tests/test_network_template.py::test_every_taggable_resource_has_run_tags PASSED [ 28%]
+tests/test_workload.py::test_triage_mock_returns_category_and_reply PASSED [ 35%]
+tests/test_workload.py::test_health_and_ready PASSED                     [ 42%]
+tests/test_workload.py::test_mock_latency_delays_triage PASSED           [ 50%]
+tests/test_workload.py::test_mock_is_default_mode_with_zero_latency PASSED [ 57%]
+tests/test_workload.py::test_bedrock_calls_client_once_per_request_with_model_id PASSED [ 64%]
+tests/test_workload.py::test_bedrock_model_id_defaults_when_unset_or_empty PASSED [ 71%]
+tests/test_workload.py::test_bedrock_model_id_env_overrides_default PASSED [ 78%]
+tests/test_workload_env.py::test_triage_env_mock_mode_returns_category_and_reply PASSED [ 85%]
+tests/test_workload_env.py::test_bedrock_env_uses_boto3_client_and_model_id PASSED [ 92%]
+tests/test_workload_env.py::test_triage_rejects_body_without_text PASSED [100%]
+
+============================== 14 passed in 1.11s ==============================
+exit=0

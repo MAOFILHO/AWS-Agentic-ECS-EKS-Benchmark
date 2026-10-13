@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Benchmark network. VPC with public and private subnets in 2 AZs, one NAT gateway
+  for the whole VPC, an S3 gateway endpoint and interface endpoints for ecr.api,
+  ecr.dkr, logs and sts.
+
+# AZ us-east-1e is excluded: EKS control-plane subnets cannot use it (SPEC section 10).
+
+Parameters:
+  RunId:
+    Type: String
+    Description: Benchmark run id, written to the run-id tag.
+    AllowedPattern: "[a-z0-9-]+"
+  TtlHours:
+    Type: Number
+    Default: 4
+    MinValue: 1
+    Description: Hours before the janitor deletes this stack.
+  AvailabilityZones:
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+    Default: us-east-1a,us-east-1b
+    Description: Exactly 2 AZs. The first two entries are used.
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    AllowedPattern: '(\d{1,3}\.){3}\d{1,3}/16'
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - { Key: Name, Value: !Sub "${RunId}-vpc" }
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 12]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name, Value: !Sub "${RunId}-public-a" }
+        - { Key: kubernetes.io/role/elb, Value: "1" }
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 12]]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name, Value: !Sub "${RunId}-public-b" }
+        - { Key: kubernetes.io/role/elb, Value: "1" }
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 12]]
+      Tags:
+        - { Key: Name, Value: !Sub "${RunId}-private-a" }
+        - { Key: kubernetes.io/role/internal-elb, Value: "1" }
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 4, 12]]
+      Tags:
+        - { Key: Name, Value: !Sub "${RunId}-private-b" }
+        - { Key: kubernetes.io/role/internal-elb, Value: "1" }
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # One NAT gateway for the whole VPC (Decision 6: lowest cost).
+  NatEip:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetARouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS from inside the VPC to the interface endpoints
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  EcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  EcrDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  LogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+  StsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sts"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export: { Name: !Sub "${AWS::StackName}-VpcId" }
+  PublicSubnetIds:
+    Value: !Join [",", [!Ref PublicSubnetA, !Ref PublicSubnetB]]
+    Export: { Name: !Sub "${AWS::StackName}-PublicSubnetIds" }
+  PrivateSubnetIds:
+    Value: !Join [",", [!Ref PrivateSubnetA, !Ref PrivateSubnetB]]
+    Export: { Name: !Sub "${AWS::StackName}-PrivateSubnetIds" }

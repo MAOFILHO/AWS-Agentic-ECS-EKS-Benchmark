@@ -50,12 +50,12 @@ def test_deploy_role_trusts_only_this_repository():
 
 
 def _statements():
-    """Every (resource name, statement) in role inline policies and managed policies."""
+    """Every (resource name, statement) in role inline, managed and standalone policies."""
     for name, res in _resources().items():
         props = res.get("Properties", {})
         if res["Type"] == "AWS::IAM::Role":
             docs = [p["PolicyDocument"] for p in props.get("Policies", [])]
-        elif res["Type"] == "AWS::IAM::ManagedPolicy":
+        elif res["Type"] in ("AWS::IAM::ManagedPolicy", "AWS::IAM::Policy"):
             docs = [props["PolicyDocument"]]
         else:
             continue

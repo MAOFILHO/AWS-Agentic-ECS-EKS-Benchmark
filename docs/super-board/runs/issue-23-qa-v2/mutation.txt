@@ -1,0 +1,6 @@
+M1 sub wildcard repo -> 1 failed, 6 passed in 0.18s
+M2 */* in StackRoleBoundary -> 1 failed, 6 passed in 0.18s
+M3 */* in separate AWS::IAM::Policy -> 7 passed in 0.15s
+M4 boundary condition removed -> 1 failed, 6 passed in 0.17s
+M5 sub condition removed -> 1 failed, 6 passed in 0.17s
+M3 after test fix -> 1 failed, 6 passed in 0.18s

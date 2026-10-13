@@ -38,14 +38,15 @@ def test_deploy_role_trusts_only_this_repository():
     roles = [r for r in _resources().values() if r["Type"] == "AWS::IAM::Role"]
     assert len(roles) == 1
     statements = roles[0]["Properties"]["AssumeRolePolicyDocument"]["Statement"]
-    subjects = []
     for st in statements:
         assert st["Action"] == "sts:AssumeRoleWithWebIdentity"
-        for condition in st["Condition"].values():
+        subjects = []
+        for condition in st.get("Condition", {}).values():
             subjects += _as_list(condition.get("token.actions.githubusercontent.com:sub", []))
-    assert subjects
-    for sub in subjects:
-        assert sub.startswith(f"repo:{REPO}:"), sub
+        # A trust statement with no sub condition trusts every repository.
+        assert subjects, "trust statement without a sub condition"
+        for sub in subjects:
+            assert sub.startswith(f"repo:{REPO}:"), sub
 
 
 def test_no_statement_allows_every_action_on_every_resource():

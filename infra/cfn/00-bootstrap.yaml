@@ -7,6 +7,16 @@ Parameters:
     Description: Address that receives the budget alerts. Pass it at deploy time; never commit it.
     AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
     ConstraintDescription: Must be an email address.
+  ExistingOidcProviderArn:
+    Type: String
+    Default: ""
+    Description: ARN of the account's existing GitHub OIDC provider. Leave empty to create one. The stack only references an existing provider; it never changes or deletes it.
+    AllowedPattern: "^$|^arn:aws[a-z-]*:iam::[0-9]+:oidc-provider/token\\.actions\\.githubusercontent\\.com$"
+    ConstraintDescription: Must be empty or the ARN of the token.actions.githubusercontent.com OIDC provider.
+
+# AWS allows one OIDC provider per URL per account; create it only when none exists.
+Conditions:
+  CreateOidcProvider: !Equals [!Ref ExistingOidcProviderArn, ""]
 
 Resources:
   MonthlyBudget:
@@ -69,6 +79,7 @@ Resources:
 
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
+    Condition: CreateOidcProvider
     Properties:
       Url: https://token.actions.githubusercontent.com
       ClientIdList:
@@ -173,7 +184,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !Ref GitHubOidcProvider
+              Federated: !If [CreateOidcProvider, !Ref GitHubOidcProvider, !Ref ExistingOidcProviderArn]
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:

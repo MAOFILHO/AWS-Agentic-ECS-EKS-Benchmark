@@ -3,7 +3,8 @@
 Usage:
     AWS_PROFILE=<sso-profile> BUDGET_EMAIL=<address> \
     python scripts/deploy_stack.py --stack <name> --template <file> \
-        [--env-param <CfnParameter>=<ENV_VAR> ...]
+        [--env-param <CfnParameter>=<ENV_VAR> ...] \
+        [--optional-env-param <CfnParameter>=<ENV_VAR> ...]
 
 Credentials come from the AWS_PROFILE profile through boto3. This script never reads or prints them.
 """
@@ -96,6 +97,13 @@ def main(argv=None):
         metavar="PARAM=ENV_VAR",
         help="Pass the value of ENV_VAR as CloudFormation parameter PARAM.",
     )
+    parser.add_argument(
+        "--optional-env-param",
+        action="append",
+        default=[],
+        metavar="PARAM=ENV_VAR",
+        help="Like --env-param, but leave PARAM out when ENV_VAR is unset.",
+    )
     args = parser.parse_args(argv)
 
     profile = required_env("AWS_PROFILE")
@@ -103,6 +111,10 @@ def main(argv=None):
     for pair in args.env_param:
         param, _, env_var = pair.partition("=")
         parameters[param] = required_env(env_var)
+    for pair in args.optional_env_param:
+        param, _, env_var = pair.partition("=")
+        if os.environ.get(env_var):
+            parameters[param] = os.environ[env_var]
 
     cfn = boto3.Session(profile_name=profile).client("cloudformation")
     deploy(cfn, args.stack, args.template.read_text(), parameters)

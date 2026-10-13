@@ -2,9 +2,11 @@ SHELL := /bin/bash
 .PHONY: bootstrap benchmark teardown report workload-docker
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
+# Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
 bootstrap:
 	uv run --locked python scripts/deploy_stack.py --stack agentic-platform-advisor-bootstrap \
-		--template infra/cfn/00-bootstrap.yaml --env-param BudgetEmail=BUDGET_EMAIL
+		--template infra/cfn/00-bootstrap.yaml --env-param BudgetEmail=BUDGET_EMAIL \
+		--optional-env-param ExistingOidcProviderArn=OIDC_PROVIDER_ARN
 
 benchmark teardown report:
 	@echo "not implemented yet"; exit 1

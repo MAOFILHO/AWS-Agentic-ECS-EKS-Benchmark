@@ -1,0 +1,51 @@
+$ uv run --locked ruff check
+All checks passed!
+$ uv run --locked pytest -v
+============================= test session starts ==============================
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 37 items
+tests/test_awscrt.py::test_awscrt_is_importable PASSED                   [  2%]
+tests/test_bootstrap_oidc.py::test_deploy_role_trusts_only_this_repository PASSED [  5%]
+tests/test_bootstrap_oidc.py::test_no_statement_allows_every_action_on_every_resource PASSED [  8%]
+tests/test_bootstrap_oidc.py::test_stack_role_writes_require_the_boundary PASSED [ 10%]
+tests/test_bootstrap_oidc.py::test_attach_role_policy_is_limited_to_named_aws_policies PASSED [ 13%]
+tests/test_bootstrap_oidc.py::test_deploy_role_iam_rights_stay_on_the_project_path PASSED [ 16%]
+tests/test_bootstrap_oidc.py::test_deploy_role_cannot_edit_or_drop_the_boundary PASSED [ 18%]
+tests/test_bootstrap_oidc.py::test_no_tracked_text_file_holds_an_account_id PASSED [ 21%]
+tests/test_bootstrap_oidc.py::test_existing_provider_arn_parameter_defaults_to_empty PASSED [ 24%]
+tests/test_bootstrap_oidc.py::test_provider_is_created_only_under_its_condition PASSED [ 27%]
+tests/test_bootstrap_oidc.py::test_no_provider_resource_when_an_existing_arn_is_set PASSED [ 29%]
+tests/test_bootstrap_oidc.py::test_provider_resource_is_created_when_no_arn_is_set PASSED [ 32%]
+tests/test_bootstrap_oidc.py::test_role_trust_uses_the_existing_or_the_created_provider PASSED [ 35%]
+tests/test_bootstrap_oidc.py::test_existing_provider_arn_pattern_accepts_only_the_github_provider PASSED [ 37%]
+tests/test_deploy_stack.py::test_calls_create_then_describe_then_execute PASSED [ 40%]
+tests/test_deploy_stack.py::test_declined_answer_exits_non_zero_and_executes_nothing PASSED [ 43%]
+tests/test_deploy_stack.py::test_missing_budget_email_exits_naming_it PASSED [ 45%]
+tests/test_deploy_stack.py::test_missing_aws_profile_exits_naming_it PASSED [ 48%]
+tests/test_deploy_stack.py::test_make_bootstrap_runs_the_deploy_script PASSED [ 51%]
+tests/test_deploy_stack.py::test_unset_optional_parameter_is_left_out PASSED [ 54%]
+tests/test_deploy_stack.py::test_set_optional_parameter_is_sent PASSED   [ 56%]
+tests/test_deploy_stack.py::test_missing_budget_email_still_fails_with_optional_unset PASSED [ 59%]
+tests/test_deploy_stack.py::test_make_bootstrap_passes_the_provider_arn_as_optional PASSED [ 62%]
+tests/test_network_template.py::test_exactly_one_nat_gateway PASSED      [ 64%]
+tests/test_network_template.py::test_defines_required_endpoints PASSED   [ 67%]
+tests/test_network_template.py::test_us_east_1e_only_in_exclusion_comment PASSED [ 70%]
+tests/test_network_template.py::test_every_taggable_resource_has_run_tags PASSED [ 72%]
+tests/test_workload.py::test_triage_mock_returns_category_and_reply PASSED [ 75%]
+tests/test_workload.py::test_health_and_ready PASSED                     [ 78%]
+tests/test_workload.py::test_mock_latency_delays_triage PASSED           [ 81%]
+tests/test_workload.py::test_mock_is_default_mode_with_zero_latency PASSED [ 83%]
+tests/test_workload.py::test_bedrock_calls_client_once_per_request_with_model_id PASSED [ 86%]
+tests/test_workload.py::test_bedrock_model_id_defaults_when_unset_or_empty PASSED [ 89%]
+tests/test_workload.py::test_bedrock_model_id_env_overrides_default PASSED [ 91%]
+tests/test_workload_env.py::test_triage_env_mock_mode_returns_category_and_reply PASSED [ 94%]
+tests/test_workload_env.py::test_bedrock_env_uses_boto3_client_and_model_id PASSED [ 97%]
+tests/test_workload_env.py::test_triage_rejects_body_without_text PASSED [100%]
+============================== 37 passed in 1.64s ==============================
+$ uvx cfn-lint==1.57.2 infra/cfn/00-bootstrap.yaml
+exit=0
+$ git grep -nE "(^|[^0-9A-Za-z])[0-9]{12}([^0-9A-Za-z]|$)" (account id scan)
+matches-exit=1 (1 = none)
+$ grep repo: trust subjects
+193:                token.actions.githubusercontent.com:sub: repo:MAOFILHO/agentic-platform-advisor:ref:refs/heads/main

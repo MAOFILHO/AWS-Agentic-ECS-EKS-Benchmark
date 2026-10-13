@@ -152,3 +152,92 @@ def test_no_tracked_text_file_holds_an_account_id():
         if account_id.search(data):
             hits.append(name.decode())
     assert hits == []
+
+
+# Reuse an existing GitHub OIDC provider (issue #33).
+
+EXISTING_ARN = "arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
+
+
+def _template():
+    return yaml.load(TEMPLATE.read_text(), Loader=CfnLoader)
+
+
+def _evaluate(expr, params):
+    """Evaluate the condition functions this template uses: Equals, Not, Ref."""
+    if isinstance(expr, dict):
+        (fn, arg), = expr.items()
+        if fn in ("Equals", "Fn::Equals"):
+            left, right = (_evaluate(a, params) for a in arg)
+            return left == right
+        if fn in ("Not", "Fn::Not"):
+            return not _evaluate(arg[0], params)
+        if fn == "Ref":
+            return params[arg]
+        raise AssertionError(f"unsupported function {fn}")
+    return expr
+
+
+def _resource_types(params):
+    template = _template()
+    defaults = {k: v.get("Default") for k, v in template["Parameters"].items()}
+    values = {**defaults, **params}
+    conditions = {
+        name: _evaluate(expr, values) for name, expr in template["Conditions"].items()
+    }
+    return [
+        res["Type"]
+        for res in template["Resources"].values()
+        if conditions.get(res.get("Condition"), True)
+    ]
+
+
+def test_existing_provider_arn_parameter_defaults_to_empty():
+    param = _template()["Parameters"]["ExistingOidcProviderArn"]
+    assert param["Default"] == ""
+
+
+def test_provider_is_created_only_under_its_condition():
+    provider = _template()["Resources"]["GitHubOidcProvider"]
+    assert provider["Condition"] == "CreateOidcProvider"
+
+
+def test_no_provider_resource_when_an_existing_arn_is_set():
+    assert "AWS::IAM::OIDCProvider" not in _resource_types(
+        {"ExistingOidcProviderArn": EXISTING_ARN}
+    )
+
+
+def test_provider_resource_is_created_when_no_arn_is_set():
+    assert "AWS::IAM::OIDCProvider" in _resource_types({})
+
+
+def test_role_trust_uses_the_existing_or_the_created_provider():
+    role = _template()["Resources"]["DeployRole"]
+    (statement,) = role["Properties"]["AssumeRolePolicyDocument"]["Statement"]
+    assert statement["Principal"]["Federated"] == {
+        "If": [
+            "CreateOidcProvider",
+            {"Ref": "GitHubOidcProvider"},
+            {"Ref": "ExistingOidcProviderArn"},
+        ]
+    }
+    sub = statement["Condition"]["StringEquals"]["token.actions.githubusercontent.com:sub"]
+    assert sub == f"repo:{REPO}:ref:refs/heads/main"
+
+
+def test_existing_provider_arn_pattern_accepts_only_the_github_provider():
+    pattern = re.compile(
+        _template()["Parameters"]["ExistingOidcProviderArn"]["AllowedPattern"]
+    )
+    account = "1" * 12  # built at runtime: no account id may sit in a tracked file
+    good = f"arn:aws:iam::{account}:oidc-provider/token.actions.githubusercontent.com"
+    assert pattern.fullmatch("")
+    assert pattern.fullmatch(good)
+    for bad in (
+        f"arn:aws:iam::{account}:oidc-provider/accounts.google.com",
+        f"arn:aws:iam::{account}:oidc-provider/token.actions.githubusercontent.com.evil",
+        f"arn:aws:iam::{account}:role/token.actions.githubusercontent.com",
+        "*",
+    ):
+        assert not pattern.fullmatch(bad), bad

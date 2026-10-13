@@ -155,3 +155,79 @@ def test_make_bootstrap_runs_the_deploy_script():
     assert "not implemented yet" not in out
     assert "scripts/deploy_stack.py" in out
     assert "infra/cfn/00-bootstrap.yaml" in out
+
+
+# Optional env parameters (issue #33).
+
+
+def _run_main(monkeypatch, argv):
+    sent = {}
+    monkeypatch.setattr(deploy_stack.boto3, "Session", lambda **_kw: _FakeSession())
+    monkeypatch.setattr(
+        deploy_stack,
+        "deploy",
+        lambda _cfn, _stack, _body, parameters: sent.update(parameters),
+    )
+    deploy_stack.main(argv)
+    return sent
+
+
+class _FakeSession:
+    def client(self, _name):
+        return object()
+
+
+BOOTSTRAP_ARGS = [
+    "--stack",
+    STACK,
+    "--template",
+    "infra/cfn/00-bootstrap.yaml",
+    "--env-param",
+    "BudgetEmail=BUDGET_EMAIL",
+    "--optional-env-param",
+    "ExistingOidcProviderArn=OIDC_PROVIDER_ARN",
+]
+
+
+def test_unset_optional_parameter_is_left_out(monkeypatch):
+    monkeypatch.setenv("AWS_PROFILE", "demo")
+    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+    monkeypatch.delenv("OIDC_PROVIDER_ARN", raising=False)
+
+    sent = _run_main(monkeypatch, BOOTSTRAP_ARGS)
+
+    assert sent == {"BudgetEmail": "a@b.co"}
+
+
+def test_set_optional_parameter_is_sent(monkeypatch):
+    arn = "arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
+    monkeypatch.setenv("AWS_PROFILE", "demo")
+    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+    monkeypatch.setenv("OIDC_PROVIDER_ARN", arn)
+
+    sent = _run_main(monkeypatch, BOOTSTRAP_ARGS)
+
+    assert sent == {"BudgetEmail": "a@b.co", "ExistingOidcProviderArn": arn}
+
+
+def test_missing_budget_email_still_fails_with_optional_unset(monkeypatch):
+    monkeypatch.setenv("AWS_PROFILE", "demo")
+    monkeypatch.delenv("BUDGET_EMAIL", raising=False)
+    monkeypatch.delenv("OIDC_PROVIDER_ARN", raising=False)
+
+    with pytest.raises(SystemExit) as exc:
+        _run_main(monkeypatch, BOOTSTRAP_ARGS)
+
+    assert "BUDGET_EMAIL" in str(exc.value.code)
+
+
+def test_make_bootstrap_passes_the_provider_arn_as_optional():
+    out = subprocess.run(
+        ["make", "-n", "bootstrap"],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=ROOT,
+    ).stdout
+
+    assert "--optional-env-param ExistingOidcProviderArn=OIDC_PROVIDER_ARN" in out

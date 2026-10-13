@@ -1,0 +1,4 @@
+$ uvx cfn-lint==1.57.2 infra/cfn/10-network.yaml
+exit=0
+$ uvx cfn-lint==1.57.2 infra/cfn/*.yaml
+exit=0

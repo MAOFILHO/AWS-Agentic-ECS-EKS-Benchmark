@@ -1,0 +1,11 @@
+$ grep -c "Type: AWS::EC2::NatGateway" infra/cfn/10-network.yaml
+1
+$ grep -n "ServiceName" infra/cfn/10-network.yaml
+206:      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+219:      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+233:      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+247:      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+261:      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sts"
+$ grep -n "us-east-1e" infra/cfn/10-network.yaml
+7:# AZ us-east-1e is excluded: EKS control-plane subnets cannot use it (SPEC section 10).
+# CI on b57ec62 (GitHub check-runs): test=success cfn=success image=success lint=success

@@ -1,0 +1,3 @@
+# mutation: sts endpoint renamed to ssm (template restored after)
+FAILED tests/test_network_template.py::test_defines_required_endpoints - Asse...
+1 failed in 0.07s

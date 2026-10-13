@@ -18,8 +18,11 @@ class _CfnLoader(yaml.SafeLoader):
     pass
 
 
-# Keep short-form intrinsics (!Ref, !Sub ...) loadable; their values do not matter here.
-_CfnLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+# Keep short-form intrinsics (!Ref, !Sub ...) loadable; a scalar keeps its raw text.
+_CfnLoader.add_multi_constructor(
+    "!",
+    lambda loader, suffix, node: node.value if isinstance(node, yaml.ScalarNode) else None,
+)
 
 
 def _resources():
@@ -32,12 +35,19 @@ def test_exactly_one_nat_gateway():
 
 
 def test_defines_required_endpoints():
-    text = TEMPLATE.read_text()
     endpoints = [r for r in _resources().values() if r["Type"] == "AWS::EC2::VPCEndpoint"]
-    types = sorted(r["Properties"].get("VpcEndpointType", "Gateway") for r in endpoints)
-    assert types == ["Gateway", "Interface", "Interface", "Interface", "Interface"]
-    for service in ("s3", "ecr.api", "ecr.dkr", "logs", "sts"):
-        assert f"com.amazonaws.${{AWS::Region}}.{service}" in text
+    prefix = "com.amazonaws.${AWS::Region}."
+    by_service = {}
+    for r in endpoints:
+        props = r["Properties"]
+        by_service[props["ServiceName"].removeprefix(prefix)] = props["VpcEndpointType"]
+    assert by_service == {
+        "s3": "Gateway",
+        "ecr.api": "Interface",
+        "ecr.dkr": "Interface",
+        "logs": "Interface",
+        "sts": "Interface",
+    }
 
 
 def test_us_east_1e_only_in_exclusion_comment():

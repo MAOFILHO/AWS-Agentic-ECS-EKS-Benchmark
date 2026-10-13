@@ -1,0 +1,15 @@
+$ env -u AWS_PROFILE -u BUDGET_EMAIL make bootstrap
+uv run --locked python scripts/deploy_stack.py --stack agentic-platform-advisor-bootstrap \
+		--template infra/cfn/00-bootstrap.yaml --env-param BudgetEmail=BUDGET_EMAIL
+error: AWS_PROFILE is not set. Export it and run again.
+make: *** [bootstrap] Error 1
+exit=2
+$ env -u BUDGET_EMAIL AWS_PROFILE=qa-dummy make bootstrap
+uv run --locked python scripts/deploy_stack.py --stack agentic-platform-advisor-bootstrap \
+		--template infra/cfn/00-bootstrap.yaml --env-param BudgetEmail=BUDGET_EMAIL
+error: BUDGET_EMAIL is not set. Export it and run again.
+make: *** [bootstrap] Error 1
+exit=2
+$ git show origin/main:Makefile (before)
+bootstrap benchmark teardown report:
+	@echo "not implemented yet"; exit 1

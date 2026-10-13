@@ -1,0 +1,11 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Test fixture. ECR repository with immutable tags; cfn-guard must accept it.
+Resources:
+  Repo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: triage-workload
+      ImageTagMutability: IMMUTABLE
+      Tags:
+        - Key: project
+          Value: agentic-platform-advisor

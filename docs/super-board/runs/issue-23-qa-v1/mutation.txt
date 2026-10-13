@@ -1,0 +1,3 @@
+mutant: second trust statement with aud only, no sub
+before test change: MUTANT SURVIVED
+after test change: MUTANT KILLED: trust statement without a sub condition

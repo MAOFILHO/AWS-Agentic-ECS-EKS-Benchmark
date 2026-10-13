@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Bootstrap stack, first half. Monthly budget alarm and the ECR repository for the workload image.
+Description: Bootstrap stack. Monthly budget alarm, the ECR repository for the workload image, and the GitHub OIDC deploy role.
 
 Parameters:
   BudgetEmail:
@@ -67,7 +67,313 @@ Resources:
         - Key: project
           Value: agentic-platform-advisor
 
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      Tags:
+        - Key: project
+          Value: agentic-platform-advisor
+
+  # Ceiling for every role the benchmark stacks create. The deploy role can create a
+  # stack role only with this boundary, so a stack role never gets IAM write rights.
+  StackRoleBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: agentic-platform-advisor-stack-boundary
+      Description: Permissions boundary for the task, node and controller roles of the benchmark stacks.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Task execution and EKS nodes pull images.
+          - Sid: EcrPull
+            Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Resource: "*"
+          # Task and pod logs.
+          - Sid: Logs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogStreams
+            Resource: "*"
+          # Workload task role calls the model (SPEC 5).
+          - Sid: BedrockInvoke
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+            Resource: "*"
+          # EKS cluster role, node role and VPC CNI manage instances and network interfaces.
+          - Sid: Ec2
+            Effect: Allow
+            Action: ec2:*
+            Resource: "*"
+          # EKS cluster role and nodes.
+          - Sid: Eks
+            Effect: Allow
+            Action: eks:*
+            Resource: "*"
+          # EKS cluster role scales node groups.
+          - Sid: AutoScaling
+            Effect: Allow
+            Action: autoscaling:*
+            Resource: "*"
+          # EKS cluster role and the load balancer controller.
+          - Sid: LoadBalancing
+            Effect: Allow
+            Action: elasticloadbalancing:*
+            Resource: "*"
+          # EKS cluster role (AmazonEKSClusterPolicy) for secrets encryption and private DNS.
+          - Sid: EksClusterExtras
+            Effect: Allow
+            Action:
+              - kms:CreateGrant
+              - kms:DescribeKey
+              - route53:AssociateVPCWithHostedZone
+            Resource: "*"
+          # Load balancer controller reads certificates, WAF and Shield state.
+          - Sid: LbcReads
+            Effect: Allow
+            Action:
+              - acm:DescribeCertificate
+              - acm:ListCertificates
+              - cognito-idp:DescribeUserPoolClient
+              - iam:GetServerCertificate
+              - iam:ListServerCertificates
+              - shield:DescribeProtection
+              - shield:GetSubscriptionState
+              - waf-regional:GetWebACLForResource
+              - wafv2:GetWebACL
+              - wafv2:GetWebACLForResource
+              - tag:GetResources
+            Resource: "*"
+          # EKS and the load balancer controller create their service-linked roles.
+          - Sid: ServiceLinkedRoles
+            Effect: Allow
+            Action: iam:CreateServiceLinkedRole
+            Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/*
+
+  # CI assumes this role through OIDC. No access keys exist (ADR 0005).
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: agentic-platform-advisor-deploy
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # Only the main branch of this one repository.
+                token.actions.githubusercontent.com:sub: repo:MAOFILHO/agentic-platform-advisor:ref:refs/heads/main
+      Policies:
+        - PolicyName: benchmark-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Deploy and delete the benchmark stacks (SPEC 9: 10-network to 41-eks-lbc-iam).
+              - Sid: CloudFormation
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStacks
+                  - cloudformation:ListStackResources
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:TagResource
+                  - cloudformation:UntagResource
+                Resource: "*"
+              # ECR login token; AWS does not scope it to a repository.
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              # Push the workload image to its one repository.
+              - Sid: EcrPush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeImages
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !GetAtt WorkloadRepository.Arn
+              # 10-network VPC, subnets, gateways, security groups; EKS node instances.
+              - Sid: Ec2
+                Effect: Allow
+                Action: ec2:*
+                Resource: "*"
+              # 20-harness and 30-ecs clusters, services, k6 RunTask.
+              - Sid: Ecs
+                Effect: Allow
+                Action: ecs:*
+                Resource: "*"
+              # 30-ecs service scaling.
+              - Sid: AppAutoScaling
+                Effect: Allow
+                Action: application-autoscaling:*
+                Resource: "*"
+              # 40-eks cluster, node groups, add-ons, Pod Identity associations.
+              - Sid: Eks
+                Effect: Allow
+                Action: eks:*
+                Resource: "*"
+              # ALBs in 30-ecs and the ones the EKS load balancer controller creates.
+              - Sid: LoadBalancing
+                Effect: Allow
+                Action: elasticloadbalancing:*
+                Resource: "*"
+              # Log groups in every stack.
+              - Sid: Logs
+                Effect: Allow
+                Action: logs:*
+                Resource: "*"
+              # Collector reads latency and scale-out metrics.
+              - Sid: MetricsRead
+                Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                Resource: "*"
+              # Kubernetes version and EKS AMI from SSM public parameters (SPEC 10).
+              - Sid: SsmPublicParameters
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}::parameter/aws/service/*
+              # Teardown tag sweep finds leftover resources.
+              - Sid: TagSweep
+                Effect: Allow
+                Action: tag:GetResources
+                Resource: "*"
+              # Cost model prices and next-day reconcile.
+              - Sid: CostRead
+                Effect: Allow
+                Action:
+                  - pricing:GetProducts
+                  - ce:GetCostAndUsage
+                Resource: "*"
+              # Stack roles live under the /agentic-platform-advisor/ path, so the deploy
+              # role cannot touch any other role in the account (trust, tags, delete).
+              - Sid: IamStackRoles
+                Effect: Allow
+                Action:
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRolePolicies
+                  - iam:CreateInstanceProfile
+                  - iam:DeleteInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:AddRoleToInstanceProfile
+                  - iam:RemoveRoleFromInstanceProfile
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/agentic-platform-advisor/*
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/agentic-platform-advisor/*
+              # Create a stack role or change its inline policies only when it carries
+              # the StackRoleBoundary, so no stack role can grow past the boundary.
+              - Sid: IamStackRolesWithBoundary
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:DetachRolePolicy
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/agentic-platform-advisor/*
+                Condition:
+                  ArnEquals:
+                    iam:PermissionsBoundary: !Ref StackRoleBoundary
+              # Attach only the AWS managed policies the ECS and EKS stacks use, and only
+              # to a role that carries the StackRoleBoundary.
+              - Sid: IamAttachStackPolicies
+                Effect: Allow
+                Action: iam:AttachRolePolicy
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/agentic-platform-advisor/*
+                Condition:
+                  ArnEquals:
+                    iam:PermissionsBoundary: !Ref StackRoleBoundary
+                    iam:PolicyARN:
+                      - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+                      - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonEKSClusterPolicy
+                      - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy
+                      - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy
+                      - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+              # Service-linked roles ECS, EKS and ELB create on first use.
+              - Sid: IamServiceLinkedRoles
+                Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/*
+              # Hand stack roles only to the services that run the workload.
+              - Sid: IamPassRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/agentic-platform-advisor/*
+                Condition:
+                  StringEquals:
+                    iam:PassedToService:
+                      - ecs-tasks.amazonaws.com
+                      - eks.amazonaws.com
+                      - ec2.amazonaws.com
+                      - pods.eks.amazonaws.com
+              # The role can never widen itself.
+              - Sid: DenySelfEdit
+                Effect: Deny
+                Action: iam:*
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/agentic-platform-advisor-deploy
+              # The role can never edit or delete the boundary it must put on stack roles.
+              - Sid: DenyBoundaryEdit
+                Effect: Deny
+                Action: iam:*
+                Resource: !Ref StackRoleBoundary
+              # The role can never take the boundary off a role, or swap it for another.
+              - Sid: DenyBoundaryRemoval
+                Effect: Deny
+                Action:
+                  - iam:DeleteRolePermissionsBoundary
+                  - iam:PutRolePermissionsBoundary
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*
+      Tags:
+        - Key: project
+          Value: agentic-platform-advisor
+
 Outputs:
   WorkloadRepositoryUri:
     Description: Registry URI the benchmark stacks pull the workload image from.
     Value: !GetAtt WorkloadRepository.RepositoryUri
+
+  DeployRoleArn:
+    Description: Role ARN GitHub Actions assumes through OIDC. Store it as a repo variable, not in a file.
+    Value: !GetAtt DeployRole.Arn

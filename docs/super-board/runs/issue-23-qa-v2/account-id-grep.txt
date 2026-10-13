@@ -1,0 +1,1 @@
+git grep exit=1 (1 = no hits)

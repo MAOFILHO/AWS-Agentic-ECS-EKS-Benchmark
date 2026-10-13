@@ -1,0 +1,24 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-23-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-23-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 13 items
+
+tests/test_bootstrap_oidc.py::test_deploy_role_trusts_only_this_repository PASSED [  7%]
+tests/test_bootstrap_oidc.py::test_no_statement_allows_every_action_on_every_resource PASSED [ 15%]
+tests/test_bootstrap_oidc.py::test_no_tracked_text_file_holds_an_account_id PASSED [ 23%]
+tests/test_workload.py::test_triage_mock_returns_category_and_reply PASSED [ 30%]
+tests/test_workload.py::test_health_and_ready PASSED                     [ 38%]
+tests/test_workload.py::test_mock_latency_delays_triage PASSED           [ 46%]
+tests/test_workload.py::test_mock_is_default_mode_with_zero_latency PASSED [ 53%]
+tests/test_workload.py::test_bedrock_calls_client_once_per_request_with_model_id PASSED [ 61%]
+tests/test_workload.py::test_bedrock_model_id_defaults_when_unset_or_empty PASSED [ 69%]
+tests/test_workload.py::test_bedrock_model_id_env_overrides_default PASSED [ 76%]
+tests/test_workload_env.py::test_triage_env_mock_mode_returns_category_and_reply PASSED [ 84%]
+tests/test_workload_env.py::test_bedrock_env_uses_boto3_client_and_model_id PASSED [ 92%]
+tests/test_workload_env.py::test_triage_rejects_body_without_text PASSED [100%]
+
+============================== 13 passed in 1.13s ==============================
+exit=0

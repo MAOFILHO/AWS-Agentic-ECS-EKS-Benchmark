@@ -28,3 +28,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t triage-workload workload/
+
+  cfn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: cfn-lint
+        run: uvx cfn-lint==1.57.2 infra/cfn/*.yaml
+      - name: Install cfn-guard
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/aws-cloudformation/cloudformation-guard/main/install-guard.sh | sh -s -- -v 3.1.2
+          echo "$HOME/.guard/bin" >> "$GITHUB_PATH"
+      - name: cfn-guard validate
+        run: cfn-guard validate --data infra/cfn --rules infra/cfn-guard/rules.guard
+      - name: cfn-guard rejects a mutable ECR repository
+        run: |
+          if cfn-guard validate --data tests/cfn-guard/bad-mutable-ecr.yaml --rules infra/cfn-guard/rules.guard; then
+            echo "expected cfn-guard to fail on the mutable ECR fixture"
+            exit 1
+          fi
+      - name: cfn-guard accepts the fixed copy
+        run: cfn-guard validate --data tests/cfn-guard/good-immutable-ecr.yaml --rules infra/cfn-guard/rules.guard

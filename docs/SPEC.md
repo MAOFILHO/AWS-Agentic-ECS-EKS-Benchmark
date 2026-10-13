@@ -149,7 +149,7 @@ The owner answered the eight open questions. Each answer is final for v1.
 
 1. **Budget alarm.** USD 15.00 per month. The alert email is the CloudFormation parameter `BudgetEmail`. The address is never written into a committed file, because the repo is public.
 2. **Replica size.** The lowest-cost SKU that fits the workload, the same in every cell. Phase 3 and 4 cards set the exact SKU.
-3. **Bedrock model.** The lowest-cost text model available in `us-east-1`, read from `BEDROCK_MODEL_ID`. Model access is not yet confirmed.
+3. **Bedrock model.** The lowest-cost text model available in `us-east-1`, read from `BEDROCK_MODEL_ID`. Model access is confirmed for `amazon.nova-micro-v1:0` in `us-east-1` (see `docs/bedrock-check.md`).
 4. **Tracing.** Langfuse. The owner supplies the keys through the local env file and GitHub secrets. No key is committed.
 5. **`ttl-hours`.** 4.
 6. **NAT gateway.** One per run (lowest cost).

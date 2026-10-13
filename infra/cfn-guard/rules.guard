@@ -1,0 +1,47 @@
+# cfn-guard rules for every template in infra/cfn/.
+# Each rule runs only when the template has a resource of that type.
+
+let ecr_repos = Resources.*[ Type == 'AWS::ECR::Repository' ]
+let vpcs = Resources.*[ Type == 'AWS::EC2::VPC' ]
+let subnets = Resources.*[ Type == 'AWS::EC2::Subnet' ]
+let security_groups = Resources.*[ Type == 'AWS::EC2::SecurityGroup' ]
+let ecs_clusters = Resources.*[ Type == 'AWS::ECS::Cluster' ]
+let eks_clusters = Resources.*[ Type == 'AWS::EKS::Cluster' ]
+let iam_roles = Resources.*[ Type == 'AWS::IAM::Role' ]
+let log_groups = Resources.*[ Type == 'AWS::Logs::LogGroup' ]
+
+rule ecr_immutable_tags when %ecr_repos !empty {
+    %ecr_repos.Properties.ImageTagMutability == 'IMMUTABLE'
+}
+
+rule ecr_project_tag when %ecr_repos !empty {
+    some %ecr_repos.Properties.Tags[*].Key == 'project'
+}
+
+rule vpc_project_tag when %vpcs !empty {
+    some %vpcs.Properties.Tags[*].Key == 'project'
+}
+
+rule subnet_project_tag when %subnets !empty {
+    some %subnets.Properties.Tags[*].Key == 'project'
+}
+
+rule security_group_project_tag when %security_groups !empty {
+    some %security_groups.Properties.Tags[*].Key == 'project'
+}
+
+rule ecs_cluster_project_tag when %ecs_clusters !empty {
+    some %ecs_clusters.Properties.Tags[*].Key == 'project'
+}
+
+rule eks_cluster_project_tag when %eks_clusters !empty {
+    some %eks_clusters.Properties.Tags[*].Key == 'project'
+}
+
+rule iam_role_project_tag when %iam_roles !empty {
+    some %iam_roles.Properties.Tags[*].Key == 'project'
+}
+
+rule log_group_project_tag when %log_groups !empty {
+    some %log_groups.Properties.Tags[*].Key == 'project'
+}

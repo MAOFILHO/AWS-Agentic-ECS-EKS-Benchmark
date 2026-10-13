@@ -20,6 +20,9 @@ KEYWORDS = {
 }
 
 
+DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-micro-v1:0"
+
+
 class MockLLM:
     """Fake LLM with a fixed latency, so a run measures platform overhead only."""
 
@@ -54,7 +57,7 @@ def make_llm(env=os.environ, client=None):
             import boto3
 
             client = boto3.client("bedrock-runtime")
-        return BedrockLLM(env["BEDROCK_MODEL_ID"], client)
+        return BedrockLLM(env.get("BEDROCK_MODEL_ID") or DEFAULT_BEDROCK_MODEL_ID, client)
     return MockLLM(int(env.get("MOCK_LATENCY_MS", "0")))
 
 

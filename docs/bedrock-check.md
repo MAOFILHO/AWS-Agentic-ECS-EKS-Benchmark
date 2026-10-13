@@ -34,5 +34,5 @@ No account id or credential is recorded here.
 
 ## Finding
 
-The service has no default for `BEDROCK_MODEL_ID`. It raises `KeyError` at start when the variable is unset.
-This check set it explicitly.
+At the time of this check the service had no default for `BEDROCK_MODEL_ID` and raised `KeyError` when it was unset, so the check set it explicitly.
+Issue #17 added the default `amazon.nova-micro-v1:0`.

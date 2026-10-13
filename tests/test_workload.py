@@ -64,3 +64,15 @@ def test_bedrock_calls_client_once_per_request_with_model_id():
 
     client.post("/triage", json=TICKET)
     assert len(stub.calls) == 2
+
+
+def test_bedrock_model_id_defaults_when_unset_or_empty():
+    for env in ({"LLM_MODE": "bedrock"}, {"LLM_MODE": "bedrock", "BEDROCK_MODEL_ID": ""}):
+        llm = make_llm(env, client=StubBedrock())
+        assert isinstance(llm, BedrockLLM)
+        assert llm.model_id == "amazon.nova-micro-v1:0"
+
+
+def test_bedrock_model_id_env_overrides_default():
+    llm = make_llm({"LLM_MODE": "bedrock", "BEDROCK_MODEL_ID": "x.test-model"}, client=StubBedrock())
+    assert llm.model_id == "x.test-model"

@@ -70,7 +70,10 @@
   "truth_threshold": 70,
   "usage_pause_pct": 95,
   "usage_fallback": "none",
-  "verify_commands": [],
+  "verify_commands": [
+    "uv run --locked ruff check",
+    "uv run --locked pytest"
+  ],
   "max_workers": 0,
   "rebuild_cap": 2,
   "block_rate_alert_pct": 30,

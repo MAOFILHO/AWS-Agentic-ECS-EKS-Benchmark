@@ -10,6 +10,8 @@ anyio==4.15.1
     #   httpx2
     #   langsmith
     #   starlette
+awscrt==0.37.0
+    # via agentic-platform-advisor
 boto3==1.43.108
     # via agentic-platform-advisor
 botocore==1.43.108

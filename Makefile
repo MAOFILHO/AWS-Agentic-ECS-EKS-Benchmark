@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .PHONY: bootstrap benchmark teardown report workload-docker
 
-# Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO) and BUDGET_EMAIL.
+# Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 bootstrap:
 	uv run --locked python scripts/deploy_stack.py --stack agentic-platform-advisor-bootstrap \
 		--template infra/cfn/00-bootstrap.yaml --env-param BudgetEmail=BUDGET_EMAIL

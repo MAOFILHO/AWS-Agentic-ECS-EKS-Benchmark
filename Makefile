@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: bootstrap ecs-fargate benchmark teardown report workload-docker push-image mirror-base
+.PHONY: bootstrap ecs-fargate ecs-ec2 benchmark teardown report workload-docker push-image mirror-base
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 # Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
@@ -17,6 +17,17 @@ ecs-fargate:
 	NETWORK_STACK=$(RUN_ID)-network uv run --locked python scripts/deploy_stack.py --stack $(RUN_ID)-ecs-fargate \
 		--template infra/cfn/30-ecs.yaml --env-param RunId=RUN_ID \
 		--env-param NetworkStackName=NETWORK_STACK --env-param ImageUri=IMAGE_URI
+
+# Deploy the network stack, then the ecs-ec2 cell (30-ecs with ComputeType=EC2). Same needs as ecs-fargate.
+ecs-ec2:
+	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make ecs-ec2 RUN_ID=<id>"; exit 1; }
+	@test -n "$$IMAGE_URI" || { echo "error: IMAGE_URI is not set. Export the ECR image URI."; exit 1; }
+	uv run --locked python scripts/deploy_stack.py --stack $(RUN_ID)-network \
+		--template infra/cfn/10-network.yaml --env-param RunId=RUN_ID
+	NETWORK_STACK=$(RUN_ID)-network COMPUTE_TYPE=EC2 uv run --locked python scripts/deploy_stack.py \
+		--stack $(RUN_ID)-ecs-ec2 --template infra/cfn/30-ecs.yaml --env-param RunId=RUN_ID \
+		--env-param NetworkStackName=NETWORK_STACK --env-param ImageUri=IMAGE_URI \
+		--env-param ComputeType=COMPUTE_TYPE
 
 # Delete every stack of one run, newest first, then check nothing tagged run-id=RUN_ID is left.
 # Needs AWS_PROFILE and a region (AWS_REGION or AWS_DEFAULT_REGION). Asks y/N first.

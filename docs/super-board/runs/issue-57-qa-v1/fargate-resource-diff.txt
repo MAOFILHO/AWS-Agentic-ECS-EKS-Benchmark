@@ -1,0 +1,8 @@
+main resources: 13
+FARGATE resources on branch: 13
+equal to main: True
+EC2 adds: {'InstanceSecurityGroup': 'AWS::EC2::SecurityGroup', 'InstanceRole': 'AWS::IAM::Role', 'InstanceProfile': 'AWS::IAM::InstanceProfile', 'LaunchTemplate': 'AWS::EC2::LaunchTemplate', 'AutoScalingGroup': 'AWS::AutoScaling::AutoScalingGroup', 'CapacityProvider': 'AWS::ECS::CapacityProvider', 'CapacityProviderAssociation': 'AWS::ECS::ClusterCapacityProviderAssociations'}
+InstanceRole boundary: agentic-platform-advisor-StackRoleBoundaryArn
+Task Cpu/Memory: Cpu Memory
+CPU target: 60
+Action "*" present: False

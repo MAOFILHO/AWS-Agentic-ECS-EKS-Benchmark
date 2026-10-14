@@ -1,0 +1,209 @@
+Run actions/checkout@v4	﻿2026-10-14T20:26:50.9107726Z ##[group]Run actions/checkout@v4
+Run actions/checkout@v4	2026-10-14T20:26:50.9108775Z with:
+Run actions/checkout@v4	2026-10-14T20:26:50.9109355Z   repository: MAOFILHO/agentic-platform-advisor
+Run actions/checkout@v4	2026-10-14T20:26:50.9113583Z   token: ***
+Run actions/checkout@v4	2026-10-14T20:26:50.9114074Z   ssh-strict: true
+Run actions/checkout@v4	2026-10-14T20:26:50.9114913Z   ssh-user: git
+Run actions/checkout@v4	2026-10-14T20:26:50.9115530Z   persist-credentials: true
+Run actions/checkout@v4	2026-10-14T20:26:50.9116081Z   clean: true
+Run actions/checkout@v4	2026-10-14T20:26:50.9116589Z   sparse-checkout-cone-mode: true
+Run actions/checkout@v4	2026-10-14T20:26:50.9117169Z   fetch-depth: 1
+Run actions/checkout@v4	2026-10-14T20:26:50.9117654Z   fetch-tags: false
+Run actions/checkout@v4	2026-10-14T20:26:50.9118158Z   show-progress: true
+Run actions/checkout@v4	2026-10-14T20:26:50.9118660Z   lfs: false
+Run actions/checkout@v4	2026-10-14T20:26:50.9119127Z   submodules: false
+Run actions/checkout@v4	2026-10-14T20:26:50.9119668Z   set-safe-directory: true
+Run actions/checkout@v4	2026-10-14T20:26:50.9120235Z   allow-unsafe-pr-checkout: false
+Run actions/checkout@v4	2026-10-14T20:26:50.9121160Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:51.0385739Z Syncing repository: MAOFILHO/agentic-platform-advisor
+Run actions/checkout@v4	2026-10-14T20:26:51.0389776Z ##[group]Getting Git version info
+Run actions/checkout@v4	2026-10-14T20:26:51.0392531Z Working directory is '/home/runner/work/agentic-platform-advisor/agentic-platform-advisor'
+Run actions/checkout@v4	2026-10-14T20:26:51.0396573Z [command]/usr/bin/git version
+Run actions/checkout@v4	2026-10-14T20:26:51.0533549Z git version 2.55.0
+Run actions/checkout@v4	2026-10-14T20:26:51.0546495Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:51.0554344Z Temporarily overriding HOME='/home/runner/work/_temp/9cdc0639-aa31-4f90-a571-d03a7d749529' before making global git config changes
+Run actions/checkout@v4	2026-10-14T20:26:51.0557948Z Adding repository directory to the temporary git global config as a safe directory
+Run actions/checkout@v4	2026-10-14T20:26:51.0560593Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/agentic-platform-advisor/agentic-platform-advisor
+Run actions/checkout@v4	2026-10-14T20:26:51.0629212Z Deleting the contents of '/home/runner/work/agentic-platform-advisor/agentic-platform-advisor'
+Run actions/checkout@v4	2026-10-14T20:26:51.0646640Z ##[group]Initializing the repository
+Run actions/checkout@v4	2026-10-14T20:26:51.0655460Z [command]/usr/bin/git init /home/runner/work/agentic-platform-advisor/agentic-platform-advisor
+Run actions/checkout@v4	2026-10-14T20:26:51.0763267Z hint: Using 'master' as the name for the initial branch. This default branch name
+Run actions/checkout@v4	2026-10-14T20:26:51.0785640Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Run actions/checkout@v4	2026-10-14T20:26:51.0797356Z hint: to use in all of your new repositories, which will suppress this warning,
+Run actions/checkout@v4	2026-10-14T20:26:51.0799293Z hint: call:
+Run actions/checkout@v4	2026-10-14T20:26:51.0800761Z hint:
+Run actions/checkout@v4	2026-10-14T20:26:51.0807576Z hint: 	git config --global init.defaultBranch <name>
+Run actions/checkout@v4	2026-10-14T20:26:51.0808805Z hint:
+Run actions/checkout@v4	2026-10-14T20:26:51.0809923Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Run actions/checkout@v4	2026-10-14T20:26:51.0811723Z hint: 'development'. The just-created branch can be renamed via this command:
+Run actions/checkout@v4	2026-10-14T20:26:51.0813156Z hint:
+Run actions/checkout@v4	2026-10-14T20:26:51.0813978Z hint: 	git branch -m <name>
+Run actions/checkout@v4	2026-10-14T20:26:51.0815224Z hint:
+Run actions/checkout@v4	2026-10-14T20:26:51.0816412Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Run actions/checkout@v4	2026-10-14T20:26:51.0818625Z Initialized empty Git repository in /home/runner/work/agentic-platform-advisor/agentic-platform-advisor/.git/
+Run actions/checkout@v4	2026-10-14T20:26:51.0822223Z [command]/usr/bin/git remote add origin https://github.com/MAOFILHO/agentic-platform-advisor
+Run actions/checkout@v4	2026-10-14T20:26:51.0890348Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:51.0891883Z ##[group]Disabling automatic garbage collection
+Run actions/checkout@v4	2026-10-14T20:26:51.0898635Z [command]/usr/bin/git config --local gc.auto 0
+Run actions/checkout@v4	2026-10-14T20:26:51.1039034Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:51.1040437Z ##[group]Setting up auth
+Run actions/checkout@v4	2026-10-14T20:26:51.1041802Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Run actions/checkout@v4	2026-10-14T20:26:51.1046387Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Run actions/checkout@v4	2026-10-14T20:26:51.1586414Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Run actions/checkout@v4	2026-10-14T20:26:51.1626443Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Run actions/checkout@v4	2026-10-14T20:26:51.1962563Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Run actions/checkout@v4	2026-10-14T20:26:51.1988203Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Run actions/checkout@v4	2026-10-14T20:26:51.2242758Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Run actions/checkout@v4	2026-10-14T20:26:51.2288429Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:51.2290297Z ##[group]Fetching the repository
+Run actions/checkout@v4	2026-10-14T20:26:51.2301159Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +cd14590cf5df2e63253e482687838fc6324c8d09:refs/remotes/pull/59/merge
+Run actions/checkout@v4	2026-10-14T20:26:52.3147463Z From https://github.com/MAOFILHO/agentic-platform-advisor
+Run actions/checkout@v4	2026-10-14T20:26:52.3157012Z  * [new ref]         cd14590cf5df2e63253e482687838fc6324c8d09 -> pull/59/merge
+Run actions/checkout@v4	2026-10-14T20:26:52.3167080Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:52.3169364Z ##[group]Determining the checkout info
+Run actions/checkout@v4	2026-10-14T20:26:52.3171803Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:52.3183232Z [command]/usr/bin/git sparse-checkout disable
+Run actions/checkout@v4	2026-10-14T20:26:52.3248509Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Run actions/checkout@v4	2026-10-14T20:26:52.3288753Z ##[group]Checking out the ref
+Run actions/checkout@v4	2026-10-14T20:26:52.3291681Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/59/merge
+Run actions/checkout@v4	2026-10-14T20:26:52.4478636Z Note: switching to 'refs/remotes/pull/59/merge'.
+Run actions/checkout@v4	2026-10-14T20:26:52.4495402Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4496953Z You are in 'detached HEAD' state. You can look around, make experimental
+Run actions/checkout@v4	2026-10-14T20:26:52.4500919Z changes and commit them, and you can discard any commits you make in this
+Run actions/checkout@v4	2026-10-14T20:26:52.4505024Z state without impacting any branches by switching back to a branch.
+Run actions/checkout@v4	2026-10-14T20:26:52.4507480Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4509065Z If you want to create a new branch to retain commits you create, you may
+Run actions/checkout@v4	2026-10-14T20:26:52.4513223Z do so (now or later) by using -c with the switch command. Example:
+Run actions/checkout@v4	2026-10-14T20:26:52.4515603Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4516621Z   git switch -c <new-branch-name>
+Run actions/checkout@v4	2026-10-14T20:26:52.4518162Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4519160Z Or undo this operation with:
+Run actions/checkout@v4	2026-10-14T20:26:52.4520664Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4521587Z   git switch -
+Run actions/checkout@v4	2026-10-14T20:26:52.4523071Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4525265Z Turn off this advice by setting config variable advice.detachedHead to false
+Run actions/checkout@v4	2026-10-14T20:26:52.4528097Z 
+Run actions/checkout@v4	2026-10-14T20:26:52.4530936Z HEAD is now at cd14590 Merge 30acc487bdd7fa526e03004d37572ef8f546017f into de5cf2d7a55d078c6526710b0e349cfe54c32f3d
+Run actions/checkout@v4	2026-10-14T20:26:52.4540034Z ##[endgroup]
+Run actions/checkout@v4	2026-10-14T20:26:52.4562203Z [command]/usr/bin/git log -1 --format=%H
+Run actions/checkout@v4	2026-10-14T20:26:52.4593359Z cd14590cf5df2e63253e482687838fc6324c8d09
+cfn-lint	﻿2026-10-14T20:26:54.6274003Z ##[group]Run uvx cfn-lint==1.57.2 infra/cfn/*.yaml
+cfn-lint	2026-10-14T20:26:54.6274549Z uvx cfn-lint==1.57.2 infra/cfn/*.yaml
+cfn-lint	2026-10-14T20:26:54.6567945Z shell: /usr/bin/bash -e {0}
+cfn-lint	2026-10-14T20:26:54.6568363Z env:
+cfn-lint	2026-10-14T20:26:54.6569092Z ##[endgroup]
+cfn-lint	2026-10-14T20:26:55.1204067Z Downloading networkx (2.0MiB)
+cfn-lint	2026-10-14T20:26:55.1298240Z Downloading cfn-lint (5.4MiB)
+cfn-lint	2026-10-14T20:26:55.1302428Z Downloading sympy (6.0MiB)
+cfn-lint	2026-10-14T20:26:55.3539065Z  Downloaded networkx
+cfn-lint	2026-10-14T20:26:55.4890696Z  Downloaded sympy
+cfn-lint	2026-10-14T20:26:55.5065772Z  Downloaded cfn-lint
+cfn-lint	2026-10-14T20:26:55.5873963Z Installed 9 packages in 80ms
+cfn-guard validate	﻿2026-10-14T20:27:00.9140302Z ##[group]Run cfn-guard validate --data infra/cfn --rules infra/cfn-guard/rules.guard
+cfn-guard validate	2026-10-14T20:27:00.9141314Z cfn-guard validate --data infra/cfn --rules infra/cfn-guard/rules.guard
+cfn-guard validate	2026-10-14T20:27:00.9209231Z shell: /usr/bin/bash -e {0}
+cfn-guard validate	2026-10-14T20:27:00.9209509Z env:
+cfn-guard validate	2026-10-14T20:27:00.9210124Z ##[endgroup]
+cfn-guard rejects a mutable ECR repository	﻿2026-10-14T20:27:01.0450292Z ##[group]Run if cfn-guard validate --data tests/cfn-guard/bad-mutable-ecr.yaml --rules infra/cfn-guard/rules.guard; then
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0451216Z if cfn-guard validate --data tests/cfn-guard/bad-mutable-ecr.yaml --rules infra/cfn-guard/rules.guard; then
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0451876Z   echo "expected cfn-guard to fail on the mutable ECR fixture"
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0452268Z   exit 1
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0452503Z fi
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0515892Z shell: /usr/bin/bash -e {0}
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0516172Z env:
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0516766Z ##[endgroup]
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0923399Z /home/runner/work/agentic-platform-advisor/agentic-platform-advisor/tests/cfn-guard/bad-mutable-ecr.yaml Status = FAIL
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0925197Z FAILED rules
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0926037Z rules.guard/ecr_immutable_tags                       FAIL
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0927009Z ---
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0939387Z Evaluating data /home/runner/work/agentic-platform-advisor/agentic-platform-advisor/tests/cfn-guard/bad-mutable-ecr.yaml against rules rules.guard
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0940933Z Number of non-compliant resources 1
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0941622Z Resource = Repo {
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0942264Z   Type      = AWS::ECR::Repository
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0942879Z   Rule = ecr_immutable_tags {
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0943498Z     ALL {
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0944956Z       Check =  %ecr_repos[*].Properties.ImageTagMutability EQUALS  "IMMUTABLE" {
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0945905Z         ComparisonError {
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0947385Z           Error            = Check was not compliant as property value [Path=/Resources/Repo/Properties/ImageTagMutability[L:7,C:26] Value="MUTABLE"] not equal to value [Path=[L:0,C:0] Value="IMMUTABLE"].
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0952289Z           PropertyPath    = /Resources/Repo/Properties/ImageTagMutability[L:7,C:26]
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0953311Z           Operator        = EQUAL
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0953776Z           Value           = "MUTABLE"
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0954328Z           ComparedWith    = "IMMUTABLE"
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0956837Z           Code:
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0957269Z                 5.    Type: AWS::ECR::Repository
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0957778Z                 6.    Properties:
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0958271Z                 7.      RepositoryName: triage-workload
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0958832Z                 8.      ImageTagMutability: MUTABLE
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0959346Z                 9.      Tags:
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0959795Z                10.        - Key: project
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0960114Z 
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0960247Z         }
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0960560Z       }
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0960858Z     }
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0961160Z   }
+cfn-guard rejects a mutable ECR repository	2026-10-14T20:27:01.0961456Z }
+cfn-guard accepts the fixed copy	﻿2026-10-14T20:27:01.1017183Z ##[group]Run cfn-guard validate --data tests/cfn-guard/good-immutable-ecr.yaml --rules infra/cfn-guard/rules.guard
+cfn-guard accepts the fixed copy	2026-10-14T20:27:01.1018046Z cfn-guard validate --data tests/cfn-guard/good-immutable-ecr.yaml --rules infra/cfn-guard/rules.guard
+cfn-guard accepts the fixed copy	2026-10-14T20:27:01.1081536Z shell: /usr/bin/bash -e {0}
+cfn-guard accepts the fixed copy	2026-10-14T20:27:01.1081824Z env:
+cfn-guard accepts the fixed copy	2026-10-14T20:27:01.1082435Z ##[endgroup]
+cfn-guard rejects a task security group open to the internet	﻿2026-10-14T20:27:01.1541455Z ##[group]Run if cfn-guard validate --data tests/cfn-guard/bad-open-task-sg.yaml --rules infra/cfn-guard/rules.guard; then
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1542377Z if cfn-guard validate --data tests/cfn-guard/bad-open-task-sg.yaml --rules infra/cfn-guard/rules.guard; then
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1543065Z   echo "expected cfn-guard to fail on the open task security group fixture"
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1543480Z   exit 1
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1543693Z fi
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1606671Z shell: /usr/bin/bash -e {0}
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1606951Z env:
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1607549Z ##[endgroup]
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1730270Z /home/runner/work/agentic-platform-advisor/agentic-platform-advisor/tests/cfn-guard/bad-open-task-sg.yaml Status = FAIL
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1731631Z FAILED rules
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1732387Z rules.guard/security_group_open_cidr_port_80_only    FAIL
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1733328Z ---
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1751463Z Evaluating data /home/runner/work/agentic-platform-advisor/agentic-platform-advisor/tests/cfn-guard/bad-open-task-sg.yaml against rules rules.guard
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1753011Z Number of non-compliant resources 1
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1753760Z Resource = TaskSecurityGroup {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1754500Z   Type      = AWS::EC2::SecurityGroup
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1755455Z   Rule = security_group_open_cidr_port_80_only {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1756151Z     ALL {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1756675Z       Check =  FromPort EQUALS  80 {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1757314Z         ComparisonError {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1759102Z           Error            = Check was not compliant as property value [Path=/Resources/TaskSecurityGroup/Properties/SecurityGroupIngress/0/FromPort[L:10,C:20] Value=8080] not equal to value [Path=[L:0,C:0] Value=80].
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1762005Z           PropertyPath    = /Resources/TaskSecurityGroup/Properties/SecurityGroupIngress/0/FromPort[L:10,C:20]
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1763062Z           Operator        = EQUAL
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1763554Z           Value           = 8080
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1764013Z           ComparedWith    = 80
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1765046Z           Code:
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1765427Z                 8.      VpcId: vpc-00000000
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1765930Z                 9.      SecurityGroupIngress:
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1766447Z                10.        - IpProtocol: tcp
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1766921Z                11.          FromPort: 8080
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1767392Z                12.          ToPort: 8080
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1767856Z                13.          CidrIp: 0.0.0.0/0
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1768179Z 
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1768318Z         }
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1768629Z       }
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1768966Z       Check =  ToPort EQUALS  80 {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1769456Z         ComparisonError {
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1770311Z           Error            = Check was not compliant as property value [Path=/Resources/TaskSecurityGroup/Properties/SecurityGroupIngress/0/ToPort[L:11,C:18] Value=8080] not equal to value [Path=[L:0,C:0] Value=80].
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1771405Z           PropertyPath    = /Resources/TaskSecurityGroup/Properties/SecurityGroupIngress/0/ToPort[L:11,C:18]
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1771930Z           Operator        = EQUAL
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1772197Z           Value           = 8080
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1772463Z           ComparedWith    = 80
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1772708Z           Code:
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1772948Z                 9.      SecurityGroupIngress:
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1773254Z                10.        - IpProtocol: tcp
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1773550Z                11.          FromPort: 8080
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1773852Z                12.          ToPort: 8080
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1774126Z                13.          CidrIp: 0.0.0.0/0
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1774417Z                14.      Tags:
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1775353Z 
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1775499Z         }
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1775822Z       }
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1776062Z     }
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1776542Z   }
+cfn-guard rejects a task security group open to the internet	2026-10-14T20:27:01.1776729Z }
+cfn-guard accepts the closed task security group	﻿2026-10-14T20:27:01.1808447Z ##[group]Run cfn-guard validate --data tests/cfn-guard/good-closed-task-sg.yaml --rules infra/cfn-guard/rules.guard
+cfn-guard accepts the closed task security group	2026-10-14T20:27:01.1809337Z cfn-guard validate --data tests/cfn-guard/good-closed-task-sg.yaml --rules infra/cfn-guard/rules.guard
+cfn-guard accepts the closed task security group	2026-10-14T20:27:01.1872897Z shell: /usr/bin/bash -e {0}
+cfn-guard accepts the closed task security group	2026-10-14T20:27:01.1873170Z env:
+cfn-guard accepts the closed task security group	2026-10-14T20:27:01.1873764Z ##[endgroup]

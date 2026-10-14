@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: bootstrap benchmark teardown report workload-docker
+.PHONY: bootstrap benchmark teardown report workload-docker push-image mirror-base
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 # Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
@@ -15,3 +15,13 @@ benchmark teardown report:
 workload-docker:
 	docker build -t triage-workload workload/
 	docker run --rm -p 8080:8080 -e LLM_MODE=$${LLM_MODE:-mock} -e BEDROCK_MODEL_ID triage-workload
+
+# Build workload/ and push it to ECR, tagged with the short git sha. Needs AWS_PROFILE and a region
+# (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). ARGS="--base-image <tag mirror-base printed>" builds
+# from the mirror; ARGS=--allow-dirty pushes uncommitted changes.
+push-image:
+	uv run --locked python scripts/push_image.py $(ARGS)
+
+# Mirror python:3.12-slim and the pinned uv image into the base-images ECR repository.
+mirror-base:
+	uv run --locked python scripts/push_image.py --mirror-base $(ARGS)

@@ -45,3 +45,11 @@ rule iam_role_project_tag when %iam_roles !empty {
 rule log_group_project_tag when %log_groups !empty {
     some %log_groups.Properties.Tags[*].Key == 'project'
 }
+
+# The load balancer is the only public entry. Any rule open to the internet must be port 80 only.
+rule security_group_open_cidr_port_80_only when %security_groups !empty {
+    %security_groups.Properties.SecurityGroupIngress[ CidrIp == '0.0.0.0/0' ] {
+        FromPort == 80
+        ToPort == 80
+    }
+}

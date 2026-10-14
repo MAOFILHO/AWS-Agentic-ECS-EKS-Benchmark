@@ -1,0 +1,285 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Benchmark cell ecs-fargate. ECS cluster, Fargate service in the private subnets,
+  internet-facing ALB on HTTP port 80, and CPU target-tracking autoscaling.
+
+# Fargate size: the default 256 CPU and 512 MB is the lowest-cost size (SPEC Decision 2).
+# Card "real deploy" confirms the workload fits in it.
+
+Parameters:
+  RunId:
+    Type: String
+    Description: Benchmark run id, written to the run-id tag.
+    AllowedPattern: "[a-z0-9-]+"
+  TtlHours:
+    Type: Number
+    Default: 4
+    MinValue: 1
+    Description: Hours before the janitor deletes this stack.
+  NetworkStackName:
+    Type: String
+    Description: Name of the 10-network stack whose exports this stack reads.
+  ImageUri:
+    Type: String
+    Description: Workload image in ECR, with tag or digest.
+  Cpu:
+    Type: String
+    Default: "256"
+    AllowedValues: ["256", "512", "1024", "2048", "4096"]
+    Description: Fargate CPU units per task.
+  Memory:
+    Type: String
+    Default: "512"
+    AllowedPattern: "[0-9]+"
+    Description: Fargate memory in MB per task. Must be a size Fargate allows for the CPU.
+  MinReplicas:
+    Type: Number
+    Default: 1
+    MinValue: 1
+  MaxReplicas:
+    Type: Number
+    Default: 4
+    MinValue: 1
+  LlmMode:
+    Type: String
+    Default: mock
+    AllowedValues: [mock, bedrock]
+
+Resources:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${RunId}-ecs-fargate"
+      RetentionInDays: 7
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${RunId}-ecs-fargate"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTP from the internet to the load balancer
+      VpcId: !ImportValue { "Fn::Sub": "${NetworkStackName}-VpcId" }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Workload port from the load balancer only
+      VpcId: !ImportValue { "Fn::Sub": "${NetworkStackName}-VpcId" }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  # Pulls the image and writes logs. Needs no other permission.
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: pull-image-write-logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt LogGroup.Arn
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  # The workload's own identity. It may call one model and nothing else.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-nova-micro
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.nova-micro-v1:0"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${RunId}-ecs-fargate"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: workload
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - { Name: LLM_MODE, Value: !Ref LlmMode }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: workload
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NetworkStackName}-PublicSubnetIds" }]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !ImportValue { "Fn::Sub": "${NetworkStackName}-VpcId" }
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckPath: /readyz
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: Listener
+    Properties:
+      ServiceName: !Sub "${RunId}-ecs-fargate"
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref MinReplicas
+      HealthCheckGracePeriodSeconds: 30
+      PropagateTags: SERVICE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [!Ref TaskSecurityGroup]
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NetworkStackName}-PrivateSubnetIds" }]
+      LoadBalancers:
+        - ContainerName: workload
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-fargate }
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      ResourceId: !Sub "service/${Cluster}/${Service.Name}"
+      MinCapacity: !Ref MinReplicas
+      MaxCapacity: !Ref MaxReplicas
+
+  CpuScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${RunId}-cpu-60"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+Outputs:
+  AlbDnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+  ClusterName:
+    Value: !Ref Cluster
+  ServiceName:
+    Value: !GetAtt Service.Name

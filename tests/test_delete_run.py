@@ -222,6 +222,31 @@ def test_mask_hides_account_ids():
     assert delete_run.mask(NAT_ARN) == "arn:aws:ec2:us-east-1:************:natgateway/nat-0abc"
 
 
+def test_aws_error_output_masks_account_id(clients, monkeypatch, capsys):
+    made, stubs = clients
+    stubs["cloudformation"].add_client_error(
+        "list_stacks",
+        "AccessDenied",
+        f"User: arn:aws:sts::{ACCOUNT}:assumed-role/AWSReservedSSO_Admin/me is not authorized",
+    )
+
+    class Session:
+        def __init__(self, region_name):
+            pass
+
+        def client(self, service):
+            return made[service]
+
+    monkeypatch.setattr(delete_run.boto3, "Session", Session)
+    with pytest.raises(SystemExit) as exc:
+        delete_run.main(["--run-id", RUN, "--region", "us-east-1", "--yes"])
+    assert exc.value.code != 0
+    output = capsys.readouterr()
+    text = output.out + output.err + str(exc.value.code)
+    assert "AccessDenied" in text
+    assert not re.search(r"\d{12}", text)
+
+
 def test_answer_other_than_y_aborts_before_deleting(clients, monkeypatch):
     made, stubs = clients
     stubs["cloudformation"].add_response(

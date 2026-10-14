@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKLOAD_REPO = "triage-workload"
 BASE_REPO = "base-images"
 PYTHON_BASE = "python:3.12-slim"
+ENV_FORMAT = "{{range .Config.Env}}{{println .}}{{end}}"
 ACCOUNT_ID = re.compile(r"\b\d{12}\b")
 
 
@@ -36,14 +37,8 @@ def say(text):
 
 
 def run_docker(args, input=None):
-    proc = subprocess.run(
-        ["docker", *args],
-        input=input,
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-        check=False,
-    )
+    cmd = ["docker", *args]
+    proc = subprocess.run(cmd, input=input, capture_output=True, text=True, cwd=ROOT, check=False)
     return proc.returncode, proc.stdout + proc.stderr
 
 
@@ -57,13 +52,9 @@ def docker(runner, args, input=None, secret=None):
 
 
 def resolve_region(flag):
-    region = (
-        flag or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
-    )
+    region = flag or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
     if not region:
-        raise SystemExit(
-            "error: no AWS region. Pass --region or set AWS_REGION or AWS_DEFAULT_REGION."
-        )
+        raise SystemExit("error: no AWS region. Pass --region or set AWS_REGION or AWS_DEFAULT_REGION.")
     return region
 
 
@@ -74,9 +65,7 @@ def image_tag(cwd, allow_dirty):
         ).stdout.strip()
 
     if git("status", "--porcelain") and not allow_dirty:
-        raise SystemExit(
-            "error: working tree has uncommitted changes. Commit them or pass --allow-dirty."
-        )
+        raise SystemExit("error: uncommitted changes. Commit them or pass --allow-dirty.")
     return git("rev-parse", "--short", "HEAD")
 
 
@@ -85,12 +74,8 @@ def login(ecr, runner):
     data = ecr.get_authorization_token()["authorizationData"][0]
     user, password = base64.b64decode(data["authorizationToken"]).decode().split(":", 1)
     registry = data["proxyEndpoint"].removeprefix("https://")
-    docker(
-        runner,
-        ["login", "--username", user, "--password-stdin", registry],
-        input=password,
-        secret=password,
-    )
+    login_args = ["login", "--username", user, "--password-stdin", registry]
+    docker(runner, login_args, input=password, secret=password)
     return registry
 
 
@@ -127,16 +112,7 @@ def mirror(ecr, runner):
         docker(runner, ["pull", source])
         if source == PYTHON_BASE:
             # 3.12-slim moves; tag the exact patch release the pull resolved to.
-            env = docker(
-                runner,
-                [
-                    "image",
-                    "inspect",
-                    "--format",
-                    "{{range .Config.Env}}{{println .}}{{end}}",
-                    source,
-                ],
-            )
+            env = docker(runner, ["image", "inspect", "--format", ENV_FORMAT, source])
             version = re.search(r"^PYTHON_VERSION=(\S+)$", env, re.MULTILINE).group(1)
             tag = f"python-{version}-slim"
         else:
@@ -154,12 +130,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--region")
     parser.add_argument("--allow-dirty", action="store_true")
-    parser.add_argument(
-        "--base-image", metavar="TAG", help="Build FROM this base-images tag."
-    )
-    parser.add_argument(
-        "--mirror-base", action="store_true", help="Mirror base images only."
-    )
+    parser.add_argument("--base-image", metavar="TAG", help="Build FROM this base-images tag.")
+    parser.add_argument("--mirror-base", action="store_true", help="Mirror base images only.")
     args = parser.parse_args(argv)
 
     region = resolve_region(args.region)

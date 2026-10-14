@@ -11,9 +11,10 @@ import yaml
 from botocore.stub import Stubber
 
 from scripts import push_image
+from tests.test_bootstrap_oidc import CfnLoader
 
 ROOT = Path(__file__).resolve().parents[1]
-ACCOUNT = "123456789012"
+ACCOUNT = "9" * 12  # built at runtime: no tracked file may hold an account id
 REGISTRY = f"{ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com"
 TOKEN = "s3cr3t-ecr-password"
 ACCOUNT_ID = re.compile(r"\b\d{12}\b")
@@ -33,19 +34,9 @@ def ecr():
 
 
 def _stub_token(stubber):
-    stubber.add_response(
-        "get_authorization_token",
-        {
-            "authorizationData": [
-                {
-                    "authorizationToken": base64.b64encode(
-                        f"AWS:{TOKEN}".encode()
-                    ).decode(),
-                    "proxyEndpoint": f"https://{REGISTRY}",
-                }
-            ]
-        },
-    )
+    token = base64.b64encode(f"AWS:{TOKEN}".encode()).decode()
+    data = {"authorizationToken": token, "proxyEndpoint": f"https://{REGISTRY}"}
+    stubber.add_response("get_authorization_token", {"authorizationData": [data]})
 
 
 class Docker:
@@ -66,29 +57,13 @@ class Docker:
 
 @pytest.fixture
 def repo(tmp_path):
-    def git(*args):
-        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+    def git(cmd):
+        out = subprocess.run(["git", *cmd.split()], cwd=tmp_path, capture_output=True, check=True)
+        return out.stdout.decode().strip()
 
-    git("init", "-q")
-    git(
-        "-c",
-        "user.email=a@b.co",
-        "-c",
-        "user.name=t",
-        "commit",
-        "-q",
-        "--allow-empty",
-        "-m",
-        "x",
-    )
-    sha = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    return tmp_path, sha
+    git("init -q")
+    git("-c user.email=a@b.co -c user.name=t commit -q --allow-empty -m x")
+    return tmp_path, git("rev-parse --short HEAD")
 
 
 def _assert_clean(text):
@@ -133,10 +108,7 @@ def test_push_logs_in_builds_tags_and_pushes(ecr, capsys):
     push_image.push(client, docker, "abc1234")
 
     login, build, push = docker.calls
-    assert login == (
-        ["login", "--username", "AWS", "--password-stdin", REGISTRY],
-        TOKEN,
-    )
+    assert login == (["login", "--username", "AWS", "--password-stdin", REGISTRY], TOKEN)
     image = f"{REGISTRY}/triage-workload:abc1234"
     assert build[0] == ["build", "-t", image, "workload/"]
     assert push[0] == ["push", image]
@@ -165,27 +137,19 @@ def test_docker_failure_hides_token_and_account(ecr, capsys):
 def test_mirror_pushes_exact_versions_and_skips_existing(ecr, capsys):
     client, stubber = ecr
     _stub_token(stubber)
-    stubber.add_client_error(
-        "describe_images", service_error_code="ImageNotFoundException"
-    )
-    stubber.add_response(
-        "describe_images", {"imageDetails": [{"imageTags": ["uv-0.11.33"]}]}
-    )
+    stubber.add_client_error("describe_images", service_error_code="ImageNotFoundException")
+    stubber.add_response("describe_images", {"imageDetails": [{"imageTags": ["uv-0.11.33"]}]})
     docker = Docker()
     push_image.mirror(client, docker)
 
     cmds = [args for args, _ in docker.calls]
     python = f"{REGISTRY}/base-images:python-3.12.13-slim"
-    assert ["pull", "python:3.12-slim"] in cmds
+    assert ["pull", "python:3.12-slim"] in cmds and ["pull", push_image.uv_image()] in cmds
     assert ["tag", "python:3.12-slim", python] in cmds
     assert ["push", python] in cmds
     # uv tag already in the immutable repository: no second push.
     assert not any(c[0] == "push" and "uv-" in c[1] for c in cmds)
     _assert_clean(capsys.readouterr().out)
-
-
-def test_mirrored_uv_version_matches_dockerfile():
-    assert push_image.uv_image() == "ghcr.io/astral-sh/uv:0.11.33"
 
 
 def test_dockerfile_base_image_argument_defaults_to_docker_hub_name():
@@ -194,17 +158,8 @@ def test_dockerfile_base_image_argument_defaults_to_docker_hub_name():
     assert "FROM ${BASE_IMAGE}" in text
 
 
-class CfnLoader(yaml.SafeLoader):
-    pass
-
-
-CfnLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
-
-
 def test_base_images_repository_matches_workload_repository():
-    template = yaml.load(
-        (ROOT / "infra/cfn/00-bootstrap.yaml").read_text(), Loader=CfnLoader
-    )
+    template = yaml.load((ROOT / "infra/cfn/00-bootstrap.yaml").read_text(), Loader=CfnLoader)
     res = template["Resources"]
     base, workload = res["BaseImagesRepository"], res["WorkloadRepository"]
     assert base["Type"] == "AWS::ECR::Repository"

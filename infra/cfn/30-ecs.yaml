@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Benchmark cell ecs-fargate. ECS cluster, Fargate service in the private subnets,
-  internet-facing ALB on HTTP port 80, and CPU target-tracking autoscaling.
+  Benchmark cell ecs-fargate or ecs-ec2 (ComputeType). ECS cluster, service in the private
+  subnets, internet-facing ALB on HTTP port 80, and CPU target-tracking autoscaling.
 
 # Fargate size: the default 256 CPU and 512 MB is the lowest-cost size (SPEC Decision 2).
 # Card "real deploy" confirms the workload fits in it.
@@ -44,28 +44,40 @@ Parameters:
     Type: String
     Default: mock
     AllowedValues: [mock, bedrock]
+  ComputeType:
+    Type: String
+    Default: FARGATE
+    AllowedValues: [FARGATE, EC2]
+    Description: FARGATE for the ecs-fargate cell, EC2 for the ecs-ec2 cell.
+  InstanceType:
+    Type: String
+    Default: t3.small
+    Description: EC2 container instance type (ComputeType=EC2 only). x86_64, to match the amd64 image.
+
+Conditions:
+  IsEc2: !Equals [!Ref ComputeType, EC2]
 
 Resources:
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/ecs/${RunId}-ecs-fargate"
+      LogGroupName: !If [IsEc2, !Sub "/ecs/${RunId}-ecs-ec2", !Sub "/ecs/${RunId}-ecs-fargate"]
       RetentionInDays: 7
       Tags:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub "${RunId}-ecs-fargate"
+      ClusterName: !If [IsEc2, !Sub "${RunId}-ecs-ec2", !Sub "${RunId}-ecs-fargate"]
       Tags:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -81,7 +93,7 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   TaskSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -97,7 +109,7 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   # Pulls the image and writes logs. Needs no other permission.
   ExecutionRole:
@@ -132,7 +144,7 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   # The workload's own identity. It may call one model and nothing else.
   TaskRole:
@@ -160,13 +172,13 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub "${RunId}-ecs-fargate"
-      RequiresCompatibilities: [FARGATE]
+      Family: !If [IsEc2, !Sub "${RunId}-ecs-ec2", !Sub "${RunId}-ecs-fargate"]
+      RequiresCompatibilities: !If [IsEc2, [EC2], [FARGATE]]
       NetworkMode: awsvpc
       Cpu: !Ref Cpu
       Memory: !Ref Memory
@@ -191,7 +203,7 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -204,7 +216,7 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -218,7 +230,7 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
 
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -233,10 +245,17 @@ Resources:
   Service:
     Type: AWS::ECS::Service
     DependsOn: Listener
+    # Conditional DependsOn: with EC2, wait for the capacity provider to join the cluster.
+    Metadata:
+      WaitFor: !If [IsEc2, !Ref CapacityProviderAssociation, ""]
     Properties:
-      ServiceName: !Sub "${RunId}-ecs-fargate"
+      ServiceName: !If [IsEc2, !Sub "${RunId}-ecs-ec2", !Sub "${RunId}-ecs-fargate"]
       Cluster: !Ref Cluster
-      LaunchType: FARGATE
+      LaunchType: !If [IsEc2, !Ref AWS::NoValue, FARGATE]
+      CapacityProviderStrategy: !If
+        - IsEc2
+        - [{ CapacityProvider: !Ref CapacityProvider, Weight: 1 }]
+        - !Ref AWS::NoValue
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: !Ref MinReplicas
       HealthCheckGracePeriodSeconds: 30
@@ -254,7 +273,139 @@ Resources:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
-        - { Key: cell, Value: ecs-fargate }
+        - { Key: cell, Value: !If [IsEc2, ecs-ec2, ecs-fargate] }
+
+  # ComputeType=EC2 only, from here to CapacityProviderAssociation. Tasks keep awsvpc and the
+  # task security group, so the instances need no inbound rule.
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: IsEc2
+    Properties:
+      GroupDescription: ECS container instances, no inbound traffic
+      VpcId: !ImportValue { "Fn::Sub": "${NetworkStackName}-VpcId" }
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-ec2 }
+
+  # The ECS agent on the instance registers it with the cluster and reports task state.
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Condition: IsEc2
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ecs-agent
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:DeregisterContainerInstance
+                  - ecs:RegisterContainerInstance
+                  - ecs:Submit*
+                Resource: !GetAtt Cluster.Arn
+              - Effect: Allow
+                Action:
+                  - ecs:DiscoverPollEndpoint
+                  - ecs:Poll
+                  - ecs:StartTelemetrySession
+                  - ecs:UpdateContainerInstancesState
+                Resource: "*"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-ec2 }
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: IsEc2
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Condition: IsEc2
+    Properties:
+      LaunchTemplateData:
+        # ECS-optimized Amazon Linux 2023, x86_64, latest recommended.
+        ImageId: "{{resolve:ssm:/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended/image_id}}"
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt InstanceProfile.Arn
+        SecurityGroupIds: [!Ref InstanceSecurityGroup]
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            echo "ECS_CLUSTER=${Cluster}" >> /etc/ecs/ecs.config
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - { Key: run-id, Value: !Ref RunId }
+              - { Key: ttl-hours, Value: !Ref TtlHours }
+              - { Key: project, Value: agentic-platform-advisor }
+              - { Key: cell, Value: ecs-ec2 }
+      TagSpecifications:
+        - ResourceType: launch-template
+          Tags:
+            - { Key: run-id, Value: !Ref RunId }
+            - { Key: ttl-hours, Value: !Ref TtlHours }
+            - { Key: project, Value: agentic-platform-advisor }
+            - { Key: cell, Value: ecs-ec2 }
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: IsEc2
+    Properties:
+      MinSize: !Ref MinReplicas
+      MaxSize: !Ref MaxReplicas
+      VPCZoneIdentifier: !Split [",", !ImportValue { "Fn::Sub": "${NetworkStackName}-PrivateSubnetIds" }]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      Tags:
+        - { Key: run-id, Value: !Ref RunId, PropagateAtLaunch: true }
+        - { Key: ttl-hours, Value: !Ref TtlHours, PropagateAtLaunch: true }
+        - { Key: project, Value: agentic-platform-advisor, PropagateAtLaunch: true }
+        - { Key: cell, Value: ecs-ec2, PropagateAtLaunch: true }
+
+  # ECS grows and shrinks the Auto Scaling group to fit the tasks the service wants.
+  CapacityProvider:
+    Type: AWS::ECS::CapacityProvider
+    Condition: IsEc2
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref AutoScalingGroup
+        ManagedScaling:
+          Status: ENABLED
+          TargetCapacity: 100
+        ManagedTerminationProtection: DISABLED
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: ecs-ec2 }
+
+  CapacityProviderAssociation:
+    Type: AWS::ECS::ClusterCapacityProviderAssociations
+    Condition: IsEc2
+    Properties:
+      Cluster: !Ref Cluster
+      CapacityProviders: [!Ref CapacityProvider]
+      DefaultCapacityProviderStrategy:
+        - { CapacityProvider: !Ref CapacityProvider, Weight: 1 }
 
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget

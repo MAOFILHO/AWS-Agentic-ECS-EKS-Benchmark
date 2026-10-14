@@ -9,6 +9,8 @@ let ecs_clusters = Resources.*[ Type == 'AWS::ECS::Cluster' ]
 let eks_clusters = Resources.*[ Type == 'AWS::EKS::Cluster' ]
 let iam_roles = Resources.*[ Type == 'AWS::IAM::Role' ]
 let log_groups = Resources.*[ Type == 'AWS::Logs::LogGroup' ]
+let asgs = Resources.*[ Type == 'AWS::AutoScaling::AutoScalingGroup' ]
+let launch_templates = Resources.*[ Type == 'AWS::EC2::LaunchTemplate' ]
 
 rule ecr_immutable_tags when %ecr_repos !empty {
     %ecr_repos.Properties.ImageTagMutability == 'IMMUTABLE'
@@ -46,9 +48,22 @@ rule log_group_project_tag when %log_groups !empty {
     some %log_groups.Properties.Tags[*].Key == 'project'
 }
 
+rule asg_project_tag when %asgs !empty {
+    some %asgs.Properties.Tags[*].Key == 'project'
+}
+
+# Container instances use IMDSv2 only.
+rule launch_template_imdsv2 when %launch_templates !empty {
+    %launch_templates.Properties.LaunchTemplateData.MetadataOptions.HttpTokens == 'required'
+}
+
 # The load balancer is the only public entry. Any rule open to the internet must be port 80 only.
-rule security_group_open_cidr_port_80_only when %security_groups !empty {
-    %security_groups.Properties.SecurityGroupIngress[ CidrIp == '0.0.0.0/0' ] {
+# A group with no inbound rule at all (ECS container instances) has nothing to check.
+let groups_with_ingress = Resources.*[ Type == 'AWS::EC2::SecurityGroup'
+    Properties.SecurityGroupIngress exists ]
+
+rule security_group_open_cidr_port_80_only when %groups_with_ingress !empty {
+    %groups_with_ingress.Properties.SecurityGroupIngress[ CidrIp == '0.0.0.0/0' ] {
         FromPort == 80
         ToPort == 80
     }

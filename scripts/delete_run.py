@@ -15,7 +15,7 @@ import sys
 import time
 
 import boto3
-from botocore.exceptions import WaiterError
+from botocore.exceptions import BotoCoreError, ClientError, WaiterError
 
 # The tag index keeps these for minutes after delete; trust EC2's own state instead.
 LAGGING = {
@@ -136,14 +136,17 @@ def main(argv=None):
 
     region = resolve_region(args.region)
     session = boto3.Session(region_name=region)
-    teardown(
-        session.client("cloudformation"),
-        session.client("ec2"),
-        session.client("resourcegroupstaggingapi"),
-        args.run_id,
-        args.leftover_timeout,
-        answer=(lambda _prompt: "y") if args.yes else input,
-    )
+    try:
+        teardown(
+            session.client("cloudformation"),
+            session.client("ec2"),
+            session.client("resourcegroupstaggingapi"),
+            args.run_id,
+            args.leftover_timeout,
+            answer=(lambda _prompt: "y") if args.yes else input,
+        )
+    except (BotoCoreError, ClientError) as err:
+        raise SystemExit(mask(f"error: {err}")) from None
 
 
 if __name__ == "__main__":

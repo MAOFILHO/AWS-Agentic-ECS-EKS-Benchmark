@@ -59,9 +59,13 @@ def deploy(cfn, stack, template_body, parameters, answer=input, sleep=time.sleep
         sleep(5)
 
     if cs["Status"] == "FAILED":
-        cfn.delete_change_set(StackName=stack, ChangeSetName=name)
         reason = cs.get("StatusReason", "")
-        if any(text in reason for text in NO_CHANGES):
+        no_changes = any(text in reason for text in NO_CHANGES)
+        if not no_changes:
+            # Show the detail before the delete call, so a failed delete cannot hide it.
+            print(f"error: change set failed: {reason}", file=sys.stderr)
+        cfn.delete_change_set(StackName=stack, ChangeSetName=name)
+        if no_changes:
             print(f"{stack}: no changes.")
             return
         raise SystemExit(f"error: change set failed: {reason}")

@@ -8,6 +8,7 @@ from pathlib import Path
 import boto3
 import pytest
 import yaml
+from botocore.exceptions import ClientError
 from botocore.stub import Stubber
 
 from scripts import push_image
@@ -77,6 +78,35 @@ def test_no_region_exits_and_names_it(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         push_image.resolve_region(None)
     assert "region" in str(exc.value.code)
+
+
+def test_cli_without_region_exits_non_zero_and_names_it(monkeypatch):
+    monkeypatch.delenv("AWS_REGION", raising=False)
+    monkeypatch.delenv("AWS_DEFAULT_REGION", raising=False)
+    monkeypatch.setenv("AWS_PROFILE", "stub")
+    with pytest.raises(SystemExit) as exc:
+        push_image.main([])
+    assert exc.value.code not in (0, None)
+    assert "region" in str(exc.value.code)
+
+
+def test_ecr_access_denied_does_not_print_account_id(ecr, capsys):
+    # [qa] witness: a role without ecr:GetAuthorizationToken. AWS puts the caller ARN,
+    # and so the account id, in the error message; it must not reach the output.
+    client, stubber = ecr
+    stubber.add_client_error(
+        "get_authorization_token",
+        service_error_code="AccessDeniedException",
+        service_message=f"User: arn:aws:sts::{ACCOUNT}:assumed-role/dev/me is not authorized",
+    )
+    try:
+        push_image.push(client, Docker(), "abc1234")
+    except SystemExit as exc:
+        _assert_clean(str(exc.code))
+    except ClientError as exc:  # uncaught, its message is printed in the traceback
+        _assert_clean(str(exc))
+    out = capsys.readouterr()
+    _assert_clean(out.out + out.err)
 
 
 def test_region_flag_then_env(monkeypatch):

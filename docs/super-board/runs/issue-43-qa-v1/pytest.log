@@ -1,0 +1,7 @@
+E        +    where <built-in method search of re.Pattern object at 0x10cdecdc0> = re.compile('\\b\\d{12}\\b').search
+
+tests/test_push_image.py:72: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_push_image.py::test_ecr_access_denied_does_not_print_account_id
+1 failed, 56 passed in 1.92s
+pytest exit=1

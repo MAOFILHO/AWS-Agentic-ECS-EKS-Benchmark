@@ -1,0 +1,16 @@
+
+#13 [stage-0 7/7] COPY --chown=app:app . workload/
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers done
+#14 exporting manifest sha256:5cc23f134a7a86c31cd52d92009fdc4c2d9270cb1308b81d2f56f48f747f176f done
+#14 exporting config sha256:8c5682fbc05515d60c31cb49f9936a620fa24291399b5fc2a07085fc1de45e3d done
+#14 exporting attestation manifest sha256:e8f19bec5570d401974856a1fe124ef52ee663d4a2dba481150db38d64ce90d1 done
+#14 exporting manifest list sha256:0a14b39c2c92d8655c9d40279f9e2c08a178e6fb26c2ada147039d48d87f4ca1 done
+#14 naming to docker.io/library/triage-workload-qa43:latest done
+#14 unpacking to docker.io/library/triage-workload-qa43:latest done
+#14 DONE 0.0s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/yyy9kgk8cqum9qskw6c7tm4th
+docker build exit=0

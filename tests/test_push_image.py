@@ -153,7 +153,7 @@ def test_push_logs_in_builds_tags_and_pushes(ecr, capsys):
     login, build, push = docker.calls
     assert login == (["login", "--username", "AWS", "--password-stdin", REGISTRY], TOKEN)
     image = f"{REGISTRY}/triage-workload:abc1234"
-    assert build[0] == ["build", "-t", image, "workload/"]
+    assert build[0] == ["build", "--platform", "linux/amd64", "-t", image, "workload/"]
     assert push[0] == ["push", image]
     out = capsys.readouterr().out
     assert "<account>.dkr.ecr.us-east-1.amazonaws.com/triage-workload:abc1234" in out
@@ -187,12 +187,47 @@ def test_mirror_pushes_exact_versions_and_skips_existing(ecr, capsys):
 
     cmds = [args for args, _ in docker.calls]
     python = f"{REGISTRY}/base-images:python-3.12.13-slim"
-    assert ["pull", "python:3.12-slim"] in cmds and ["pull", push_image.uv_image()] in cmds
+    amd64 = ["pull", "--platform", "linux/amd64"]
+    assert [*amd64, "python:3.12-slim"] in cmds and [*amd64, push_image.uv_image()] in cmds
     assert ["tag", "python:3.12-slim", python] in cmds
     assert ["push", python] in cmds
     # uv tag already in the immutable repository: no second push.
     assert not any(c[0] == "push" and "uv-" in c[1] for c in cmds)
     _assert_clean(capsys.readouterr().out)
+
+
+def test_platform_flag_overrides_build_and_mirror_pull(ecr):
+    client, stubber = ecr
+    _stub_token(stubber)
+    docker = Docker()
+    push_image.push(client, docker, "abc1234", platform="linux/arm64")
+    assert docker.calls[1][0][:3] == ["build", "--platform", "linux/arm64"]
+
+    _stub_token(stubber)
+    for _ in range(2):
+        stubber.add_response("describe_images", {"imageDetails": [{"imageTags": ["x"]}]})
+    docker = Docker()
+    push_image.mirror(client, docker, platform="linux/arm64")
+    pulls = [args for args, _ in docker.calls if args[0] == "pull"]
+    assert pulls and all(p[:3] == ["pull", "--platform", "linux/arm64"] for p in pulls)
+
+
+def test_cli_platform_defaults_to_amd64_and_overrides(monkeypatch):
+    seen = []
+    monkeypatch.setenv("AWS_PROFILE", "stub")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setattr(
+        push_image.boto3,
+        "Session",
+        lambda **kw: type("S", (), {"client": lambda *a: None})(),
+    )
+    monkeypatch.setattr(push_image, "image_tag", lambda *a: "abc1234")
+    monkeypatch.setattr(push_image, "push", lambda *a: seen.append(a[4]))
+    monkeypatch.setattr(push_image, "mirror", lambda *a: seen.append(a[2]))
+    push_image.main([])
+    push_image.main(["--platform", "linux/arm64"])
+    push_image.main(["--mirror-base"])
+    assert seen == ["linux/amd64", "linux/arm64", "linux/amd64"]
 
 
 def test_dockerfile_base_image_argument_defaults_to_docker_hub_name():

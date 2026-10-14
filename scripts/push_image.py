@@ -2,11 +2,13 @@
 
 Usage:
     AWS_PROFILE=<sso-profile> python scripts/push_image.py [--region R] [--allow-dirty] \
-        [--base-image <base-images tag>]
-    AWS_PROFILE=<sso-profile> python scripts/push_image.py --mirror-base [--region R]
+        [--base-image <base-images tag>] [--platform linux/amd64]
+    AWS_PROFILE=<sso-profile> python scripts/push_image.py --mirror-base [--region R] \
+        [--platform linux/amd64]
 
-The image tag is the short git sha. Credentials come from the AWS_PROFILE profile through
-boto3. The ECR token goes to `docker login` on stdin only. Output masks the account id.
+The image tag is the short git sha. Images are built and pulled for linux/amd64 by default (Fargate
+x86_64), whatever the host CPU; pass --platform linux/arm64 for Graviton. Credentials come from the
+AWS_PROFILE profile through boto3. The ECR token goes to `docker login` on stdin only. Output masks the account id.
 """
 
 import argparse
@@ -24,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKLOAD_REPO = "triage-workload"
 BASE_REPO = "base-images"
 PYTHON_BASE = "python:3.12-slim"
+DEFAULT_PLATFORM = "linux/amd64"
 ENV_FORMAT = "{{range .Config.Env}}{{println .}}{{end}}"
 ACCOUNT_ID = re.compile(r"\b\d{12}\b")
 
@@ -87,10 +90,10 @@ def login(ecr, runner):
     return registry
 
 
-def push(ecr, runner, tag, base_tag=None):
+def push(ecr, runner, tag, base_tag=None, platform=DEFAULT_PLATFORM):
     registry = login(ecr, runner)
     image = f"{registry}/{WORKLOAD_REPO}:{tag}"
-    build = ["build", "-t", image]
+    build = ["build", "--platform", platform, "-t", image]
     if base_tag:
         build += ["--build-arg", f"BASE_IMAGE={registry}/{BASE_REPO}:{base_tag}"]
     docker(runner, [*build, "workload/"])
@@ -116,10 +119,10 @@ def tag_exists(ecr, tag):
     return True
 
 
-def mirror(ecr, runner):
+def mirror(ecr, runner, platform=DEFAULT_PLATFORM):
     registry = login(ecr, runner)
     for source in (PYTHON_BASE, uv_image()):
-        docker(runner, ["pull", source])
+        docker(runner, ["pull", "--platform", platform, source])
         if source == PYTHON_BASE:
             # 3.12-slim moves; tag the exact patch release the pull resolved to.
             env = docker(runner, ["image", "inspect", "--format", ENV_FORMAT, source])
@@ -141,6 +144,7 @@ def main(argv=None):
     parser.add_argument("--region")
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--base-image", metavar="TAG", help="Build FROM this base-images tag.")
+    parser.add_argument("--platform", default=DEFAULT_PLATFORM, help="Target platform (default: %(default)s).")
     parser.add_argument("--mirror-base", action="store_true", help="Mirror base images only.")
     args = parser.parse_args(argv)
 
@@ -150,9 +154,9 @@ def main(argv=None):
         raise SystemExit("error: AWS_PROFILE is not set. Export it and run again.")
     ecr = boto3.Session(profile_name=profile, region_name=region).client("ecr")
     if args.mirror_base:
-        mirror(ecr, run_docker)
+        mirror(ecr, run_docker, args.platform)
     else:
-        push(ecr, run_docker, image_tag(ROOT, args.allow_dirty), args.base_image)
+        push(ecr, run_docker, image_tag(ROOT, args.allow_dirty), args.base_image, args.platform)
 
 
 if __name__ == "__main__":

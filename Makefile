@@ -33,7 +33,8 @@ workload-docker:
 
 # Build workload/ and push it to ECR, tagged with the short git sha. Needs AWS_PROFILE and a region
 # (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). ARGS="--base-image <tag mirror-base printed>" builds
-# from the mirror; ARGS=--allow-dirty pushes uncommitted changes.
+# from the mirror; ARGS=--allow-dirty pushes uncommitted changes. Images are linux/amd64 (Fargate x86_64)
+# even on an M1 Mac; ARGS="--platform linux/arm64" overrides it for Graviton.
 push-image:
 	uv run --locked python scripts/push_image.py $(ARGS)
 

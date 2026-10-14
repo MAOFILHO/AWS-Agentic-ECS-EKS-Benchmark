@@ -109,6 +109,19 @@ def test_ecr_access_denied_does_not_print_account_id(ecr, capsys):
     _assert_clean(out.out + out.err)
 
 
+def test_mirror_describe_denied_exits_without_account_id(ecr):
+    client, stubber = ecr
+    _stub_token(stubber)
+    stubber.add_client_error(
+        "describe_images",
+        service_error_code="AccessDeniedException",
+        service_message=f"User: arn:aws:sts::{ACCOUNT}:assumed-role/dev/me is not authorized",
+    )
+    with pytest.raises(SystemExit) as exc:
+        push_image.mirror(client, Docker())
+    _assert_clean(str(exc.value.code))
+
+
 def test_region_flag_then_env(monkeypatch):
     monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-west-1")
     assert push_image.resolve_region(None) == "eu-west-1"

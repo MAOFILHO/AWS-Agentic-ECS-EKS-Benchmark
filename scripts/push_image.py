@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKLOAD_REPO = "triage-workload"
@@ -34,6 +34,11 @@ def redact(text):
 
 def say(text):
     print(redact(text))
+
+
+def aws_error(err):
+    """An AWS error as a clean exit: its message can carry the caller ARN, so the account id."""
+    return SystemExit(f"error: AWS call failed: {redact(str(err))}")
 
 
 def run_docker(args, input=None):
@@ -71,7 +76,10 @@ def image_tag(cwd, allow_dirty):
 
 def login(ecr, runner):
     """Log docker in to the registry; return the registry host."""
-    data = ecr.get_authorization_token()["authorizationData"][0]
+    try:
+        data = ecr.get_authorization_token()["authorizationData"][0]
+    except (BotoCoreError, ClientError) as err:
+        raise aws_error(err) from None
     user, password = base64.b64decode(data["authorizationToken"]).decode().split(":", 1)
     registry = data["proxyEndpoint"].removeprefix("https://")
     login_args = ["login", "--username", user, "--password-stdin", registry]
@@ -102,7 +110,9 @@ def tag_exists(ecr, tag):
     except ClientError as err:
         if err.response["Error"]["Code"] == "ImageNotFoundException":
             return False
-        raise
+        raise aws_error(err) from None
+    except BotoCoreError as err:
+        raise aws_error(err) from None
     return True
 
 

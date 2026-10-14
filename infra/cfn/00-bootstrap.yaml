@@ -161,6 +161,19 @@ Resources:
             Effect: Allow
             Action: eks:*
             Resource: "*"
+          # ECS instance role: the agent registers the instance and reports task state.
+          # The role policy scopes the cluster-bound actions to the cluster ARN.
+          - Sid: EcsAgent
+            Effect: Allow
+            Action:
+              - ecs:DeregisterContainerInstance
+              - ecs:DiscoverPollEndpoint
+              - ecs:Poll
+              - ecs:RegisterContainerInstance
+              - ecs:StartTelemetrySession
+              - ecs:Submit*
+              - ecs:UpdateContainerInstancesState
+            Resource: "*"
           # EKS cluster role scales node groups.
           - Sid: AutoScaling
             Effect: Allow

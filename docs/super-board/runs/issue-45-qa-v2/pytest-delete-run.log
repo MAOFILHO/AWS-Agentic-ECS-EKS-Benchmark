@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-45-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-45-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 13 items
+
+tests/test_delete_run.py::test_no_region_exits_naming_it_and_makes_no_aws_call PASSED [  7%]
+tests/test_delete_run.py::test_region_comes_from_flag_then_env PASSED    [ 15%]
+tests/test_delete_run.py::test_finds_only_run_stacks_newest_first PASSED [ 23%]
+tests/test_delete_run.py::test_deletes_in_given_order_and_waits_for_each PASSED [ 30%]
+tests/test_delete_run.py::test_delete_failed_exits_and_prints_failed_resources_masked PASSED [ 38%]
+tests/test_delete_run.py::test_deleted_nat_gateway_is_not_a_leftover PASSED [ 46%]
+tests/test_delete_run.py::test_absent_vpc_endpoint_is_not_a_leftover PASSED [ 53%]
+tests/test_delete_run.py::test_available_nat_gateway_and_other_resources_are_leftovers PASSED [ 61%]
+tests/test_delete_run.py::test_leftover_check_retries_until_clean PASSED [ 69%]
+tests/test_delete_run.py::test_live_leftover_fails_after_timeout_with_masked_arns PASSED [ 76%]
+tests/test_delete_run.py::test_mask_hides_account_ids PASSED             [ 84%]
+tests/test_delete_run.py::test_aws_error_output_masks_account_id PASSED  [ 92%]
+tests/test_delete_run.py::test_answer_other_than_y_aborts_before_deleting PASSED [100%]
+
+============================== 13 passed in 0.45s ==============================

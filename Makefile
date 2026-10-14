@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: bootstrap ecs-fargate benchmark teardown report workload-docker
+.PHONY: bootstrap ecs-fargate benchmark teardown report workload-docker push-image mirror-base
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 # Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
@@ -18,10 +18,25 @@ ecs-fargate:
 		--template infra/cfn/30-ecs.yaml --env-param RunId=RUN_ID \
 		--env-param NetworkStackName=NETWORK_STACK --env-param ImageUri=IMAGE_URI
 
-benchmark teardown report:
+# Delete every stack of one run, newest first, then check nothing tagged run-id=RUN_ID is left.
+# Needs AWS_PROFILE and a region (AWS_REGION or AWS_DEFAULT_REGION). Asks y/N first.
+teardown:
+	uv run --locked python scripts/delete_run.py --run-id "$(RUN_ID)"
+
+benchmark report:
 	@echo "not implemented yet"; exit 1
 
 # Build and run the workload image on :8080. LLM_MODE=bedrock uses BEDROCK_MODEL_ID, default amazon.nova-micro-v1:0.
 workload-docker:
 	docker build -t triage-workload workload/
 	docker run --rm -p 8080:8080 -e LLM_MODE=$${LLM_MODE:-mock} -e BEDROCK_MODEL_ID triage-workload
+
+# Build workload/ and push it to ECR, tagged with the short git sha. Needs AWS_PROFILE and a region
+# (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). ARGS="--base-image <tag mirror-base printed>" builds
+# from the mirror; ARGS=--allow-dirty pushes uncommitted changes.
+push-image:
+	uv run --locked python scripts/push_image.py $(ARGS)
+
+# Mirror python:3.12-slim and the pinned uv image into the base-images ECR repository.
+mirror-base:
+	uv run --locked python scripts/push_image.py --mirror-base $(ARGS)

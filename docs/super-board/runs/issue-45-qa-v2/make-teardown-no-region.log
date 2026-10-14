@@ -1,0 +1,3 @@
+uv run --locked python scripts/delete_run.py --run-id "r1"
+error: no region. Pass --region or set AWS_REGION or AWS_DEFAULT_REGION.
+make: *** [teardown] Error 1

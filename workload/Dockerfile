@@ -1,7 +1,9 @@
 # Build context is workload/ (docker build workload/), so dependencies come from
 # requirements.txt, exported from the root uv.lock:
 #   uv export --no-dev --no-hashes --frozen --no-emit-project -o workload/requirements.txt
-FROM python:3.12-slim
+# make push-image can build from the ECR mirror: --base-image <base-images tag>.
+ARG BASE_IMAGE=python:3.12-slim
+FROM ${BASE_IMAGE}
 # uv pinned to an exact version; bump the tag here.
 COPY --from=ghcr.io/astral-sh/uv:0.11.33 /uv /usr/local/bin/uv
 

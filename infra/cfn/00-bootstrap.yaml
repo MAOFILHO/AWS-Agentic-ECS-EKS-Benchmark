@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Bootstrap stack. Monthly budget alarm, the ECR repository for the workload image, and the GitHub OIDC deploy role.
+Description: Bootstrap stack. Monthly budget alarm, the ECR repositories for the workload image and its mirrored base images, and the GitHub OIDC deploy role.
 
 Parameters:
   BudgetEmail:
@@ -54,6 +54,34 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: triage-workload
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep the last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: project
+          Value: agentic-platform-advisor
+
+  # Mirror of the Dockerfile base images, so builds never pull from Docker Hub (SPEC 10).
+  BaseImagesRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: base-images
       ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration:
         ScanOnPush: true
@@ -384,6 +412,10 @@ Outputs:
   WorkloadRepositoryUri:
     Description: Registry URI the benchmark stacks pull the workload image from.
     Value: !GetAtt WorkloadRepository.RepositoryUri
+
+  BaseImagesRepositoryUri:
+    Description: Registry URI of the mirrored base images (make mirror-base).
+    Value: !GetAtt BaseImagesRepository.RepositoryUri
 
   DeployRoleArn:
     Description: Role ARN GitHub Actions assumes through OIDC. Store it as a repo variable, not in a file.

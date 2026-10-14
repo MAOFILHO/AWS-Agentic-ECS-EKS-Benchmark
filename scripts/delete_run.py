@@ -17,31 +17,6 @@ import time
 import boto3
 from botocore.exceptions import WaiterError
 
-# Every stack status except DELETE_COMPLETE.
-LIVE_STATUSES = [
-    "CREATE_IN_PROGRESS",
-    "CREATE_FAILED",
-    "CREATE_COMPLETE",
-    "ROLLBACK_IN_PROGRESS",
-    "ROLLBACK_FAILED",
-    "ROLLBACK_COMPLETE",
-    "DELETE_IN_PROGRESS",
-    "DELETE_FAILED",
-    "UPDATE_IN_PROGRESS",
-    "UPDATE_COMPLETE_CLEANUP_IN_PROGRESS",
-    "UPDATE_COMPLETE",
-    "UPDATE_FAILED",
-    "UPDATE_ROLLBACK_IN_PROGRESS",
-    "UPDATE_ROLLBACK_FAILED",
-    "UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS",
-    "UPDATE_ROLLBACK_COMPLETE",
-    "REVIEW_IN_PROGRESS",
-    "IMPORT_IN_PROGRESS",
-    "IMPORT_COMPLETE",
-    "IMPORT_ROLLBACK_IN_PROGRESS",
-    "IMPORT_ROLLBACK_FAILED",
-    "IMPORT_ROLLBACK_COMPLETE",
-]
 # The tag index keeps these for minutes after delete; trust EC2's own state instead.
 LAGGING = {
     "natgateway": ("describe_nat_gateways", "Filter", "nat-gateway-id", "NatGateways"),
@@ -63,9 +38,15 @@ def resolve_region(flag):
     return region
 
 
+def live_statuses(cfn):
+    """Every stack status the installed API knows, except DELETE_COMPLETE."""
+    statuses = cfn.meta.service_model.shape_for("StackStatus").enum
+    return [s for s in statuses if s != "DELETE_COMPLETE"]
+
+
 def run_stacks(cfn, run_id):
     """Names of the run's live stacks, newest first."""
-    pages = cfn.get_paginator("list_stacks").paginate(StackStatusFilter=LIVE_STATUSES)
+    pages = cfn.get_paginator("list_stacks").paginate(StackStatusFilter=live_statuses(cfn))
     stacks = [
         s
         for page in pages

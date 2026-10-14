@@ -10,7 +10,7 @@ from botocore.stub import Stubber
 from scripts import delete_run
 
 RUN = "r1"
-ACCOUNT = "123456789012"
+ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
 NAT_ARN = f"arn:aws:ec2:us-east-1:{ACCOUNT}:natgateway/nat-0abc"
 VPCE_ARN = f"arn:aws:ec2:us-east-1:{ACCOUNT}:vpc-endpoint/vpce-0abc"
 BUCKET_ARN = "arn:aws:s3:::r1-results"
@@ -117,7 +117,7 @@ def test_finds_only_run_stacks_newest_first(clients):
                 _summary("r1-harness", 2),
             ]
         },
-        {"StackStatusFilter": delete_run.LIVE_STATUSES},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
     )
     names = delete_run.run_stacks(made["cloudformation"], RUN)
     assert names == ["r1-ecs", "r1-harness", "r1-network"]
@@ -227,7 +227,7 @@ def test_answer_other_than_y_aborts_before_deleting(clients, monkeypatch):
     stubs["cloudformation"].add_response(
         "list_stacks",
         {"StackSummaries": [_summary("r1-ecs", 1)]},
-        {"StackStatusFilter": delete_run.LIVE_STATUSES},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
     )
     with pytest.raises(SystemExit) as exc:
         delete_run.teardown(

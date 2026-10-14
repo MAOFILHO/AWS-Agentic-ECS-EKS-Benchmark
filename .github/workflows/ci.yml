@@ -38,7 +38,8 @@ jobs:
         run: uvx cfn-lint==1.57.2 infra/cfn/*.yaml
       - name: Install cfn-guard
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/aws-cloudformation/cloudformation-guard/main/install-guard.sh | sh -s -- -v 3.1.2
+          # Installer pinned to the 3.1.2 tag commit; it installs cfn-guard 3.1.2. Bump both together.
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/aws-cloudformation/cloudformation-guard/de26750fa2d97099272156238041968abeb3b95b/install-guard.sh | sh -s -- -v 3.1.2
           echo "$HOME/.guard/bin" >> "$GITHUB_PATH"
       - name: cfn-guard validate
         run: cfn-guard validate --data infra/cfn --rules infra/cfn-guard/rules.guard

@@ -109,6 +109,16 @@ def _gone(ec2, ecs, arn):
     kind, _, resource_id = arn.split(":", 5)[5].partition("/")
     if kind in ECS_KINDS:
         return _ecs_stale(ecs, kind, arn, resource_id)
+    if kind == "instance":
+        # EC2 lists a terminated instance for about an hour.
+        try:
+            reservations = ec2.describe_instances(InstanceIds=[resource_id])["Reservations"]
+        except ClientError as err:
+            if err.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                return True
+            raise
+        found = [i for r in reservations for i in r["Instances"]]
+        return all(i["State"]["Name"] in {"terminated", "shutting-down"} for i in found)
     if kind not in LAGGING:
         return False
     method, filter_param, filter_name, key = LAGGING[kind]

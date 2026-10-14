@@ -17,11 +17,12 @@ import time
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError, WaiterError
 
-# The tag index keeps these for minutes after delete; trust EC2's own state instead.
+# The tag index keeps these for minutes after delete; trust EC2's and ECS's own state instead.
 LAGGING = {
     "natgateway": ("describe_nat_gateways", "Filter", "nat-gateway-id", "NatGateways"),
     "vpc-endpoint": ("describe_vpc_endpoints", "Filters", "vpc-endpoint-id", "VpcEndpoints"),
 }
+ECS_KINDS = {"cluster", "service", "task-definition", "task"}
 CHECK_INTERVAL = 30
 
 
@@ -79,8 +80,32 @@ def delete_stacks(cfn, names):
         print(f"{name}: deleted.")
 
 
-def _gone(ec2, arn):
-    kind, _, resource_id = arn.rsplit(":", 1)[-1].partition("/")
+def _ecs_stale(ecs, kind, arn, resource_id):
+    """True when ECS reports the item INACTIVE or STOPPED, or does not know it at all."""
+    cluster = resource_id.split("/")[0]
+    if kind == "cluster":
+        items, key, dead = ecs.describe_clusters(clusters=[arn])["clusters"], "status", "INACTIVE"
+    elif kind == "service":
+        found = ecs.describe_services(cluster=cluster, services=[arn])
+        items, key, dead = found["services"], "status", "INACTIVE"
+    elif kind == "task-definition":
+        found = ecs.describe_task_definition(taskDefinition=arn)
+        items, key, dead = [found["taskDefinition"]], "status", "INACTIVE"
+    else:
+        try:
+            found = ecs.describe_tasks(cluster=cluster, tasks=[arn])
+        except ClientError as err:
+            if err.response["Error"]["Code"] == "ClusterNotFoundException":
+                return True
+            raise
+        items, key, dead = found["tasks"], "lastStatus", "STOPPED"
+    return all(item[key] == dead for item in items)
+
+
+def _gone(ec2, ecs, arn):
+    kind, _, resource_id = arn.split(":", 5)[5].partition("/")
+    if kind in ECS_KINDS:
+        return _ecs_stale(ecs, kind, arn, resource_id)
     if kind not in LAGGING:
         return False
     method, filter_param, filter_name, key = LAGGING[kind]
@@ -90,17 +115,17 @@ def _gone(ec2, arn):
     return all(item["State"].lower() == "deleted" for item in found)
 
 
-def leftovers(tagging, ec2, run_id):
+def leftovers(tagging, ec2, ecs, run_id):
     pages = tagging.get_paginator("get_resources").paginate(
         TagFilters=[{"Key": "run-id", "Values": [run_id]}]
     )
     arns = [m["ResourceARN"] for page in pages for m in page["ResourceTagMappingList"]]
-    return [arn for arn in arns if not _gone(ec2, arn)]
+    return [arn for arn in arns if not _gone(ec2, ecs, arn)]
 
 
-def check_leftovers(tagging, ec2, run_id, timeout, sleep=time.sleep, clock=time.monotonic):
+def check_leftovers(tagging, ec2, ecs, run_id, timeout, sleep=time.sleep, clock=time.monotonic):
     deadline = clock() + timeout
-    while found := leftovers(tagging, ec2, run_id):
+    while found := leftovers(tagging, ec2, ecs, run_id):
         if clock() >= deadline:
             for arn in found:
                 print(f"  leftover {mask(arn)}", file=sys.stderr)
@@ -109,13 +134,13 @@ def check_leftovers(tagging, ec2, run_id, timeout, sleep=time.sleep, clock=time.
     print(f"run-id={run_id}: no leftovers.")
 
 
-def teardown(cfn, ec2, tagging, run_id, timeout, answer=input):
+def teardown(cfn, ec2, ecs, tagging, run_id, timeout, answer=input):
     names = run_stacks(cfn, run_id)
     print(f"Stacks to delete, newest first: {', '.join(names) or 'none'}")
     if names and answer("Delete these stacks? [y/N] ").strip() != "y":
         raise SystemExit("Aborted. Nothing was deleted.")
     delete_stacks(cfn, names)
-    check_leftovers(tagging, ec2, run_id, timeout)
+    check_leftovers(tagging, ec2, ecs, run_id, timeout)
 
 
 def main(argv=None):
@@ -140,6 +165,7 @@ def main(argv=None):
         teardown(
             session.client("cloudformation"),
             session.client("ec2"),
+            session.client("ecs"),
             session.client("resourcegroupstaggingapi"),
             args.run_id,
             args.leftover_timeout,

@@ -2,7 +2,8 @@
 # requirements.txt, exported from the root uv.lock:
 #   uv export --no-dev --no-hashes --frozen --no-emit-project -o workload/requirements.txt
 FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /usr/local/bin/uv
+# uv pinned to an exact version; bump the tag here.
+COPY --from=ghcr.io/astral-sh/uv:0.11.33 /uv /usr/local/bin/uv
 
 WORKDIR /srv
 COPY requirements.txt .

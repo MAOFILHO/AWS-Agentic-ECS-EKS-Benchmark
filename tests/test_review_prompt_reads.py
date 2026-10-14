@@ -12,7 +12,7 @@ CONFIG = json.loads(
 
 
 def _review_reads() -> str:
-    match = re.search(r"const REVIEW_READS = \[(.*?)\n\]", WAVE, re.S)
+    match = re.search(r"const REVIEW_READS = \[(.*?)\n\]", WAVE, re.DOTALL)
     assert match, "REVIEW_READS block missing from super-board-wave.js"
     return match.group(1)
 

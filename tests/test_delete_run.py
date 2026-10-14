@@ -239,6 +239,29 @@ def test_live_leftover_fails_after_timeout_with_masked_arns(clients, capsys):
     assert not re.search(r"\d{12}", text)
 
 
+def test_each_retry_prints_one_progress_line_without_account_id(clients, capsys):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [NAT_ARN, BUCKET_ARN])
+    _stub_nat(stubs["ec2"], "available")
+    _stub_tags(stubs["resourcegroupstaggingapi"], [BUCKET_ARN])
+    _stub_tags(stubs["resourcegroupstaggingapi"], [])
+    delete_run.check_leftovers(
+        made["resourcegroupstaggingapi"],
+        made["ec2"],
+        made["ecs"],
+        RUN,
+        timeout=900,
+        sleep=lambda _s: None,
+    )
+    out = capsys.readouterr().out
+    progress = [line for line in out.splitlines() if line.startswith("checking leftovers")]
+    assert progress == [
+        f"checking leftovers (attempt 1, 2 left, next check in {delete_run.CHECK_INTERVAL} s)",
+        f"checking leftovers (attempt 2, 1 left, next check in {delete_run.CHECK_INTERVAL} s)",
+    ]
+    assert not re.search(r"\d{12}", out)
+
+
 def test_mask_hides_account_ids():
     assert delete_run.mask(NAT_ARN) == "arn:aws:ec2:us-east-1:************:natgateway/nat-0abc"
 

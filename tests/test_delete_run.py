@@ -332,10 +332,29 @@ def test_missing_ecs_item_is_not_a_leftover(clients):
     assert _leftovers(made) == []
 
 
-def test_task_in_an_inactive_cluster_is_not_a_leftover(clients):
+@pytest.mark.parametrize("arn,method", [(TASK_ARN, "describe_tasks"), (SERVICE_ARN, "describe_services")])
+def test_service_or_task_in_a_gone_cluster_is_not_a_leftover(clients, arn, method):
     made, stubs = clients
-    _stub_tags(stubs["resourcegroupstaggingapi"], [TASK_ARN])
-    stubs["ecs"].add_client_error("describe_tasks", "ClusterNotFoundException")
+    _stub_tags(stubs["resourcegroupstaggingapi"], [arn])
+    stubs["ecs"].add_client_error(method, "ClusterNotFoundException")
+    assert _leftovers(made) == []
+
+
+def test_unknown_task_definition_is_not_a_leftover(clients):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [TASKDEF_ARN])
+    stubs["ecs"].add_client_error("describe_task_definition", "ClientException")
+    assert _leftovers(made) == []
+
+
+def test_delete_in_progress_task_definition_is_not_a_leftover(clients):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [TASKDEF_ARN])
+    stubs["ecs"].add_response(
+        "describe_task_definition",
+        {"taskDefinition": {"taskDefinitionArn": TASKDEF_ARN, "status": "DELETE_IN_PROGRESS"}},
+        {"taskDefinition": TASKDEF_ARN},
+    )
     assert _leftovers(made) == []
 
 

@@ -81,25 +81,28 @@ def delete_stacks(cfn, names):
 
 
 def _ecs_stale(ecs, kind, arn, resource_id):
-    """True when ECS reports the item INACTIVE or STOPPED, or does not know it at all."""
+    """True when ECS reports the item gone: INACTIVE, STOPPED, DELETE_IN_PROGRESS or unknown."""
     cluster = resource_id.split("/")[0]
-    if kind == "cluster":
-        items, key, dead = ecs.describe_clusters(clusters=[arn])["clusters"], "status", "INACTIVE"
-    elif kind == "service":
-        found = ecs.describe_services(cluster=cluster, services=[arn])
-        items, key, dead = found["services"], "status", "INACTIVE"
-    elif kind == "task-definition":
-        found = ecs.describe_task_definition(taskDefinition=arn)
-        items, key, dead = [found["taskDefinition"]], "status", "INACTIVE"
-    else:
-        try:
-            found = ecs.describe_tasks(cluster=cluster, tasks=[arn])
-        except ClientError as err:
-            if err.response["Error"]["Code"] == "ClusterNotFoundException":
-                return True
-            raise
-        items, key, dead = found["tasks"], "lastStatus", "STOPPED"
-    return all(item[key] == dead for item in items)
+    try:
+        if kind == "cluster":
+            items = ecs.describe_clusters(clusters=[arn])["clusters"]
+            key, dead = "status", {"INACTIVE"}
+        elif kind == "service":
+            items = ecs.describe_services(cluster=cluster, services=[arn])["services"]
+            key, dead = "status", {"INACTIVE"}
+        elif kind == "task-definition":
+            items = [ecs.describe_task_definition(taskDefinition=arn)["taskDefinition"]]
+            key, dead = "status", {"INACTIVE", "DELETE_IN_PROGRESS"}
+        else:
+            items = ecs.describe_tasks(cluster=cluster, tasks=[arn])["tasks"]
+            key, dead = "lastStatus", {"STOPPED"}
+    except ClientError as err:
+        # A gone cluster fails service and task lookups; ECS rejects a gone task definition.
+        gone = "ClusterNotFoundException" if kind != "task-definition" else "ClientException"
+        if err.response["Error"]["Code"] == gone:
+            return True
+        raise
+    return all(item[key] in dead for item in items)
 
 
 def _gone(ec2, ecs, arn):

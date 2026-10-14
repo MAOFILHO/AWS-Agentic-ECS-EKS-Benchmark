@@ -126,6 +126,16 @@ const REVIEW_MEMORY = [
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
 ]
 
+// Review-lane reads that work (#39). Review agents invented bad reads four times and each
+// one halted the board. Repo is `repo.remote` in the config; it is not guessed.
+const REVIEW_READS = [
+  `Review reads, repo MAOFILHO/agentic-platform-advisor (config repo.remote; use it as given):`,
+  `- PR fields: gh pr view <N> --json <fields> with only valid fields (headRefName, headRefOid, body, files, labels, additions, deletions, changedFiles, state, mergeCommit, comments, reviews, reviewDecision, statusCheckRollup)`,
+  `- review threads: gh api graphql -f query='query{repository(owner:"MAOFILHO",name:"agentic-platform-advisor"){pullRequest(number:<N>){reviewThreads(first:100){nodes{id isResolved comments(first:20){nodes{body path line}}}}}}}'`,
+  `- PR comments: gh api repos/MAOFILHO/agentic-platform-advisor/issues/<N>/comments --paginate --slurp, no --jq`,
+  `Not allowed: --slurp together with --jq; a wrong repo name; reviewThreads in gh pr view (it is not a gh pr view field, use gh api graphql).`,
+]
+
 // GitHub budget (rate-limit-etiquette.md → "Price list"). Measured 2026-10-04: a
 // 3-card wave spent ~2,850 of 5,000 GraphQL points/hr, nearly all of it lanes
 // finding a card with `gh project item-list` (~203 points on a 131-card board)
@@ -142,7 +152,7 @@ const lanePrompt = (lane, card) => [
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
-  ...(lane === 'review' ? REVIEW_MEMORY : []),
+  ...(lane === 'review' ? [...REVIEW_READS, ...REVIEW_MEMORY] : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]
     : []),

@@ -1,0 +1,5 @@
+Using CPython 3.12.14
+Creating virtual environment at: .venv
+Installed 56 packages in 224ms
+All checks passed!
+exit 0

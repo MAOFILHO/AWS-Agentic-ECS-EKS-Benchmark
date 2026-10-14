@@ -5,6 +5,7 @@ from pathlib import Path
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from botocore.stub import ANY, Stubber
 
 from scripts import deploy_stack
@@ -231,3 +232,75 @@ def test_make_bootstrap_passes_the_provider_arn_as_optional():
     ).stdout
 
     assert "--optional-env-param ExistingOidcProviderArn=OIDC_PROVIDER_ARN" in out
+
+
+# Failed change set detail (issue #37).
+
+LONG_REASON = (
+    "Template format error: resource Repo references an unknown parameter; "
+    "see the AWS::ECR::Repository docs for the full list of required properties."
+)
+
+
+def _stub_failed_change_set(stubber, reason):
+    stubber.add_client_error(
+        "describe_stacks",
+        service_error_code="ValidationError",
+        service_message=f"Stack with id {STACK} does not exist",
+    )
+    stubber.add_response(
+        "create_change_set",
+        {"Id": "cs-arn", "StackId": "stack-arn"},
+        {
+            "StackName": STACK,
+            "ChangeSetName": ANY,
+            "ChangeSetType": "CREATE",
+            "TemplateBody": "body",
+            "Parameters": [{"ParameterKey": "BudgetEmail", "ParameterValue": "a@b.co"}],
+            "Capabilities": ["CAPABILITY_NAMED_IAM"],
+        },
+    )
+    stubber.add_response(
+        "describe_change_set",
+        {"Status": "FAILED", "StatusReason": reason},
+        {"StackName": STACK, "ChangeSetName": ANY},
+    )
+
+
+def test_failed_change_set_exits_with_full_reason_and_deletes_it(cfn):
+    client, stubber = cfn
+    _stub_failed_change_set(stubber, LONG_REASON)
+    stubber.add_response(
+        "delete_change_set", {}, {"StackName": STACK, "ChangeSetName": ANY}
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _deploy(client, "y")
+
+    assert exc.value.code not in (0, None)
+    assert LONG_REASON in str(exc.value.code)
+
+
+def test_failed_change_set_reason_is_shown_even_if_delete_fails(cfn, capsys):
+    client, stubber = cfn
+    _stub_failed_change_set(stubber, LONG_REASON)
+    stubber.add_client_error("delete_change_set", service_error_code="Throttling")
+
+    with pytest.raises(ClientError):
+        _deploy(client, "y")
+
+    assert LONG_REASON in capsys.readouterr().err
+
+
+def test_no_changes_change_set_exits_zero_with_message(cfn, capsys):
+    client, stubber = cfn
+    _stub_failed_change_set(
+        stubber, "The submitted information didn't contain changes."
+    )
+    stubber.add_response(
+        "delete_change_set", {}, {"StackName": STACK, "ChangeSetName": ANY}
+    )
+
+    _deploy(client, "y")
+
+    assert "no changes." in capsys.readouterr().out

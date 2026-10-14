@@ -128,11 +128,18 @@ def leftovers(tagging, ec2, ecs, run_id):
 
 def check_leftovers(tagging, ec2, ecs, run_id, timeout, sleep=time.sleep, clock=time.monotonic):
     deadline = clock() + timeout
+    attempt = 0
     while found := leftovers(tagging, ec2, ecs, run_id):
+        attempt += 1
         if clock() >= deadline:
             for arn in found:
                 print(f"  leftover {mask(arn)}", file=sys.stderr)
             raise SystemExit(f"error: {len(found)} resource(s) tagged run-id={run_id} still live.")
+        print(
+            f"checking leftovers (attempt {attempt}, {len(found)} left,"
+            f" next check in {CHECK_INTERVAL} s)",
+            flush=True,
+        )
         sleep(CHECK_INTERVAL)
     print(f"run-id={run_id}: no leftovers.")
 

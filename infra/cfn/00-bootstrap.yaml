@@ -388,3 +388,9 @@ Outputs:
   DeployRoleArn:
     Description: Role ARN GitHub Actions assumes through OIDC. Store it as a repo variable, not in a file.
     Value: !GetAtt DeployRole.Arn
+
+  StackRoleBoundaryArn:
+    Description: Permissions boundary the benchmark stacks put on every role they create.
+    Value: !Ref StackRoleBoundary
+    Export:
+      Name: agentic-platform-advisor-StackRoleBoundaryArn

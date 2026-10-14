@@ -51,3 +51,11 @@ jobs:
           fi
       - name: cfn-guard accepts the fixed copy
         run: cfn-guard validate --data tests/cfn-guard/good-immutable-ecr.yaml --rules infra/cfn-guard/rules.guard
+      - name: cfn-guard rejects a task security group open to the internet
+        run: |
+          if cfn-guard validate --data tests/cfn-guard/bad-open-task-sg.yaml --rules infra/cfn-guard/rules.guard; then
+            echo "expected cfn-guard to fail on the open task security group fixture"
+            exit 1
+          fi
+      - name: cfn-guard accepts the closed task security group
+        run: cfn-guard validate --data tests/cfn-guard/good-closed-task-sg.yaml --rules infra/cfn-guard/rules.guard

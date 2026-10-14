@@ -14,6 +14,7 @@ ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
 NAT_ARN = f"arn:aws:ec2:us-east-1:{ACCOUNT}:natgateway/nat-0abc"
 VPCE_ARN = f"arn:aws:ec2:us-east-1:{ACCOUNT}:vpc-endpoint/vpce-0abc"
 BUCKET_ARN = "arn:aws:s3:::r1-results"
+INSTANCE_ARN = f"arn:aws:ec2:us-east-1:{ACCOUNT}:instance/i-0abc"
 ECS_PREFIX = f"arn:aws:ecs:us-east-1:{ACCOUNT}"
 CLUSTER_ARN = f"{ECS_PREFIX}:cluster/r1-ecs"
 SERVICE_ARN = f"{ECS_PREFIX}:service/r1-ecs/r1-svc"
@@ -407,3 +408,35 @@ def test_active_cluster_service_task_definition_and_running_task_are_leftovers(c
         {"cluster": "r1-ecs", "tasks": [TASK_ARN]},
     )
     assert _leftovers(made) == arns
+
+
+def _stub_instance(ec2_stub, state):
+    instances = [{"InstanceId": "i-0abc", "State": {"Name": state}}] if state else []
+    ec2_stub.add_response(
+        "describe_instances",
+        {"Reservations": [{"Instances": instances}] if instances else []},
+        {"InstanceIds": ["i-0abc"]},
+    )
+
+
+@pytest.mark.parametrize("state", ["terminated", "shutting-down"])
+def test_terminated_ec2_instance_is_not_a_leftover(clients, state):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [INSTANCE_ARN])
+    _stub_instance(stubs["ec2"], state)
+    assert _leftovers(made) == []
+
+
+@pytest.mark.parametrize("state", ["running", "stopped"])
+def test_running_or_stopped_ec2_instance_is_a_leftover(clients, state):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [INSTANCE_ARN])
+    _stub_instance(stubs["ec2"], state)
+    assert _leftovers(made) == [INSTANCE_ARN]
+
+
+def test_purged_ec2_instance_is_not_a_leftover(clients):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [INSTANCE_ARN])
+    stubs["ec2"].add_client_error("describe_instances", "InvalidInstanceID.NotFound")
+    assert _leftovers(made) == []

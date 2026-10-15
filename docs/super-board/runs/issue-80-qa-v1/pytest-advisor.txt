@@ -1,0 +1,35 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-80-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-80-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 25 items
+
+tests/test_advisor_state.py::test_run_state_round_trips_through_json PASSED [  4%]
+tests/test_advisor_state.py::test_run_state_rejects_unknown_cell PASSED  [  8%]
+tests/test_advisor_state.py::test_figure_without_source_is_rejected PASSED [ 12%]
+tests/test_advisor_state.py::test_metrics_json_round_trips_with_shared_costs_and_gaps PASSED [ 16%]
+tests/test_advisor_state.py::test_bad_run_id_is_refused[] PASSED         [ 20%]
+tests/test_advisor_state.py::test_bad_run_id_is_refused[Bad] PASSED      [ 24%]
+tests/test_advisor_state.py::test_bad_run_id_is_refused[a_b] PASSED      [ 28%]
+tests/test_advisor_state.py::test_bad_run_id_is_refused[xxxxxxxxxxxxxxxxxxxxxxxxx] PASSED [ 32%]
+tests/test_advisor_state.py::test_bad_run_id_is_refused[../etc] PASSED   [ 36%]
+tests/test_advisor_state.py::test_bad_run_id_is_refused[a b] PASSED      [ 40%]
+tests/test_advisor_state.py::test_run_dirs_are_created_under_root PASSED [ 44%]
+tests/test_advisor_state.py::test_checkpointer_file_opens PASSED         [ 48%]
+tests/test_advisor_state.py::test_advisor_files_hold_no_account_id_or_email PASSED [ 52%]
+tests/test_advisor_state_qa.py::test_run_id_with_newline_or_out_of_range_is_refused[abc\n] PASSED [ 56%]
+tests/test_advisor_state_qa.py::test_run_id_with_newline_or_out_of_range_is_refused[abc-\n] PASSED [ 60%]
+tests/test_advisor_state_qa.py::test_run_id_with_newline_or_out_of_range_is_refused[\nabc] PASSED [ 64%]
+tests/test_advisor_state_qa.py::test_run_id_with_newline_or_out_of_range_is_refused[-------------------------] PASSED [ 68%]
+tests/test_advisor_state_qa.py::test_run_id_with_newline_or_out_of_range_is_refused[ABC-1] PASSED [ 72%]
+tests/test_advisor_state_qa.py::test_run_id_at_the_edges_is_accepted[a] PASSED [ 76%]
+tests/test_advisor_state_qa.py::test_run_id_at_the_edges_is_accepted[xxxxxxxxxxxxxxxxxxxxxxxx] PASSED [ 80%]
+tests/test_advisor_state_qa.py::test_run_id_at_the_edges_is_accepted[0-9-z] PASSED [ 84%]
+tests/test_advisor_state_qa.py::test_figure_with_null_source_is_rejected PASSED [ 88%]
+tests/test_advisor_state_qa.py::test_shared_cost_without_source_is_rejected PASSED [ 92%]
+tests/test_advisor_state_qa.py::test_full_run_state_round_trips_with_every_field_set PASSED [ 96%]
+tests/test_advisor_state_qa.py::test_written_outputs_and_tests_hold_no_account_id_or_email PASSED [100%]
+
+============================== 25 passed in 0.18s ==============================

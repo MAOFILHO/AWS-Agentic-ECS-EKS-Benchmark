@@ -2,10 +2,10 @@
 
 | AC | Result | Proof |
 |---|---|---|
-| AC1 RunState JSON round trip | ✅ | `tests/test_advisor_state.py:27`, full-field case `tests/test_advisor_state_qa.py:48` |
-| AC2 figure without source rejected | ✅ | missing and empty `test_advisor_state.py:40`, null `test_advisor_state_qa.py:38` |
-| AC3 bad run_id refused | ✅ | `test_advisor_state.py:67`, newline and edge cases `test_advisor_state_qa.py:26` |
-| AC4 no account id or email | ✅ | outputs + tests scanned `test_advisor_state_qa.py:53`, `scan.txt` 0 hits |
+| AC1 RunState JSON round trip | ✅ | `tests/test_advisor_state.py:27`, full-field case `tests/test_advisor_state_qa.py:51` |
+| AC2 figure without source rejected | ✅ | missing and empty `test_advisor_state.py:40`, null `test_advisor_state_qa.py:41` |
+| AC3 bad run_id refused | ✅ | `test_advisor_state.py:67`, newline and edge cases `test_advisor_state_qa.py:27` |
+| AC4 no account id or email | ✅ | outputs + tests scanned `test_advisor_state_qa.py:56`, `scan.txt` 0 hits |
 | AC5 ruff + pytest | ✅ | `ruff.txt` clean, `pytest.txt` 207 passed |
 
 Test gaps (not written):

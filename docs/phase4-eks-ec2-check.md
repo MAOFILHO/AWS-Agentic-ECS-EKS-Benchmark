@@ -68,7 +68,7 @@ ECS numbers come from `docs/phase3-fargate-check.md` (run `p3fg2`) and `docs/pha
 ## Commands run
 
 a. `aws login --profile default-advanced`, then set `AWS_PROFILE`, `AWS_REGION=us-east-1`, `AWS_DEFAULT_REGION=us-east-1`, `BUDGET_EMAIL` and `OIDC_PROVIDER_ARN`
-b. `brew install helm`
+b. Install Helm with `brew`
 c. `make bootstrap`, run again after the card #75 fix merged
 d. `make push-image`
 e. `make eks-ec2 RUN_ID=p4ek1`, run twice (the second run after the card #77 fix)

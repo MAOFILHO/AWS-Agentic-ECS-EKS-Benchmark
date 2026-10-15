@@ -1,0 +1,3 @@
+# eks-ec2 cell: pin pods to the managed node group (EKS sets this label on its nodes).
+nodeSelector:
+  eks.amazonaws.com/nodegroup: workload

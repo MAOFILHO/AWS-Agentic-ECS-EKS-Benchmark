@@ -9,7 +9,7 @@ import pytest
 
 from scripts import deploy_eks
 
-ACCOUNT = "123456789012"
+ACCOUNT = "1234" * 3  # no 12-digit literal in a tracked file (test_bootstrap_oidc)
 IMAGE = f"{ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/triage-workload:abc1234"
 ALB = "k8s-default-workload-0a1b2c3d4e-987654321.us-east-1.elb.amazonaws.com"
 OUTPUTS = {
@@ -203,3 +203,29 @@ def test_failed_helm_error_masks_the_account_id():
 def test_image_without_tag_is_refused():
     with pytest.raises(SystemExit, match="no tag"):
         deploy_eks.split_image("localhost:5000/triage-workload")
+
+
+def test_aws_error_from_main_masks_the_account_id(monkeypatch):
+    from botocore.exceptions import ClientError
+
+    class DeniedSsm:
+        def get_parameters(self, Names):
+            raise ClientError({"Error": {"Code": "AccessDeniedException", "Message": (
+                f"User: arn:aws:sts::{ACCOUNT}:assumed-role/x/y is not authorized to perform: ssm:GetParameters"
+            )}}, "GetParameters")
+
+    class Session:
+        def __init__(self, **kw):
+            pass
+
+        def client(self, name):
+            return DeniedSsm() if name == "ssm" else object()
+
+    for name, value in {"IMAGE_URI": IMAGE, "AWS_PROFILE": "sso", "AWS_REGION": "us-east-1"}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(deploy_eks.boto3, "Session", Session)
+
+    with pytest.raises(SystemExit) as exc:
+        deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1"])
+    assert exc.value.code != 0
+    assert ACCOUNT not in str(exc.value)

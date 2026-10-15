@@ -1,0 +1,3 @@
+=========================== short test summary info ============================
+FAILED tests/test_bootstrap_oidc.py::test_no_tracked_text_file_holds_an_account_id
+1 failed, 161 passed, 13 skipped in 3.36s

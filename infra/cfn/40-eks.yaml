@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Benchmark cell eks-ec2 or eks-fargate (ComputeType). EKS cluster in the private subnets
+  with API authentication, add-ons, and either a managed node group (EC2) or a Fargate profile.
+
+# Control-plane subnets come from the 10-network stack, which excludes AZ us-east-1e
+# (EKS control-plane subnets cannot use it, SPEC section 10).
+# Control-plane logging stays off: Logging is omitted, so no log types are enabled (cost).
+# The deploying principal becomes cluster admin through BootstrapClusterCreatorAdminPermissions,
+# which creates its access entry. No separate AccessEntry resource, or the two would conflict.
+
+Parameters:
+  RunId:
+    Type: String
+    Description: Benchmark run id, written to the run-id tag.
+    AllowedPattern: "[a-z0-9-]+"
+  TtlHours:
+    Type: Number
+    Default: 4
+    MinValue: 1
+    Description: Hours before the janitor deletes this stack.
+  NetworkStackName:
+    Type: String
+    Description: Name of the 10-network stack whose exports this stack reads.
+  ComputeType:
+    Type: String
+    Default: EC2
+    AllowedValues: [EC2, FARGATE]
+    Description: EC2 for the eks-ec2 cell (managed node group), FARGATE for the eks-fargate cell (Fargate profile).
+  KubernetesVersion:
+    Type: String
+    AllowedPattern: '[0-9]+\.[0-9]+'
+    Description: Kubernetes minor version, for example 1.33. The deploy script resolves it from SSM public parameters (SPEC section 10).
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    Description: Node instance type (ComputeType=EC2 only). x86_64, to match the amd64 image.
+  MinNodes:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    Description: Node group minimum and starting size (ComputeType=EC2 only).
+  MaxNodes:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    Description: Node group maximum size (ComputeType=EC2 only).
+
+Conditions:
+  IsEc2: !Equals [!Ref ComputeType, EC2]
+  IsFargate: !Equals [!Ref ComputeType, FARGATE]
+
+Resources:
+  ClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSClusterPolicy"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  # Nodes join the cluster, pull images, run the VPC CNI, and talk to the Pod Identity agent.
+  NodeRole:
+    Type: AWS::IAM::Role
+    Condition: IsEc2
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: eks-ec2 }
+
+  # Fargate runs the kubelet for each pod. It pulls images and writes logs, nothing else.
+  # An inline policy instead of AmazonEKSFargatePodExecutionRolePolicy: the boundary check
+  # covers inline actions, and the deploy role may not attach that managed policy.
+  PodExecutionRole:
+    Type: AWS::IAM::Role
+    Condition: IsFargate
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks-fargate-pods.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub "arn:${AWS::Partition}:eks:${AWS::Region}:${AWS::AccountId}:fargateprofile/${RunId}-eks-fargate/*"
+      Policies:
+        - PolicyName: pull-image-write-logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: "*"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: eks-fargate }
+
+  Cluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !If [IsEc2, !Sub "${RunId}-eks-ec2", !Sub "${RunId}-eks-fargate"]
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt ClusterRole.Arn
+      AccessConfig:
+        AuthenticationMode: API
+        BootstrapClusterCreatorAdminPermissions: true
+      ResourcesVpcConfig:
+        SubnetIds: !Split [",", !ImportValue { "Fn::Sub": "${NetworkStackName}-PrivateSubnetIds" }]
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: true
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  # Add-ons that run as DaemonSets need nodes; the node group waits for the CNI.
+  VpcCniAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: vpc-cni
+      ResolveConflicts: OVERWRITE
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  KubeProxyAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: kube-proxy
+      ResolveConflicts: OVERWRITE
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  # On Fargate, CoreDNS must be told to run there or its pods stay Pending.
+  CoreDnsAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: coredns
+      ResolveConflicts: OVERWRITE
+      ConfigurationValues: !If [IsFargate, '{"computeType":"Fargate"}', !Ref "AWS::NoValue"]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  MetricsServerAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: metrics-server
+      ResolveConflicts: OVERWRITE
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  PodIdentityAgentAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: eks-pod-identity-agent
+      ResolveConflicts: OVERWRITE
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+
+  # eks-ec2 only. AL2023 x86_64 managed nodes in the private subnets.
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Condition: IsEc2
+    DependsOn: VpcCniAddon
+    Properties:
+      ClusterName: !Ref Cluster
+      NodeRole: !GetAtt NodeRole.Arn
+      AmiType: AL2023_x86_64_STANDARD
+      InstanceTypes: [!Ref InstanceType]
+      Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NetworkStackName}-PrivateSubnetIds" }]
+      ScalingConfig:
+        MinSize: !Ref MinNodes
+        DesiredSize: !Ref MinNodes
+        MaxSize: !Ref MaxNodes
+      Tags:
+        run-id: !Ref RunId
+        ttl-hours: !Ref TtlHours
+        project: agentic-platform-advisor
+        cell: eks-ec2
+
+  # eks-fargate only. Every pod in these namespaces runs on Fargate.
+  FargateProfile:
+    Type: AWS::EKS::FargateProfile
+    Condition: IsFargate
+    Properties:
+      ClusterName: !Ref Cluster
+      PodExecutionRoleArn: !GetAtt PodExecutionRole.Arn
+      Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NetworkStackName}-PrivateSubnetIds" }]
+      Selectors:
+        - Namespace: kube-system
+        - Namespace: default
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: eks-fargate }
+
+Outputs:
+  ClusterName:
+    Description: EKS cluster name, for aws eks update-kubeconfig and the 41-eks-lbc-iam stack.
+    Value: !Ref Cluster
+    Export: { Name: !Sub "${AWS::StackName}-ClusterName" }
+  ClusterEndpoint:
+    Description: Kubernetes API endpoint. Public information, not a secret.
+    Value: !GetAtt Cluster.Endpoint

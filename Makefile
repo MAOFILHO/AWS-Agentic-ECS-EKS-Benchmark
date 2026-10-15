@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: bootstrap ecs-fargate ecs-ec2 benchmark teardown report workload-docker push-image mirror-base
+.PHONY: bootstrap ecs-fargate ecs-ec2 eks-ec2 eks-fargate benchmark teardown report workload-docker push-image mirror-base
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 # Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
@@ -28,6 +28,12 @@ ecs-ec2:
 		--stack $(RUN_ID)-ecs-ec2 --template infra/cfn/30-ecs.yaml --env-param RunId=RUN_ID \
 		--env-param NetworkStackName=NETWORK_STACK --env-param ImageUri=IMAGE_URI \
 		--env-param ComputeType=COMPUTE_TYPE
+
+# Deploy the network stack, an EKS cell (40-eks), the controller role (41-eks-lbc-iam), then Helm installs the
+# AWS Load Balancer Controller and the workload chart. Needs AWS_PROFILE, RUN_ID, IMAGE_URI (repo:tag in ECR),
+# a region (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...), aws, helm and kubectl. Prints the ALB DNS name.
+eks-ec2 eks-fargate:
+	uv run --locked python -m scripts.deploy_eks --cell $@ --run-id "$(RUN_ID)" $(ARGS)
 
 # Delete every stack of one run, newest first, then check nothing tagged run-id=RUN_ID is left.
 # Needs AWS_PROFILE and a region (AWS_REGION or AWS_DEFAULT_REGION). Asks y/N first.

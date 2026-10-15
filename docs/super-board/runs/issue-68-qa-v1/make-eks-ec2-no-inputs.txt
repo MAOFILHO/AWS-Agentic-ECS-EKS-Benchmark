@@ -1,0 +1,4 @@
+uv run --locked python -m scripts.deploy_eks --cell eks-ec2 --run-id "" 
+error: not set: RUN_ID, IMAGE_URI, region (AWS_REGION or --region), AWS_PROFILE. Nothing was deployed.
+make: *** [eks-ec2] Error 1
+exit=2

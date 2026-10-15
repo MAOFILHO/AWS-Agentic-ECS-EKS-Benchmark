@@ -1,0 +1,56 @@
+..................................................................F..... [ 40%]
+.........................................................sssssssssssss.. [ 81%]
+................................                                         [100%]
+=================================== FAILURES ===================================
+________________ test_aws_error_from_main_masks_the_account_id _________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11402d3a0>
+
+    def test_aws_error_from_main_masks_the_account_id(monkeypatch):
+        from botocore.exceptions import ClientError
+    
+        class DeniedSsm:
+            def get_parameters(self, Names):
+                raise ClientError({"Error": {"Code": "AccessDeniedException", "Message": (
+                    f"User: arn:aws:sts::{ACCOUNT}:assumed-role/x/y is not authorized to perform: ssm:GetParameters"
+                )}}, "GetParameters")
+    
+        class Session:
+            def __init__(self, **kw):
+                pass
+    
+            def client(self, name):
+                return DeniedSsm() if name == "ssm" else object()
+    
+        for name, value in {"IMAGE_URI": IMAGE, "AWS_PROFILE": "sso", "AWS_REGION": "us-east-1"}.items():
+            monkeypatch.setenv(name, value)
+        monkeypatch.setattr(deploy_eks.boto3, "Session", Session)
+    
+        with pytest.raises(SystemExit) as exc:
+>           deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1"])
+
+tests/test_deploy_eks.py:229: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/deploy_eks.py:155: in main
+    deploy(session.client("cloudformation"), session.client("ssm"), session.client("eks"),
+scripts/deploy_eks.py:102: in deploy
+    version = kubernetes_version(ssm)
+              ^^^^^^^^^^^^^^^^^^^^^^^
+scripts/deploy_eks.py:62: in kubernetes_version
+    while params := ssm.get_parameters(Names=[SSM_AMI.format(m) for m in range(minor, minor + 10)])[
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_deploy_eks.test_aws_error_from_main_masks_the_account_id.<locals>.DeniedSsm object at 0x114047f50>
+Names = ['/aws/service/eks/optimized-ami/1.30/amazon-linux-2023/x86_64/standard/recommended/image_id', '/aws/service/eks/optim...commended/image_id', '/aws/service/eks/optimized-ami/1.35/amazon-linux-2023/x86_64/standard/recommended/image_id', ...]
+
+    def get_parameters(self, Names):
+>       raise ClientError({"Error": {"Code": "AccessDeniedException", "Message": (
+            f"User: arn:aws:sts::{ACCOUNT}:assumed-role/x/y is not authorized to perform: ssm:GetParameters"
+        )}}, "GetParameters")
+E       botocore.exceptions.ClientError: An error occurred (AccessDeniedException) when calling the GetParameters operation: User: arn:aws:sts::<account>:assumed-role/x/y is not authorized to perform: ssm:GetParameters
+
+tests/test_deploy_eks.py:213: ClientError
+=========================== short test summary info ============================
+FAILED tests/test_deploy_eks.py::test_aws_error_from_main_masks_the_account_id
+1 failed, 162 passed, 13 skipped in 3.42s

@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-68-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collected 176 items
+
+tests/test_awscrt.py .                                                   [  0%]
+tests/test_bootstrap_oidc.py .............                               [  7%]
+tests/test_boundary_covers_roles.py ....                                 [ 10%]
+tests/test_delete_run.py ...................................             [ 30%]
+tests/test_deploy_eks.py ..............                                  [ 38%]
+tests/test_deploy_stack.py ............                                  [ 44%]
+tests/test_ecs_template.py ...........................                   [ 60%]
+tests/test_eks_template.py .......................                       [ 73%]
+tests/test_helm_chart.py sssssssssssss                                   [ 80%]
+tests/test_network_template.py ....                                      [ 82%]
+tests/test_push_image.py ................                                [ 92%]
+tests/test_review_prompt_reads.py ....                                   [ 94%]
+tests/test_workload.py .......                                           [ 98%]
+tests/test_workload_env.py ...                                           [100%]
+
+======================= 163 passed, 13 skipped in 4.80s ========================

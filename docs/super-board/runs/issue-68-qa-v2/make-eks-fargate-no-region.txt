@@ -1,0 +1,4 @@
+uv run --locked python -m scripts.deploy_eks --cell eks-fargate --run-id "r1" 
+error: not set: region (AWS_REGION or --region). Nothing was deployed.
+make: *** [eks-fargate] Error 1
+exit=2

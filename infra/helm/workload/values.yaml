@@ -1,0 +1,25 @@
+# Shared by both EKS cells. values-ec2.yaml and values-fargate.yaml set only what differs.
+image:
+  repository: triage-workload
+  tag: latest
+
+# mock or bedrock; same switch as the ECS cells.
+llmMode: mock
+
+replicas:
+  min: 1
+  max: 4
+
+# Equal to the ECS cells: 256 CPU units and 512 MB (SPEC Decision 2).
+resources:
+  requests:
+    cpu: 256m
+    memory: 512Mi
+  limits:
+    cpu: 256m
+    memory: 512Mi
+
+hpa:
+  cpuTarget: 60
+
+nodeSelector: {}

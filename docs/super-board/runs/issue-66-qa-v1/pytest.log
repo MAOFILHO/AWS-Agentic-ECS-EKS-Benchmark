@@ -1,0 +1,12 @@
+........................................................................ [ 54%]
+............sssssssssssss..................................              [100%]
+=========================== short test summary info ============================
+SKIPPED [2] tests/test_helm_chart.py:31: helm not installed
+SKIPPED [2] tests/test_helm_chart.py:36: helm not installed
+SKIPPED [2] tests/test_helm_chart.py:40: helm not installed
+SKIPPED [2] tests/test_helm_chart.py:46: helm not installed
+SKIPPED [2] tests/test_helm_chart.py:56: helm not installed
+SKIPPED [2] tests/test_helm_chart.py:62: helm not installed
+SKIPPED [1] tests/test_helm_chart.py:79: helm not installed
+118 passed, 13 skipped in 3.06s
+exit=0

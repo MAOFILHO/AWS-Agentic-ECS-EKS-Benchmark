@@ -1,0 +1,2 @@
+# eks-fargate cell: the Fargate profile places pods, so no node selector.
+nodeSelector: {}

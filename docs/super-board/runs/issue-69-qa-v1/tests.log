@@ -1,0 +1,11 @@
+$ uv run --locked ruff check
+All checks passed!
+
+$ uv run --locked pytest -q -rA tests/test_delete_run.py -k "eks or helm or alb or cluster or declined or ecs_only"
+............                                                             
+12 passed, 23 deselected in 0.51s
+
+$ uv run --locked pytest -q
+........................................................................ [ 57%]
+......................................................                   [100%]
+126 passed in 3.18s

@@ -1,0 +1,24 @@
+##[group]Run helm lint infra/helm/workload -f infra/helm/workload/values-ec2.yaml
+^[[36;1mhelm lint infra/helm/workload -f infra/helm/workload/values-ec2.yaml^[[0m
+^[[36;1mhelm lint infra/helm/workload -f infra/helm/workload/values-fargate.yaml^[[0m
+1 chart(s) linted, 0 chart(s) failed
+1 chart(s) linted, 0 chart(s) failed
+##[group]Run uv run --locked pytest tests/test_helm_chart.py
+^[[36;1muv run --locked pytest tests/test_helm_chart.py^[[0m
+shell: /usr/bin/bash -e {0}
+env:
+  UV_CACHE_DIR: /home/runner/work/_temp/setup-uv-cache
+##[endgroup]
+Using CPython 3.12.3 interpreter at: /usr/bin/python3.12
+Creating virtual environment at: .venv
+Installed 56 packages in 1.69s
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/runner/work/agentic-platform-advisor/agentic-platform-advisor
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collected 13 items
+
+tests/test_helm_chart.py .............                                   [100%]
+
+============================== 13 passed in 0.44s ==============================

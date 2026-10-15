@@ -6,12 +6,17 @@ Usage:
 
 Only stacks whose name starts with `<id>-` are touched. Credentials come from the AWS_PROFILE
 profile through boto3. Output masks 12-digit account ids.
+
+For an EKS run, the workload Helm release goes first, then its ALB, then the load balancer
+controller, all before any stack: the controller makes the ALB outside CloudFormation.
 """
 
 import argparse
 import os
 import re
+import subprocess
 import sys
+import tempfile
 import time
 
 import boto3
@@ -24,6 +29,10 @@ LAGGING = {
 }
 ECS_KINDS = {"cluster", "service", "task-definition", "task"}
 CHECK_INTERVAL = 30
+WORKLOAD_RELEASE = "workload"
+LBC_RELEASE = "aws-load-balancer-controller"
+LBC_NAMESPACE = "kube-system"
+LBC_CLUSTER_TAG = "elbv2.k8s.aws/cluster"  # the controller tags every ALB it makes with this
 
 
 def mask(text):
@@ -78,6 +87,84 @@ def delete_stacks(cfn, names):
                     )
             raise SystemExit(f"error: {name} ended in DELETE_FAILED.") from None
         print(f"{name}: deleted.")
+
+
+def eks_cluster(cfn, names, run_id):
+    """ClusterName output of the run's EKS stack, or None when the run has no EKS cluster."""
+    for name in names:
+        if name.startswith(f"{run_id}-eks-"):
+            for out in cfn.describe_stacks(StackName=name)["Stacks"][0].get("Outputs", []):
+                if out["OutputKey"] == "ClusterName":
+                    return out["OutputValue"]
+    return None
+
+
+def cluster_albs(elbv2, cluster):
+    arns = [
+        lb["LoadBalancerArn"]
+        for page in elbv2.get_paginator("describe_load_balancers").paginate()
+        for lb in page["LoadBalancers"]
+    ]
+    found = []
+    for i in range(0, len(arns), 20):  # describe_tags takes at most 20 ARNs
+        for d in elbv2.describe_tags(ResourceArns=arns[i : i + 20])["TagDescriptions"]:
+            if {"Key": LBC_CLUSTER_TAG, "Value": cluster} in d["Tags"]:
+                found.append(d["ResourceArn"])
+    return found
+
+
+def wait_for_albs(elbv2, cluster, timeout, sleep=time.sleep, clock=time.monotonic):
+    deadline = clock() + timeout
+    while found := cluster_albs(elbv2, cluster):
+        if clock() >= deadline:
+            for arn in found:
+                print(f"  ALB still there {mask(arn)}", file=sys.stderr)
+            raise SystemExit(f"error: {len(found)} ALB(s) of {cluster} still there. No stack deleted.")
+        print(f"waiting for {len(found)} ALB(s) of {cluster} to go...", flush=True)
+        sleep(CHECK_INTERVAL)
+    print(f"{cluster}: no ALBs left.")
+
+
+def uninstall_helm(eks, elbv2, cluster, region, timeout, run=subprocess.run, sleep=time.sleep):
+    """Uninstall the workload, wait for its ALB, uninstall the controller. Skip a gone cluster."""
+    try:
+        eks.describe_cluster(name=cluster)
+    except ClientError as err:
+        if err.response["Error"]["Code"] != "ResourceNotFoundException":
+            raise
+        print(f"{cluster}: cluster gone, skipping Helm.")
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        kubeconfig = os.path.join(tmp, "config")  # never ~/.kube/config (SPEC risk table)
+        try:
+            run(
+                ["aws", "eks", "update-kubeconfig", "--name", cluster, "--region", region,
+                 "--kubeconfig", kubeconfig],
+                check=True, capture_output=True, text=True,
+            )
+            run(
+                ["helm", "uninstall", WORKLOAD_RELEASE, "--ignore-not-found", "--wait",
+                 "--kubeconfig", kubeconfig],
+                check=True, capture_output=True, text=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as err:
+            reason = (getattr(err, "stderr", None) or str(err)).strip().splitlines()[0]
+            print(mask(f"{cluster}: unreachable, skipping Helm ({reason})."))
+            return
+        print(f"{cluster}: Helm release {WORKLOAD_RELEASE} uninstalled.")
+        wait_for_albs(elbv2, cluster, timeout, sleep=sleep)
+        try:
+            run(
+                ["helm", "uninstall", LBC_RELEASE, "--namespace", LBC_NAMESPACE,
+                 "--ignore-not-found", "--wait", "--kubeconfig", kubeconfig],
+                check=True, capture_output=True, text=True,
+            )
+        except subprocess.CalledProcessError as err:
+            # The ALBs are gone, so the stacks can still go; the cluster delete removes the pods.
+            reason = (err.stderr or str(err)).strip().splitlines()[0]
+            print(mask(f"{cluster}: {LBC_RELEASE} uninstall failed, going on ({reason})."))
+            return
+        print(f"{cluster}: Helm release {LBC_RELEASE} uninstalled.")
 
 
 def _ecs_stale(ecs, kind, arn, resource_id):
@@ -154,11 +241,16 @@ def check_leftovers(tagging, ec2, ecs, run_id, timeout, sleep=time.sleep, clock=
     print(f"run-id={run_id}: no leftovers.")
 
 
-def teardown(cfn, ec2, ecs, tagging, run_id, timeout, answer=input):
+def teardown(
+    cfn, ec2, ecs, tagging, run_id, timeout, answer=input,
+    eks=None, elbv2=None, region=None, run=subprocess.run, sleep=time.sleep,
+):
     names = run_stacks(cfn, run_id)
     print(f"Stacks to delete, newest first: {', '.join(names) or 'none'}")
     if names and answer("Delete these stacks? [y/N] ").strip() != "y":
         raise SystemExit("Aborted. Nothing was deleted.")
+    if cluster := eks_cluster(cfn, names, run_id):
+        uninstall_helm(eks, elbv2, cluster, region, timeout, run=run, sleep=sleep)
     delete_stacks(cfn, names)
     check_leftovers(tagging, ec2, ecs, run_id, timeout)
 
@@ -190,6 +282,9 @@ def main(argv=None):
             args.run_id,
             args.leftover_timeout,
             answer=(lambda _prompt: "y") if args.yes else input,
+            eks=session.client("eks"),
+            elbv2=session.client("elbv2"),
+            region=region,
         )
     except (BotoCoreError, ClientError) as err:
         raise SystemExit(mask(f"error: {err}")) from None

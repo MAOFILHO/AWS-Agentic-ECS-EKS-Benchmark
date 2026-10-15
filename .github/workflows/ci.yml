@@ -23,6 +23,20 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv run --locked pytest
 
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: helm lint
+        run: |
+          helm lint infra/helm/workload -f infra/helm/workload/values-ec2.yaml
+          helm lint infra/helm/workload -f infra/helm/workload/values-fargate.yaml
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --locked pytest tests/test_helm_chart.py
+
   image:
     runs-on: ubuntu-latest
     steps:

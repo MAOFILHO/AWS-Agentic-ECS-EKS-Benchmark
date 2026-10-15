@@ -1,0 +1,6 @@
+apiVersion: v2
+name: workload
+description: Triage agent workload for the eks-fargate and eks-ec2 cells.
+type: application
+version: 0.1.0
+appVersion: "0.0.0"

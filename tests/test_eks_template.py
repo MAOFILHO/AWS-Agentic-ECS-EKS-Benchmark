@@ -117,6 +117,10 @@ def test_node_group_is_al2023_x86_in_private_subnets_sized_by_parameters():
     assert props["ScalingConfig"]["MaxSize"] == {"Ref": "MaxNodes"}
 
 
+def test_node_group_is_named_workload_for_the_helm_node_selector():
+    assert _eks()["Resources"]["NodeGroup"]["Properties"]["NodegroupName"] == "workload"
+
+
 def test_node_role_has_the_three_worker_policies():
     arns = str(_eks()["Resources"]["NodeRole"]["Properties"]["ManagedPolicyArns"])
     for name in ("AmazonEKSWorkerNodePolicy", "AmazonEKS_CNI_Policy", "AmazonEC2ContainerRegistryReadOnly"):

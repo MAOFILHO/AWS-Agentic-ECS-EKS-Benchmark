@@ -225,6 +225,8 @@ Resources:
     DependsOn: VpcCniAddon
     Properties:
       ClusterName: !Ref Cluster
+      # The workload chart selects nodes by the eks.amazonaws.com/nodegroup label, which EKS sets from this name.
+      NodegroupName: workload
       NodeRole: !GetAtt NodeRole.Arn
       AmiType: AL2023_x86_64_STANDARD
       InstanceTypes: [!Ref InstanceType]

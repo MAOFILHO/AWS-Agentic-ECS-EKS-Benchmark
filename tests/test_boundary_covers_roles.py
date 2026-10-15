@@ -22,6 +22,39 @@ ECS_AGENT_ACTIONS = {
     "ecs:UpdateContainerInstancesState",
 }
 
+# Actions the node role gets from its attached AWS managed policies (40-eks.yaml
+# ManagedPolicyArns), which the inline-policy check cannot see. Source: the AWS managed
+# policy documents of AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy and
+# AmazonEC2ContainerRegistryReadOnly; only the actions this repo relies on are listed.
+NODE_ROLE_MANAGED_ACTIONS = {
+    "AmazonEKSWorkerNodePolicy": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceTypes",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVpcs",
+        "eks:DescribeCluster",
+        "eks-auth:AssumeRoleForPodIdentity",
+    ],
+    "AmazonEKS_CNI_Policy": [
+        "ec2:AssignPrivateIpAddresses",
+        "ec2:AttachNetworkInterface",
+        "ec2:CreateNetworkInterface",
+        "ec2:DeleteNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DetachNetworkInterface",
+        "ec2:ModifyNetworkInterfaceAttribute",
+    ],
+    "AmazonEC2ContainerRegistryReadOnly": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetAuthorizationToken",
+        "ecr:GetDownloadUrlForLayer",
+    ],
+}
+
 
 class _CfnLoader(yaml.SafeLoader):
     pass
@@ -99,3 +132,22 @@ def test_boundary_covers_every_stack_role_policy():
 def test_boundary_allows_the_ecs_agent_actions_and_no_ecs_wildcard():
     ecs = {a for a in boundary_actions(_load(BOOTSTRAP)) if a.startswith("ecs:")}
     assert ecs == ECS_AGENT_ACTIONS
+
+
+def test_uncovered_flags_a_managed_policy_action_the_boundary_lacks():
+    roles = {"NodeRole/AmazonEKSWorkerNodePolicy": ["eks-auth:AssumeRoleForPodIdentity"]}
+    boundary = ["eks:*", "ec2:*"]
+    assert uncovered(roles, boundary) == [
+        "NodeRole/AmazonEKSWorkerNodePolicy: eks-auth:AssumeRoleForPodIdentity"
+    ]
+
+
+def test_boundary_covers_the_node_role_managed_policy_actions():
+    boundary = boundary_actions(_load(BOOTSTRAP))
+    roles = {f"NodeRole/{name}": acts for name, acts in NODE_ROLE_MANAGED_ACTIONS.items()}
+    assert uncovered(roles, boundary) == []
+
+
+def test_boundary_allows_the_pod_identity_action_and_no_eks_auth_wildcard():
+    eks_auth = {a for a in boundary_actions(_load(BOOTSTRAP)) if a.startswith("eks-auth:")}
+    assert eks_auth == {"eks-auth:AssumeRoleForPodIdentity"}

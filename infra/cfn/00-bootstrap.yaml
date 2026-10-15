@@ -161,6 +161,12 @@ Resources:
             Effect: Allow
             Action: eks:*
             Resource: "*"
+          # The Pod Identity agent on a node calls this with the node role
+          # (AmazonEKSWorkerNodePolicy). No eks-auth wildcard.
+          - Sid: EksPodIdentity
+            Effect: Allow
+            Action: eks-auth:AssumeRoleForPodIdentity
+            Resource: "*"
           # ECS instance role: the agent registers the instance and reports task state.
           # The role policy scopes the cluster-bound actions to the cluster ARN.
           - Sid: EcsAgent

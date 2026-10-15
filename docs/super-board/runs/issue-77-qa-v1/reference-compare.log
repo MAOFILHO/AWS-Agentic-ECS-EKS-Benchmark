@@ -1,0 +1,8 @@
+upstream EC2/ELB grants: 68
+pinned list grants: 68
+upstream - pinned: []
+pinned - upstream: []
+upstream - template: []
+template - upstream (wider or extra): []
+upstream non-EC2/ELB actions (excluded by design): ['acm:DescribeCertificate', 'acm:ListCertificates', 'cognito-idp:DescribeUserPoolClient', 'iam:CreateServiceLinkedRole', 'iam:GetServerCertificate', 'iam:ListServerCertificates', 'shield:CreateProtection', 'shield:DeleteProtection', 'shield:DescribeProtection', 'shield:GetSubscriptionState', 'waf-regional:AssociateWebACL', 'waf-regional:DisassociateWebACL', 'waf-regional:GetWebACL', 'waf-regional:GetWebACLForResource', 'wafv2:AssociateWebACL', 'wafv2:DisassociateWebACL', 'wafv2:GetWebACL', 'wafv2:GetWebACLForResource']
+template non-EC2/ELB actions: ['acm:DescribeCertificate', 'acm:ListCertificates', 'cognito-idp:DescribeUserPoolClient', 'iam:CreateServiceLinkedRole', 'iam:GetServerCertificate', 'iam:ListServerCertificates', 'shield:DescribeProtection', 'shield:GetSubscriptionState', 'tag:GetResources', 'waf-regional:GetWebACLForResource', 'wafv2:GetWebACL', 'wafv2:GetWebACLForResource']

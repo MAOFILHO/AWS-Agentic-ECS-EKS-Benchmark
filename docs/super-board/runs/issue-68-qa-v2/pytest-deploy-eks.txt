@@ -1,0 +1,24 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-68-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-68-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 14 items
+
+tests/test_deploy_eks.py::test_missing_input_exits_before_any_aws_call[RUN_ID] PASSED [  7%]
+tests/test_deploy_eks.py::test_missing_input_exits_before_any_aws_call[IMAGE_URI] PASSED [ 14%]
+tests/test_deploy_eks.py::test_missing_input_exits_before_any_aws_call[region] PASSED [ 21%]
+tests/test_deploy_eks.py::test_stacks_then_kubeconfig_then_controller_then_workload PASSED [ 28%]
+tests/test_deploy_eks.py::test_fargate_cell_skips_node_group_and_uses_fargate_values PASSED [ 35%]
+tests/test_deploy_eks.py::test_kubernetes_version_comes_from_ssm_and_is_printed PASSED [ 42%]
+tests/test_deploy_eks.py::test_no_ssm_parameter_stops_before_any_stack PASSED [ 50%]
+tests/test_deploy_eks.py::test_kubeconfig_is_a_temp_file_and_home_is_untouched PASSED [ 57%]
+tests/test_deploy_eks.py::test_waits_for_the_alb_hostname PASSED         [ 64%]
+tests/test_deploy_eks.py::test_alb_timeout_exits_non_zero PASSED         [ 71%]
+tests/test_deploy_eks.py::test_output_never_contains_an_account_id PASSED [ 78%]
+tests/test_deploy_eks.py::test_failed_helm_error_masks_the_account_id PASSED [ 85%]
+tests/test_deploy_eks.py::test_image_without_tag_is_refused PASSED       [ 92%]
+tests/test_deploy_eks.py::test_aws_error_from_main_masks_the_account_id PASSED [100%]
+
+============================== 14 passed in 0.22s ==============================

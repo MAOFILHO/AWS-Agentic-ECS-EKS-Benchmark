@@ -1,6 +1,7 @@
 """Static checks on infra/cfn/40-eks.yaml and 41-eks-lbc-iam.yaml. Nothing is deployed."""
 
 import re
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 import yaml
@@ -227,3 +228,194 @@ def test_no_account_id_or_email_in_the_templates():
         text = path.read_text()
         assert not re.search(r"(?<!\d)\d{12}(?!\d)", text), path.name
         assert not re.search(r"[^@\s]+@[^@\s]+\.[^@\s]+", text), path.name
+
+
+# The EC2 and Elastic Load Balancing statements of the AWS Load Balancer Controller reference
+# IAM policy for v3.6.0, the app version of the chart deploy_eks.py pins (LBC_CHART_VERSION).
+# Source: https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/
+# v3.6.0/docs/install/iam_policy.json. Each entry is (actions, resource, condition); arn:aws
+# stands for arn:${AWS::Partition}. WAF, Shield and certificate statements are left out on
+# purpose (see the template header).
+_ELB = "arn:aws:elasticloadbalancing:*:*:"
+_SG = "arn:aws:ec2:*:*:security-group/*"
+_LB_TG = [f"{_ELB}targetgroup/*/*", f"{_ELB}loadbalancer/net/*/*", f"{_ELB}loadbalancer/app/*/*"]
+_OWN = {"Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}}
+_NEW = {"Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"}}
+_RETAG = {
+    "Null": {
+        "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+        "aws:ResourceTag/elbv2.k8s.aws/cluster": "false",
+    }
+}
+LBC_REFERENCE = [
+    (
+        [
+            "ec2:DescribeAccountAttributes", "ec2:DescribeAddresses",
+            "ec2:DescribeAvailabilityZones", "ec2:DescribeInternetGateways", "ec2:DescribeVpcs",
+            "ec2:DescribeVpcPeeringConnections", "ec2:DescribeSubnets",
+            "ec2:DescribeSecurityGroups", "ec2:DescribeInstances",
+            "ec2:DescribeNetworkInterfaces", "ec2:DescribeTags", "ec2:GetCoipPoolUsage",
+            "ec2:DescribeCoipPools", "ec2:GetSecurityGroupsForVpc", "ec2:DescribeIpamPools",
+            "ec2:DescribeRouteTables",
+            "elasticloadbalancing:DescribeLoadBalancers",
+            "elasticloadbalancing:DescribeLoadBalancerAttributes",
+            "elasticloadbalancing:DescribeListeners",
+            "elasticloadbalancing:DescribeListenerCertificates",
+            "elasticloadbalancing:DescribeSSLPolicies", "elasticloadbalancing:DescribeRules",
+            "elasticloadbalancing:DescribeTargetGroups",
+            "elasticloadbalancing:DescribeTargetGroupAttributes",
+            "elasticloadbalancing:DescribeTargetHealth", "elasticloadbalancing:DescribeTags",
+            "elasticloadbalancing:DescribeTrustStores",
+            "elasticloadbalancing:DescribeListenerAttributes",
+            "elasticloadbalancing:DescribeCapacityReservation",
+        ],
+        "*",
+        None,
+    ),
+    # Rules on any group, the node (cluster) security group included: EKS does not tag it.
+    (["ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"], "*", None),
+    (["ec2:CreateSecurityGroup"], "*", None),
+    (
+        ["ec2:CreateTags"],
+        _SG,
+        {
+            "StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"},
+            "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
+        },
+    ),
+    (["ec2:CreateTags", "ec2:DeleteTags"], _SG, _RETAG),
+    (
+        [
+            "ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress",
+            "ec2:DeleteSecurityGroup",
+        ],
+        "*",
+        _OWN,
+    ),
+    (
+        ["elasticloadbalancing:CreateLoadBalancer", "elasticloadbalancing:CreateTargetGroup"],
+        "*",
+        _NEW,
+    ),
+    (
+        [
+            "elasticloadbalancing:CreateListener", "elasticloadbalancing:DeleteListener",
+            "elasticloadbalancing:CreateRule", "elasticloadbalancing:DeleteRule",
+        ],
+        "*",
+        None,
+    ),
+    (["elasticloadbalancing:AddTags", "elasticloadbalancing:RemoveTags"], _LB_TG, _RETAG),
+    (
+        ["elasticloadbalancing:AddTags", "elasticloadbalancing:RemoveTags"],
+        [
+            f"{_ELB}listener/net/*/*/*", f"{_ELB}listener/app/*/*/*",
+            f"{_ELB}listener-rule/net/*/*/*", f"{_ELB}listener-rule/app/*/*/*",
+        ],
+        None,
+    ),
+    (
+        [
+            "elasticloadbalancing:ModifyLoadBalancerAttributes",
+            "elasticloadbalancing:SetIpAddressType", "elasticloadbalancing:SetSecurityGroups",
+            "elasticloadbalancing:SetSubnets", "elasticloadbalancing:DeleteLoadBalancer",
+            "elasticloadbalancing:ModifyTargetGroup",
+            "elasticloadbalancing:ModifyTargetGroupAttributes",
+            "elasticloadbalancing:DeleteTargetGroup",
+            "elasticloadbalancing:ModifyListenerAttributes",
+            "elasticloadbalancing:ModifyCapacityReservation",
+            "elasticloadbalancing:ModifyIpPools",
+        ],
+        "*",
+        _OWN,
+    ),
+    (
+        ["elasticloadbalancing:AddTags"],
+        _LB_TG,
+        {
+            "StringEquals": {
+                "elasticloadbalancing:CreateAction": ["CreateTargetGroup", "CreateLoadBalancer"]
+            },
+            "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
+        },
+    ),
+    (
+        ["elasticloadbalancing:RegisterTargets", "elasticloadbalancing:DeregisterTargets"],
+        f"{_ELB}targetgroup/*/*",
+        None,
+    ),
+    (
+        [
+            "elasticloadbalancing:SetWebAcl", "elasticloadbalancing:ModifyListener",
+            "elasticloadbalancing:AddListenerCertificates",
+            "elasticloadbalancing:RemoveListenerCertificates",
+            "elasticloadbalancing:ModifyRule", "elasticloadbalancing:SetRulePriorities",
+        ],
+        "*",
+        None,
+    ),
+]
+
+
+def _resources(resource):
+    """Resource list with !Sub "arn:${AWS::Partition}:" read as "arn:aws:"."""
+    items = resource if isinstance(resource, list) else [resource]
+    return sorted(
+        (r["Sub"] if isinstance(r, dict) else r).replace("${AWS::Partition}", "aws")
+        for r in items
+    )
+
+
+def missing_reference_grants(statements):
+    """Reference (action, resource, condition) grants no Allow statement makes with the same scope."""
+    missing = []
+    for actions, resource, condition in LBC_REFERENCE:
+        for action in actions:
+            if not any(
+                s["Effect"] == "Allow"
+                and action in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])
+                and _resources(s["Resource"]) == _resources(resource)
+                and s.get("Condition") == condition
+                for s in statements
+            ):
+                missing.append((action, str(resource), str(condition)))
+    return missing
+
+
+def _lbc_statements():
+    (policy,) = _load(LBC)["Resources"]["LbcRole"]["Properties"]["Policies"]
+    return policy["PolicyDocument"]["Statement"]
+
+
+def test_missing_reference_grants_flags_a_dropped_action_and_a_narrowed_scope():
+    statements = [
+        {"Effect": "Allow", "Action": list(actions), "Resource": resource, **(
+            {"Condition": condition} if condition else {}
+        )}
+        for actions, resource, condition in LBC_REFERENCE
+    ]
+    assert missing_reference_grants(statements) == []
+    statements[1]["Action"] = ["ec2:AuthorizeSecurityGroupIngress"]
+    statements[13]["Action"].remove("elasticloadbalancing:SetRulePriorities")
+    statements[2]["Condition"] = _OWN
+    assert missing_reference_grants(statements) == [
+        ("ec2:RevokeSecurityGroupIngress", "*", "None"),
+        ("ec2:CreateSecurityGroup", "*", "None"),
+        ("elasticloadbalancing:SetRulePriorities", "*", "None"),
+    ]
+
+
+def test_lbc_role_grants_the_reference_ec2_and_elb_policy():
+    assert missing_reference_grants(_lbc_statements()) == []
+
+
+def test_boundary_allows_every_reference_ec2_and_elb_action():
+    doc = _load(CFN / "00-bootstrap.yaml")["Resources"]["StackRoleBoundary"]["Properties"]
+    boundary = [
+        a
+        for s in doc["PolicyDocument"]["Statement"]
+        if s["Effect"] == "Allow"
+        for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])
+    ]
+    actions = {a for acts, _, _ in LBC_REFERENCE for a in acts}
+    assert [a for a in sorted(actions) if not any(fnmatchcase(a, b) for b in boundary)] == []

@@ -616,3 +616,66 @@ def test_ecs_only_run_makes_no_eks_or_helm_call(clients, monkeypatch):
     )
     assert runner.calls == []
     assert deleted == ["r1-ecs"]
+
+
+# --- QA edge cases (issue #69) ---
+
+
+def test_cluster_found_past_newer_lbc_iam_stack(eks_clients):
+    """Real layout: <id>-eks-lbc-iam is newer and also matches <id>-eks-, but has no ClusterName."""
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "describe_stacks",
+        {
+            "Stacks": [
+                {
+                    "StackName": "r1-eks-lbc-iam",
+                    "CreationTime": datetime(2026, 10, 1, tzinfo=UTC),
+                    "StackStatus": "CREATE_COMPLETE",
+                    "Outputs": [{"OutputKey": "RoleArn", "OutputValue": "arn:aws:iam::x:role/y"}],
+                }
+            ]
+        },
+        {"StackName": "r1-eks-lbc-iam"},
+    )
+    _stub_cluster_output(stubs["cloudformation"])
+    names = ["r1-eks-lbc-iam", "r1-eks-ec2", "r1-network"]
+    assert delete_run.eks_cluster(made["cloudformation"], names, RUN) == CLUSTER
+
+
+def test_declined_prompt_runs_no_helm(eks_clients, monkeypatch):
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-eks-ec2", 2)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    runner = Runner()
+    monkeypatch.setattr(delete_run, "delete_stacks", lambda *_a: pytest.fail("deleted"))
+    with pytest.raises(SystemExit):
+        delete_run.teardown(
+            made["cloudformation"], None, None, None, RUN, timeout=900, answer=lambda _p: "",
+            eks=made["eks"], elbv2=made["elbv2"], run=runner, region="us-east-1",
+        )
+    assert runner.calls == []
+
+
+def test_cluster_albs_batches_describe_tags_by_20(eks_clients):
+    made, stubs = eks_clients
+    arns = [f"arn:aws:elasticloadbalancing:us-east-1:x:loadbalancer/app/lb{i}/z" for i in range(25)]
+    stubs["elbv2"].add_response(
+        "describe_load_balancers", {"LoadBalancers": [{"LoadBalancerArn": a} for a in arns]}, {}
+    )
+    for chunk in (arns[:20], arns[20:]):
+        stubs["elbv2"].add_response(
+            "describe_tags",
+            {
+                "TagDescriptions": [
+                    {"ResourceArn": a, "Tags": [{"Key": "elbv2.k8s.aws/cluster", "Value": CLUSTER}]}
+                    for a in chunk
+                    if a.endswith(("lb3/z", "lb22/z"))
+                ]
+            },
+            {"ResourceArns": chunk},
+        )
+    assert delete_run.cluster_albs(made["elbv2"], CLUSTER) == [arns[3], arns[22]]

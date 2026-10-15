@@ -64,8 +64,11 @@ Resources:
                   - ec2:DescribeInstances
                   - ec2:DescribeNetworkInterfaces
                   - ec2:DescribeTags
-                  - ec2:DescribeRouteTables
+                  - ec2:GetCoipPoolUsage
+                  - ec2:DescribeCoipPools
                   - ec2:GetSecurityGroupsForVpc
+                  - ec2:DescribeIpamPools
+                  - ec2:DescribeRouteTables
                   - elasticloadbalancing:DescribeLoadBalancers
                   - elasticloadbalancing:DescribeLoadBalancerAttributes
                   - elasticloadbalancing:DescribeListeners
@@ -78,6 +81,7 @@ Resources:
                   - elasticloadbalancing:DescribeTargetHealth
                   - elasticloadbalancing:DescribeTags
                   - elasticloadbalancing:DescribeTrustStores
+                  - elasticloadbalancing:DescribeCapacityReservation
                   - acm:ListCertificates
                   - acm:DescribeCertificate
                   - iam:ListServerCertificates
@@ -89,6 +93,13 @@ Resources:
                   - wafv2:GetWebACLForResource
                   - waf-regional:GetWebACLForResource
                   - tag:GetResources
+                Resource: "*"
+              # Ingress rules on any group, as in the reference policy: the controller opens the
+              # node (cluster) security group to the ALB, and EKS does not tag that group.
+              - Effect: Allow
+                Action:
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupIngress
                 Resource: "*"
               # Security groups the controller creates for its load balancers.
               - Effect: Allow
@@ -182,6 +193,8 @@ Resources:
                   - elasticloadbalancing:ModifyTargetGroupAttributes
                   - elasticloadbalancing:DeleteTargetGroup
                   - elasticloadbalancing:ModifyListenerAttributes
+                  - elasticloadbalancing:ModifyCapacityReservation
+                  - elasticloadbalancing:ModifyIpPools
                 Resource: "*"
                 Condition:
                   "Null":
@@ -193,10 +206,12 @@ Resources:
                 Resource: !Sub "arn:${AWS::Partition}:elasticloadbalancing:*:*:targetgroup/*/*"
               - Effect: Allow
                 Action:
+                  - elasticloadbalancing:SetWebAcl
                   - elasticloadbalancing:ModifyListener
                   - elasticloadbalancing:AddListenerCertificates
                   - elasticloadbalancing:RemoveListenerCertificates
                   - elasticloadbalancing:ModifyRule
+                  - elasticloadbalancing:SetRulePriorities
                 Resource: "*"
       Tags:
         - { Key: run-id, Value: !Ref RunId }

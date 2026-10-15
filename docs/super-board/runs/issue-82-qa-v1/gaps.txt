@@ -1,0 +1,6 @@
+Edge probes on analyse() with a copy of tests/fixtures/raw/real-01 (head 220677e):
+harness-cpu [NaN, 95] -> harness_bound False, no gap   (max() keeps NaN; a 95% peak is hidden)
+eks-ec2 deploy start after target_healthy -> deploy_time_s = -90.0 figure, no gap
+eks-ec2 cost load_usd Infinity -> usd_per_1k_requests = inf; metrics.json writes null and fails to reload
+k6 med NaN -> refused, gap (ok)
+naive timestamps in deploy.json -> refused, gap (ok)

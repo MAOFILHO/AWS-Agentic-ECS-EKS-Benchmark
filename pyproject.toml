@@ -8,6 +8,8 @@ dependencies = [
     "boto3>=1.43.108",
     "fastapi>=0.142.2",
     "langgraph>=1.2.13",
+    "langgraph-checkpoint-sqlite>=3.1.1",
+    "pydantic>=2.13.5",
     "uvicorn>=0.54.0",
 ]
 

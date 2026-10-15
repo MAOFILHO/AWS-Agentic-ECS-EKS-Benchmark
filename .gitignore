@@ -18,3 +18,6 @@ results/*
 .env.*
 !.env.example
 .venv
+
+# LangGraph checkpoints written per run
+runs/*/state.sqlite

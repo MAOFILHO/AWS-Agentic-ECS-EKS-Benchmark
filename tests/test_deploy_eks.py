@@ -1,0 +1,205 @@
+"""EKS cell deploy: input checks, stack and Helm order, temp kubeconfig, SSM version, masking (issue #68)."""
+
+import os
+import re
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from scripts import deploy_eks
+
+ACCOUNT = "123456789012"
+IMAGE = f"{ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/triage-workload:abc1234"
+ALB = "k8s-default-workload-0a1b2c3d4e-987654321.us-east-1.elb.amazonaws.com"
+OUTPUTS = {
+    "r1-network": {"VpcId": "vpc-0abc"},
+    "r1-eks-ec2": {"ClusterName": "r1-eks-ec2"},
+    "r1-eks-fargate": {"ClusterName": "r1-eks-fargate"},
+}
+
+
+class FakeCfn:
+    def describe_stacks(self, StackName):
+        outs = [{"OutputKey": k, "OutputValue": v} for k, v in OUTPUTS[StackName].items()]
+        return {"Stacks": [{"Outputs": outs}]}
+
+
+class FakeSsm:
+    def __init__(self, minors):
+        self.minors = minors
+
+    def get_parameters(self, Names):
+        found = [n for n in Names if int(n.split("/")[5].split(".")[1]) in self.minors]
+        return {"Parameters": [{"Name": n, "Value": "ami-0abc"} for n in found]}
+
+
+class FakeEks:
+    def __init__(self, events):
+        self.events = events
+
+    def get_waiter(self, name):
+        events = self.events
+
+        class Waiter:
+            def wait(self, **kwargs):
+                events.append(("wait", name, kwargs["clusterName"], kwargs["nodegroupName"]))
+
+        return Waiter()
+
+
+def runner(events, alb_after=1, fail=None):
+    polls = []
+
+    def run(args, check, capture_output, text):
+        assert check and capture_output and text
+        events.append(("run", *args))
+        if fail and args[0] == fail:
+            raise subprocess.CalledProcessError(1, args, stderr=f"denied for arn:aws:iam::{ACCOUNT}:role/x")
+        out = ""
+        if args[:2] == ["kubectl", "get"]:
+            polls.append(1)
+            out = ALB if len(polls) >= alb_after else ""
+        return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
+
+    return run
+
+
+def deploy(events, cell="eks-ec2", minors=range(30, 35), **kw):
+    def deploy_one(cfn, stack, body, params):
+        events.append(("stack", stack, params))
+
+    return deploy_eks.deploy(
+        FakeCfn(), FakeSsm(set(minors)), FakeEks(events), "r1", cell, "us-east-1", IMAGE,
+        deploy_one=deploy_one, run=kw.pop("run", runner(events)), sleep=lambda s: None, **kw,
+    )
+
+
+def kind(event):
+    if event[0] == "run":
+        return " ".join(event[1:3]) if event[1] != "helm" else f"helm {event[4]}"
+    return f"{event[0]} {event[1]}"
+
+
+@pytest.mark.parametrize("unset", ["RUN_ID", "IMAGE_URI", "region"])
+def test_missing_input_exits_before_any_aws_call(monkeypatch, unset):
+    env = {"IMAGE_URI": IMAGE, "AWS_PROFILE": "sso", "AWS_REGION": "us-east-1"}
+    argv = ["--cell", "eks-ec2", "--run-id", "r1"]
+    if unset == "RUN_ID":
+        argv = ["--cell", "eks-ec2"]
+    elif unset == "IMAGE_URI":
+        env.pop("IMAGE_URI")
+    else:
+        env.pop("AWS_REGION")
+    for name in ("IMAGE_URI", "AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(deploy_eks.boto3, "Session", lambda **kw: pytest.fail("AWS called"))
+
+    with pytest.raises(SystemExit) as exc:
+        deploy_eks.main(argv)
+    assert unset in str(exc.value)
+    assert exc.value.code != 0
+
+
+def test_stacks_then_kubeconfig_then_controller_then_workload():
+    events = []
+    host = deploy(events)
+
+    assert [kind(e) for e in events] == [
+        "stack r1-network",
+        "stack r1-eks-ec2",
+        "stack r1-eks-lbc-iam",
+        "wait nodegroup_active",
+        "aws eks",
+        "helm aws-load-balancer-controller",
+        "helm workload",
+        "kubectl get",
+    ]
+    assert host == ALB
+    lbc = events[5]
+    assert lbc[lbc.index("--version") + 1] == deploy_eks.LBC_CHART_VERSION
+    assert "vpcId=vpc-0abc" in lbc and "clusterName=r1-eks-ec2" in lbc
+    workload = events[6]
+    assert workload[workload.index("--values") + 1].endswith("values-ec2.yaml")
+    assert f"image.repository={ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/triage-workload" in workload
+    assert "image.tag=abc1234" in workload
+    assert events[2][2] == {"RunId": "r1", "EksStackName": "r1-eks-ec2", "Cell": "eks-ec2"}
+
+
+def test_fargate_cell_skips_node_group_and_uses_fargate_values():
+    events = []
+    deploy(events, cell="eks-fargate")
+
+    assert not [e for e in events if e[0] == "wait"]
+    assert events[1][1:] == ("r1-eks-fargate", {
+        "RunId": "r1", "NetworkStackName": "r1-network", "ComputeType": "FARGATE",
+        "KubernetesVersion": "1.34"})
+    workload = [e for e in events if e[0] == "run" and e[1] == "helm"][1]
+    assert workload[workload.index("--values") + 1].endswith("values-fargate.yaml")
+
+
+def test_kubernetes_version_comes_from_ssm_and_is_printed(capsys):
+    events = []
+    deploy(events, minors=range(30, 42))
+
+    assert events[1][2]["KubernetesVersion"] == "1.41"
+    assert "Kubernetes version 1.41" in capsys.readouterr().out
+
+
+def test_no_ssm_parameter_stops_before_any_stack():
+    events = []
+    with pytest.raises(SystemExit, match="no EKS AMI public parameter"):
+        deploy(events, minors=[])
+    assert events == []
+
+
+def test_kubeconfig_is_a_temp_file_and_home_is_untouched(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    events = []
+    deploy(events)
+
+    runs = [e for e in events if e[0] == "run"]
+    paths = {e[e.index("--kubeconfig") + 1] for e in runs}
+    assert len(paths) == 1
+    kubeconfig = paths.pop()
+    assert Path(kubeconfig).is_relative_to(deploy_eks.tempfile.gettempdir())
+    assert not Path(kubeconfig).parent.exists()  # the temp dir is removed after the deploy
+    assert os.path.expanduser("~/.kube/config") != kubeconfig
+    assert not (tmp_path / ".kube").exists()
+
+
+def test_waits_for_the_alb_hostname():
+    events = []
+    host = deploy(events, run=runner(events, alb_after=3))
+
+    assert host == ALB
+    assert len([e for e in events if e[1:3] == ("kubectl", "get")]) == 3
+
+
+def test_alb_timeout_exits_non_zero():
+    events = []
+    with pytest.raises(SystemExit, match="no ALB hostname"):
+        deploy(events, run=runner(events, alb_after=10**6), alb_timeout=0)
+
+
+def test_output_never_contains_an_account_id(capsys):
+    events = []
+    deploy(events)
+    out = capsys.readouterr()
+    assert ALB in out.out
+    assert not re.search(r"\b\d{12}\b", out.out + out.err)
+
+
+def test_failed_helm_error_masks_the_account_id():
+    events = []
+    with pytest.raises(SystemExit) as exc:
+        deploy(events, run=runner(events, fail="helm"))
+    assert ACCOUNT not in str(exc.value)
+    assert "helm upgrade failed" in str(exc.value)
+
+
+def test_image_without_tag_is_refused():
+    with pytest.raises(SystemExit, match="no tag"):
+        deploy_eks.split_image("localhost:5000/triage-workload")

@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 from scripts import deploy_stack
 
@@ -151,9 +152,12 @@ def main(argv=None):
     if missing := missing_inputs(args.run_id, image_uri, region, profile):
         raise SystemExit(f"error: not set: {', '.join(missing)}. Nothing was deployed.")
 
-    session = boto3.Session(profile_name=profile, region_name=region)
-    deploy(session.client("cloudformation"), session.client("ssm"), session.client("eks"),
-           args.run_id, args.cell, region, image_uri)
+    try:
+        session = boto3.Session(profile_name=profile, region_name=region)
+        deploy(session.client("cloudformation"), session.client("ssm"), session.client("eks"),
+               args.run_id, args.cell, region, image_uri)
+    except (BotoCoreError, ClientError) as err:
+        raise SystemExit(mask(f"error: {err}")) from None
 
 
 if __name__ == "__main__":

@@ -280,7 +280,7 @@ def test_aws_error_output_masks_account_id(clients, monkeypatch, capsys):
             pass
 
         def client(self, service):
-            return made[service]
+            return made.get(service)  # eks and elbv2 are unused: the run fails at list_stacks
 
     monkeypatch.setattr(delete_run.boto3, "Session", Session)
     with pytest.raises(SystemExit) as exc:
@@ -440,3 +440,242 @@ def test_purged_ec2_instance_is_not_a_leftover(clients):
     _stub_tags(stubs["resourcegroupstaggingapi"], [INSTANCE_ARN])
     stubs["ec2"].add_client_error("describe_instances", "InvalidInstanceID.NotFound")
     assert _leftovers(made) == []
+
+
+# --- EKS: Helm releases and ALBs go before the stacks (issue #69) ---
+
+CLUSTER = "r1-cluster"
+ALB_ARN = f"arn:aws:elasticloadbalancing:us-east-1:{ACCOUNT}:loadbalancer/app/k8s-x/abc"
+OTHER_ALB_ARN = f"arn:aws:elasticloadbalancing:us-east-1:{ACCOUNT}:loadbalancer/app/other/def"
+
+
+@pytest.fixture
+def eks_clients():
+    made = {s: _client(s) for s in ("cloudformation", "eks", "elbv2")}
+    stubbers = {s: Stubber(c) for s, c in made.items()}
+    for stubber in stubbers.values():
+        stubber.activate()
+    yield made, stubbers
+    for stubber in stubbers.values():
+        stubber.assert_no_pending_responses()
+        stubber.deactivate()
+
+
+def _stub_cluster_output(cfn_stub, stack="r1-eks-ec2"):
+    cfn_stub.add_response(
+        "describe_stacks",
+        {
+            "Stacks": [
+                {
+                    "StackName": stack,
+                    "CreationTime": datetime(2026, 10, 1, tzinfo=UTC),
+                    "StackStatus": "CREATE_COMPLETE",
+                    "Outputs": [{"OutputKey": "ClusterName", "OutputValue": CLUSTER}],
+                }
+            ]
+        },
+        {"StackName": stack},
+    )
+
+
+def _stub_albs(elbv2_stub, tagged):
+    """One describe round: an ALB of this cluster when `tagged`, plus one of another cluster."""
+    arns = ([ALB_ARN] if tagged else []) + [OTHER_ALB_ARN]
+    elbv2_stub.add_response(
+        "describe_load_balancers",
+        {"LoadBalancers": [{"LoadBalancerArn": a} for a in arns]},
+        {},
+    )
+    descriptions = [{"ResourceArn": OTHER_ALB_ARN, "Tags": [{"Key": "elbv2.k8s.aws/cluster", "Value": "x"}]}]
+    if tagged:
+        descriptions.insert(
+            0, {"ResourceArn": ALB_ARN, "Tags": [{"Key": "elbv2.k8s.aws/cluster", "Value": CLUSTER}]}
+        )
+    elbv2_stub.add_response("describe_tags", {"TagDescriptions": descriptions}, {"ResourceArns": arns})
+
+
+class Runner:
+    def __init__(self, fail_on=None, stderr=""):
+        self.calls, self.fail_on, self.stderr = [], fail_on, stderr
+
+    def __call__(self, argv, **_kwargs):
+        self.calls.append(argv)
+        if self.fail_on and self.fail_on in argv:
+            raise delete_run.subprocess.CalledProcessError(1, argv, stderr=self.stderr)
+
+
+def _helm_releases(runner):
+    return [argv[2] for argv in runner.calls if argv[:2] == ["helm", "uninstall"]]
+
+
+def test_eks_run_uninstalls_helm_and_waits_for_alb_before_first_stack_delete(eks_clients, monkeypatch, capsys):
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-network", 1), _summary("r1-eks-ec2", 2)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    _stub_cluster_output(stubs["cloudformation"])
+    stubs["eks"].add_response("describe_cluster", {"cluster": {"name": CLUSTER}}, {"name": CLUSTER})
+    _stub_albs(stubs["elbv2"], tagged=True)
+    _stub_albs(stubs["elbv2"], tagged=False)
+    events, runner = [], Runner()
+
+    def run(argv, **kwargs):
+        events.append(("run",))
+        return runner(argv, **kwargs)
+
+    monkeypatch.setattr(delete_run, "delete_stacks", lambda _c, names: events.append(("delete", names)))
+    monkeypatch.setattr(delete_run, "check_leftovers", lambda *_a: None)
+    delete_run.teardown(
+        made["cloudformation"], None, None, None, RUN, timeout=900, answer=lambda _p: "y",
+        eks=made["eks"], elbv2=made["elbv2"], run=run, sleep=lambda _s: events.append(("sleep",)),
+        region="us-east-1",
+    )
+    kinds = [e[0] for e in events]
+    assert kinds.index("delete") == len(kinds) - 1
+    assert _helm_releases(runner) == [delete_run.WORKLOAD_RELEASE, delete_run.LBC_RELEASE]
+    # the ALB wait sits between the two uninstalls
+    assert kinds == ["run", "run", "sleep", "run", "delete"]
+    assert events[-1] == ("delete", ["r1-eks-ec2", "r1-network"])
+    kubeconfigs = {argv[argv.index("--kubeconfig") + 1] for argv in runner.calls}
+    assert len(kubeconfigs) == 1
+    assert "/.kube/" not in kubeconfigs.pop()
+    assert not re.search(r"\d{12}", capsys.readouterr().out)
+
+
+def test_gone_cluster_skips_helm_in_one_line_and_still_deletes(eks_clients, monkeypatch, capsys):
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-eks-ec2", 2)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    _stub_cluster_output(stubs["cloudformation"])
+    stubs["eks"].add_client_error("describe_cluster", "ResourceNotFoundException")
+    deleted, runner = [], Runner()
+    monkeypatch.setattr(delete_run, "delete_stacks", lambda _c, names: deleted.extend(names))
+    monkeypatch.setattr(delete_run, "check_leftovers", lambda *_a: None)
+    delete_run.teardown(
+        made["cloudformation"], None, None, None, RUN, timeout=900, answer=lambda _p: "y",
+        eks=made["eks"], elbv2=made["elbv2"], run=runner, region="us-east-1",
+    )
+    assert runner.calls == []
+    assert deleted == ["r1-eks-ec2"]
+    skips = [line for line in capsys.readouterr().out.splitlines() if "skipping Helm" in line]
+    assert len(skips) == 1
+
+
+def test_unreachable_cluster_skips_helm_masked_and_still_deletes(eks_clients, monkeypatch, capsys):
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-eks-ec2", 2)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    _stub_cluster_output(stubs["cloudformation"])
+    stubs["eks"].add_response("describe_cluster", {"cluster": {"name": CLUSTER}}, {"name": CLUSTER})
+    runner = Runner(fail_on="uninstall", stderr=f"Kubernetes cluster unreachable: arn:aws:eks::{ACCOUNT}:x\nmore")
+    deleted = []
+    monkeypatch.setattr(delete_run, "delete_stacks", lambda _c, names: deleted.extend(names))
+    monkeypatch.setattr(delete_run, "check_leftovers", lambda *_a: None)
+    delete_run.teardown(
+        made["cloudformation"], None, None, None, RUN, timeout=900, answer=lambda _p: "y",
+        eks=made["eks"], elbv2=made["elbv2"], run=runner, region="us-east-1",
+    )
+    assert deleted == ["r1-eks-ec2"]
+    out = capsys.readouterr().out
+    assert len([line for line in out.splitlines() if "skipping Helm" in line]) == 1
+    assert "unreachable" in out
+    assert not re.search(r"\d{12}", out)
+
+
+def test_alb_still_there_after_timeout_exits_before_any_stack_delete(eks_clients, capsys):
+    made, stubs = eks_clients
+    _stub_albs(stubs["elbv2"], tagged=True)
+    with pytest.raises(SystemExit) as exc:
+        delete_run.wait_for_albs(made["elbv2"], CLUSTER, timeout=0, sleep=lambda _s: None)
+    text = capsys.readouterr().err + str(exc.value.code)
+    assert "k8s-x" in text
+    assert not re.search(r"\d{12}", text)
+
+
+def test_ecs_only_run_makes_no_eks_or_helm_call(clients, monkeypatch):
+    made, stubs = clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-ecs", 2)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    deleted, runner = [], Runner()
+    monkeypatch.setattr(delete_run, "delete_stacks", lambda _c, names: deleted.extend(names))
+    monkeypatch.setattr(delete_run, "check_leftovers", lambda *_a: None)
+    delete_run.teardown(
+        made["cloudformation"], made["ec2"], made["ecs"], made["resourcegroupstaggingapi"],
+        RUN, timeout=900, answer=lambda _p: "y", run=runner,
+    )
+    assert runner.calls == []
+    assert deleted == ["r1-ecs"]
+
+
+# --- QA edge cases (issue #69) ---
+
+
+def test_cluster_found_past_newer_lbc_iam_stack(eks_clients):
+    """Real layout: <id>-eks-lbc-iam is newer and also matches <id>-eks-, but has no ClusterName."""
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "describe_stacks",
+        {
+            "Stacks": [
+                {
+                    "StackName": "r1-eks-lbc-iam",
+                    "CreationTime": datetime(2026, 10, 1, tzinfo=UTC),
+                    "StackStatus": "CREATE_COMPLETE",
+                    "Outputs": [{"OutputKey": "RoleArn", "OutputValue": "arn:aws:iam::x:role/y"}],
+                }
+            ]
+        },
+        {"StackName": "r1-eks-lbc-iam"},
+    )
+    _stub_cluster_output(stubs["cloudformation"])
+    names = ["r1-eks-lbc-iam", "r1-eks-ec2", "r1-network"]
+    assert delete_run.eks_cluster(made["cloudformation"], names, RUN) == CLUSTER
+
+
+def test_declined_prompt_runs_no_helm(eks_clients, monkeypatch):
+    made, stubs = eks_clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-eks-ec2", 2)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    runner = Runner()
+    monkeypatch.setattr(delete_run, "delete_stacks", lambda *_a: pytest.fail("deleted"))
+    with pytest.raises(SystemExit):
+        delete_run.teardown(
+            made["cloudformation"], None, None, None, RUN, timeout=900, answer=lambda _p: "",
+            eks=made["eks"], elbv2=made["elbv2"], run=runner, region="us-east-1",
+        )
+    assert runner.calls == []
+
+
+def test_cluster_albs_batches_describe_tags_by_20(eks_clients):
+    made, stubs = eks_clients
+    arns = [f"arn:aws:elasticloadbalancing:us-east-1:x:loadbalancer/app/lb{i}/z" for i in range(25)]
+    stubs["elbv2"].add_response(
+        "describe_load_balancers", {"LoadBalancers": [{"LoadBalancerArn": a} for a in arns]}, {}
+    )
+    for chunk in (arns[:20], arns[20:]):
+        stubs["elbv2"].add_response(
+            "describe_tags",
+            {
+                "TagDescriptions": [
+                    {"ResourceArn": a, "Tags": [{"Key": "elbv2.k8s.aws/cluster", "Value": CLUSTER}]}
+                    for a in chunk
+                    if a.endswith(("lb3/z", "lb22/z"))
+                ]
+            },
+            {"ResourceArns": chunk},
+        )
+    assert delete_run.cluster_albs(made["elbv2"], CLUSTER) == [arns[3], arns[22]]

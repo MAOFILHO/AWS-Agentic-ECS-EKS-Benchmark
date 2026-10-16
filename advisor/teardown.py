@@ -1,6 +1,7 @@
 """Teardown node (SPEC section 10): the last node on every path after the gate's yes.
 
-Calls delete_run.py once per cell run id. A non-zero exit means stacks or tagged resources are
+Calls delete_run.py once per cell run id. That one call deletes every `<cell run id>-` stack,
+newest first: the cell, the k6 harness, then the network. A non-zero exit means stacks or tagged resources are
 left: the run status becomes "leftovers" and delete_run.py's leftover ARNs print masked.
 """
 

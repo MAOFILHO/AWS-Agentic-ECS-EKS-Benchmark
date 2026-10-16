@@ -19,6 +19,7 @@ def no_aws(monkeypatch):
     monkeypatch.setattr(deployer, "subprocess_runner", lambda argv, env: (0, ""))
     monkeypatch.setenv("AWS_PROFILE", "test")
     monkeypatch.setenv("IMAGE_URI", "repo:tag")
+    monkeypatch.setenv("K6_IMAGE_URI", "repo:k6-tag")
     monkeypatch.delenv("AWS_REGION", raising=False)
     monkeypatch.delenv("AWS_DEFAULT_REGION", raising=False)
 

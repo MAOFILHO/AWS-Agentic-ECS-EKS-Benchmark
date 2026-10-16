@@ -82,13 +82,14 @@ def shielded(node):
 
 
 def deploy_nodes(root: Path, config: dict) -> dict:
-    """The nodes that touch AWS. They read AWS_PROFILE and IMAGE_URI (repo:tag in ECR) from the env."""
+    """The nodes that touch AWS. They read AWS_PROFILE, IMAGE_URI and K6_IMAGE_URI (repo:tag in ECR) from the env."""
     profile = os.environ.get("AWS_PROFILE")
 
     def aws(service: str, region: str):  # the default session reads AWS_PROFILE
         return boto3.client(service, region_name=region)
 
-    return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root),
+    return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root,
+                                             k6_image_uri=os.environ.get("K6_IMAGE_URI")),
             "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
             "collector": make_collector(aws, profile, root),
             "teardown": shielded(make_teardown(profile, root))}

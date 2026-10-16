@@ -55,6 +55,7 @@ def test_cli_exits_non_zero_when_teardown_leaves_resources(tmp_path, monkeypatch
     monkeypatch.setattr(deployer, "subprocess_runner", runner)
     monkeypatch.setenv("AWS_PROFILE", "sso")
     monkeypatch.setenv("IMAGE_URI", "repo:tag")
+    monkeypatch.setenv("K6_IMAGE_URI", "repo:k6-tag")
     argv = ["run", "--region", REGION, "--run-id", "td-01", "--profile", "steady"]
     assert cli.main(argv, pricing=StubPricing(), ask=lambda prompt: "y", root=tmp_path) == 1
     out = capsys.readouterr()

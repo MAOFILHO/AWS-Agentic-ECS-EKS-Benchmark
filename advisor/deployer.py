@@ -1,8 +1,10 @@
 """Deployer node (SPEC section 10): deploy each cell of the run matrix by subprocess, no prompts.
 
 Each cell gets its own run id, `<run-id>-<suffix>`, so its stack names, its run-id tag and its
-delete_run.py call never touch another cell. Every command carries the region; AWS_PROFILE and
-the other inputs go in its env. Every command lands in runs/<run-id>/commands.jsonl.
+delete_run.py call never touch another cell. Per cell: the network stack, the k6 harness stack
+(`<cell run id>-harness`, read by the load runner and the collector), then the cell itself.
+Every command carries the region; AWS_PROFILE and the other inputs go in its env. Every command
+lands in runs/<run-id>/commands.jsonl.
 """
 
 import json
@@ -81,23 +83,27 @@ def run_logged(run: Runner, root: Path, run_id: str, argv: list[str], env: dict[
 
 
 def deploy_commands(cell: str, rid: str, region: str) -> list[list[str]]:
-    """The Makefile targets for one cell, with --region and --yes added. An ECS cell then reads its ALB."""
+    """Network, harness, then the cell's Makefile target, with --region and --yes added. An ECS cell then reads its ALB."""
     py = sys.executable
-    if cell.startswith("eks-"):
-        return [[py, "-m", "scripts.deploy_eks", "--cell", cell, "--run-id", rid, "--region", region, "--yes"]]
     stack = [py, "scripts/deploy_stack.py", "--region", region, "--yes"]
+    network = [*stack, "--stack", f"{rid}-network", "--template", "infra/cfn/10-network.yaml", "--env-param", "RunId=RUN_ID"]
+    harness = [*stack, "--stack", f"{rid}-harness", "--template", "infra/cfn/20-harness.yaml", "--env-param",
+               "RunId=RUN_ID", "--env-param", "NetworkStackName=NETWORK_STACK", "--env-param", "K6ImageUri=K6_IMAGE_URI"]
+    if cell.startswith("eks-"):  # deploy_eks.py finds the network stack already there: no changes
+        return [network, harness,
+                [py, "-m", "scripts.deploy_eks", "--cell", cell, "--run-id", rid, "--region", region, "--yes"]]
     ecs = [*stack, "--stack", f"{rid}-{cell}", "--template", "infra/cfn/30-ecs.yaml", "--env-param", "RunId=RUN_ID",
            "--env-param", "NetworkStackName=NETWORK_STACK", "--env-param", "ImageUri=IMAGE_URI"]
     if cell == "ecs-ec2":
         ecs += ["--env-param", "ComputeType=COMPUTE_TYPE"]
-    return [[*stack, "--stack", f"{rid}-network", "--template", "infra/cfn/10-network.yaml",
-             "--env-param", "RunId=RUN_ID"], ecs,
+    return [network, harness, ecs,
             ["aws", "cloudformation", "describe-stacks", "--stack-name", f"{rid}-{cell}", "--region", region,
              "--query", "Stacks[0].Outputs[?OutputKey=='AlbDnsName'].OutputValue", "--output", "text"]]
 
 
 def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: Runner | None = None,
-                  now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> Callable[[RunState], dict]:
+                  now: Callable[[], datetime] = lambda: datetime.now(UTC),
+                  k6_image_uri: str | None = None) -> Callable[[RunState], dict]:
     """Build the node. A failed command stops it with status "failed"; the graph then runs teardown."""
 
     def deployer(state: RunState) -> dict:
@@ -106,12 +112,15 @@ def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: R
         def failed(why: str) -> dict:
             return {"status": "failed", "errors": [*state.errors, mask(f"deployer: {why}")]}
 
-        if missing := [name for name, value in (("AWS_PROFILE", profile), ("IMAGE_URI", image_uri)) if not value]:
-            return failed(f"not set: {', '.join(missing)}; nothing was deployed")
+        inputs = (("AWS_PROFILE", profile), ("IMAGE_URI", image_uri), ("K6_IMAGE_URI", k6_image_uri))
+        if missing := [name for name, value in inputs if not value]:
+            hint = " (run make push-k6 and export the URI it prints)" if "K6_IMAGE_URI" in missing else ""
+            return failed(f"not set: {', '.join(missing)}{hint}; nothing was deployed")
         raw = create_run_dirs(state.run_id, root).raw
         for cell in cells_of(state):
             rid = cell_run_id(state.run_id, cell)
-            env = {"AWS_PROFILE": profile, "IMAGE_URI": image_uri, "RUN_ID": rid, "NETWORK_STACK": f"{rid}-network"}
+            env = {"AWS_PROFILE": profile, "IMAGE_URI": image_uri, "K6_IMAGE_URI": k6_image_uri, "RUN_ID": rid,
+                   "NETWORK_STACK": f"{rid}-network"}
             if cell == "ecs-ec2":
                 env["COMPUTE_TYPE"] = "EC2"
             start = now()

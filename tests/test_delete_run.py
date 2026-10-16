@@ -138,6 +138,24 @@ def test_deletes_in_given_order_and_waits_for_each(clients, capsys):
     assert out.index("r1-ecs") < out.index("r1-harness") < out.index("r1-network")
 
 
+def test_one_teardown_call_deletes_the_harness_with_the_cell(clients, capsys):
+    """Issue #103: the harness stack shares the cell run id prefix, so it goes in the same pass."""
+    made, stubs = clients
+    stubs["cloudformation"].add_response(
+        "list_stacks",
+        {"StackSummaries": [_summary("r1-network", 1), _summary("r1-harness", 2), _summary("r1-ecs-fargate", 3)]},
+        {"StackStatusFilter": delete_run.live_statuses(made["cloudformation"])},
+    )
+    for name in ("r1-ecs-fargate", "r1-harness", "r1-network"):
+        _stub_delete(stubs["cloudformation"], name)
+    _stub_tags(stubs["resourcegroupstaggingapi"], [])
+    delete_run.teardown(made["cloudformation"], made["ec2"], made["ecs"], made["resourcegroupstaggingapi"],
+                        RUN, 0, answer=lambda _prompt: "y")
+    out = capsys.readouterr().out
+    assert "r1-harness: deleting..." in out and "r1-harness: deleted." in out
+    assert out.index("r1-ecs-fargate: deleted.") < out.index("r1-harness: deleting...") < out.index("r1-network:")
+
+
 def test_delete_failed_exits_and_prints_failed_resources_masked(clients, capsys):
     made, stubs = clients
     _stub_delete(stubs["cloudformation"], "r1-ecs", final="DELETE_FAILED")

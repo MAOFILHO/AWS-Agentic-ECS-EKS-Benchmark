@@ -16,6 +16,7 @@ from advisor.teardown import make_teardown
 ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
 ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
 IMAGE = f"{ACCOUNT}.dkr.ecr.us-east-2.amazonaws.com/triage-workload:abc1234"
+K6 = f"{ACCOUNT}.dkr.ecr.us-east-2.amazonaws.com/triage-workload:k6-abc1234"
 REGION = "us-east-2"
 
 
@@ -48,16 +49,33 @@ def alb_output(argv):
 
 def test_default_matrix_deploys_ecs_fargate_then_eks_ec2_once_each(tmp_path):
     run = FakeRunner()
-    assert make_deployer("sso", IMAGE, tmp_path, run=run)(state()) == {"status": "deployed"}
-    assert run.scripts() == ["scripts/deploy_stack.py", "scripts/deploy_stack.py", "cloudformation",
-                             "scripts.deploy_eks"]
+    assert make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run)(state()) == {"status": "deployed"}
+    assert run.scripts() == ["scripts/deploy_stack.py"] * 3 + ["cloudformation"] + ["scripts/deploy_stack.py"] * 2 + [
+        "scripts.deploy_eks"]
     stacks = [argv[argv.index("--stack") + 1] for argv, _ in run.calls if "--stack" in argv]
-    assert stacks == ["dep-01-ef-network", "dep-01-ef-ecs-fargate"]
+    assert stacks == ["dep-01-ef-network", "dep-01-ef-harness", "dep-01-ef-ecs-fargate",
+                      "dep-01-ke-network", "dep-01-ke-harness"]
+
+
+def test_harness_stack_gets_the_network_and_the_k6_image(tmp_path):
+    run = FakeRunner()
+    make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run)(state(("ecs-fargate",)))
+    argv, env = next((a, e) for a, e in run.calls if "dep-01-ef-harness" in a)
+    assert argv[argv.index("--template") + 1] == "infra/cfn/20-harness.yaml"
+    assert {"RunId=RUN_ID", "NetworkStackName=NETWORK_STACK", "K6ImageUri=K6_IMAGE_URI"} <= set(argv)
+    assert env["K6_IMAGE_URI"] == K6 and env["NETWORK_STACK"] == "dep-01-ef-network"
+
+
+def test_unset_k6_image_fails_before_any_stack_is_created(tmp_path):
+    run = FakeRunner()
+    out = make_deployer("sso", IMAGE, tmp_path, k6_image_uri=None, run=run)(state())
+    assert run.calls == [] and out["status"] == "failed"
+    assert "K6_IMAGE_URI" in out["errors"][0] and "make push-k6" in out["errors"][0]
 
 
 def test_every_command_carries_the_region_and_the_cell_run_id(tmp_path):
     run = FakeRunner()
-    make_deployer("sso", IMAGE, tmp_path, run=run)(state(("ecs-fargate", "ecs-ec2", "eks-ec2", "eks-fargate")))
+    make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run)(state(("ecs-fargate", "ecs-ec2", "eks-ec2", "eks-fargate")))
     for argv, env in run.calls:
         assert argv[argv.index("--region") + 1] == REGION and env["AWS_PROFILE"] == "sso"
         assert re.fullmatch(r"dep-01-[a-z]{2}", env["RUN_ID"]) and any(a.startswith(env["RUN_ID"]) for a in argv)
@@ -69,7 +87,7 @@ def test_every_command_carries_the_region_and_the_cell_run_id(tmp_path):
 
 def test_deploy_json_records_start_end_and_alb(tmp_path):
     times = iter(datetime(2026, 10, 15, 12, m, tzinfo=UTC) for m in range(4))
-    make_deployer("sso", IMAGE, tmp_path, run=FakeRunner(output=alb_output), now=lambda: next(times))(state())
+    make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=FakeRunner(output=alb_output), now=lambda: next(times))(state())
     raw = tmp_path / "results" / "dep-01" / "raw"
     ecs = json.loads((raw / "ecs-fargate" / "deploy.json").read_text())
     assert ecs == {"stack_create_start": "2026-10-15T12:00:00+00:00", "stack_create_end": "2026-10-15T12:01:00+00:00",
@@ -87,18 +105,18 @@ def test_missing_profile_or_image_fails_before_any_command(tmp_path):
 
 def test_run_record_and_output_hold_no_account_id_or_profile(tmp_path, capsys):
     run = FakeRunner(fail=lambda argv: "scripts.deploy_eks" in argv, output=alb_output)
-    out = make_deployer("sso", IMAGE, tmp_path, run=run)(state())
+    out = make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run)(state())
     printed = capsys.readouterr()
     assert not ACCOUNT_ID.search(printed.out + printed.err + " ".join(out["errors"]))
     lines = (tmp_path / "runs" / "dep-01" / "commands.jsonl").read_text()
     entries = [json.loads(line) for line in lines.splitlines()]
-    assert [e["exit"] for e in entries] == [0, 0, 0, 1] and all(e["seconds"] >= 0 for e in entries)
+    assert [e["exit"] for e in entries] == [0, 0, 0, 0, 0, 0, 1] and all(e["seconds"] >= 0 for e in entries)
     assert "IMAGE_URI" in entries[0]["env"] and ACCOUNT not in lines and "sso" not in lines
 
 
 def test_second_cell_failure_still_reaches_teardown_for_every_cell(tmp_path):
     run = FakeRunner(fail=lambda argv: "scripts.deploy_eks" in argv)
-    nodes = {"deployer": make_deployer("sso", IMAGE, tmp_path, run=run), "teardown": make_teardown("sso", tmp_path, run=run)}
+    nodes = {"deployer": make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run), "teardown": make_teardown("sso", tmp_path, run=run)}
     graph = build_graph(lambda s: {}, make_gate(auto_approve_under=100.0), InMemorySaver(), **nodes)
     out = graph.invoke(state().model_copy(update={"estimate_usd": 1.0}), {"configurable": {"thread_id": "dep-01"}})
     assert out["status"] == "failed" and "eks-ec2" in out["errors"][0]
@@ -118,7 +136,7 @@ def test_a_runner_that_raises_mid_deploy_still_reaches_teardown(tmp_path):
             return super().__call__(argv, env)
 
     run = Raising()
-    nodes = {"deployer": make_deployer("sso", IMAGE, tmp_path, run=run), "teardown": make_teardown("sso", tmp_path, run=run)}
+    nodes = {"deployer": make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run), "teardown": make_teardown("sso", tmp_path, run=run)}
     graph = build_graph(lambda s: {}, make_gate(auto_approve_under=100.0), InMemorySaver(), **nodes)
     out = graph.invoke(state().model_copy(update={"estimate_usd": 1.0}), {"configurable": {"thread_id": "dep-01"}})
     assert out["status"] == "failed" and "ecs-fargate" in out["errors"][0]

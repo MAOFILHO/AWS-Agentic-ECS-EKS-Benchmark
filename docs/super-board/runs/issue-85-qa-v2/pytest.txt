@@ -1,0 +1,15 @@
+# QA v2 · PR #91 @ de09cc3
+
+$ uv run --locked ruff check
+All checks passed!
+
+$ uv run --locked pytest -q
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 73%]
+........................................................................ [ 98%]
+....                                                                     [100%]
+292 passed in 4.82s
+
+$ probe: runner raises on every command through the real graph
+status=leftovers; deployer error recorded masked (exit 127); teardown ran for dep-01-ef and dep-01-ke; both delete calls logged; no 12-digit id in output

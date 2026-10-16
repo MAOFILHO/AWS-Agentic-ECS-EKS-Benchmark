@@ -229,3 +229,16 @@ def test_aws_error_from_main_masks_the_account_id(monkeypatch):
         deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1"])
     assert exc.value.code != 0
     assert ACCOUNT not in str(exc.value)
+
+
+
+def test_yes_answers_every_change_set_prompt(monkeypatch):
+    seen = {}
+    for name, value in {"IMAGE_URI": IMAGE, "AWS_PROFILE": "sso", "AWS_REGION": "us-east-1"}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(deploy_eks.boto3, "Session", lambda **kw: type("S", (), {"client": lambda self, n: None})())
+    monkeypatch.setattr(deploy_eks, "deploy", lambda *a, deploy_one, **kw: seen.update(one=deploy_one))
+    deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1"])
+    assert seen["one"] is deploy_eks.deploy_stack.deploy
+    deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1", "--yes"])
+    assert seen["one"].keywords["answer"]("Execute? ") == "y"

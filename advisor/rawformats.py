@@ -14,7 +14,8 @@ including a NaN or Infinity number. The analyst turns a missing or bad file into
   `{"timestamp": ISO 8601, "kind": "alarm" | "scheduled" | "healthy", "message": str}`.
   `alarm` = autoscaling alarm or HPA decision, `scheduled` = task or pod placed,
   `healthy` = replica passed its health check (`/readyz` 200 or ALB target healthy).
-- `deploy.json`: `{"stack_create_start", "stack_create_end", "target_healthy"}`, ISO 8601.
+- `deploy.json`: `{"stack_create_start", "stack_create_end", "target_healthy"}`, ISO 8601, and
+  `alb_dns_name`. The deployer writes all but `target_healthy`, which the collector adds.
 - `config.json`: `{"config_lines": int, "moving_parts": int}`.
 - `cost.json`: `{"load_usd": number, "idle_usd_per_hour": number}`, from the cost model.
 """
@@ -89,6 +90,7 @@ class Deploy(Strict):
     stack_create_start: AwareDatetime
     stack_create_end: AwareDatetime
     target_healthy: AwareDatetime
+    alb_dns_name: str | None = None
 
 
 class Config(Strict):

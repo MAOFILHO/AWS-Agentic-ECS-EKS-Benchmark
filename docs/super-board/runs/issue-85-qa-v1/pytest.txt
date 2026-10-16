@@ -1,0 +1,34 @@
+$ uv run --locked ruff check
+All checks passed!
+
+$ uv run --locked pytest -q   (builder head b9a6a80, before the QA test)
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 4.54s
+
+$ uv run --locked pytest -q   (with the QA test)
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+advisor/deployer.py:100: in deployer
+    code, out = run_logged(runner, root, state.run_id, argv, env)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+advisor/deployer.py:51: in run_logged
+    code, out = run(argv, env)
+                ^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_deployer.test_a_runner_that_raises_mid_deploy_still_reaches_teardown.<locals>.Raising object at 0x1125bca10>
+argv = ['aws', 'cloudformation', 'describe-stacks', '--stack-name', 'dep-01-ef-ecs-fargate', '--region', ...]
+env = {'AWS_PROFILE': 'sso', 'IMAGE_URI': '************.dkr.ecr.us-east-2.amazonaws.com/triage-workload:abc1234', 'RUN_ID': 'dep-01-ef', 'NETWORK_STACK': 'dep-01-ef-network'}
+
+    def __call__(self, argv, env):
+        if argv[0] == "aws":
+            self.calls.append((argv, env))
+>           raise FileNotFoundError("aws")
+E           FileNotFoundError: aws
+E           During task with name 'deployer' and id '4b0aaea6-8dda-e032-6962-251860d4290b'
+
+tests/test_deployer.py:117: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_deployer.py::test_a_runner_that_raises_mid_deploy_still_reaches_teardown
+1 failed, 290 passed in 4.59s

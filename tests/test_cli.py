@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from advisor import cli
+from advisor import cli, deployer
 from tests.test_cost import StubPricing
 
 ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
@@ -15,6 +15,10 @@ def no_aws(monkeypatch):
         raise AssertionError("AWS call")
 
     monkeypatch.setattr(cli.boto3, "client", refuse)
+    # A yes deploys: every deploy and teardown command goes to a runner that succeeds and does nothing.
+    monkeypatch.setattr(deployer, "subprocess_runner", lambda argv, env: (0, ""))
+    monkeypatch.setenv("AWS_PROFILE", "test")
+    monkeypatch.setenv("IMAGE_URI", "repo:tag")
     monkeypatch.delenv("AWS_REGION", raising=False)
     monkeypatch.delenv("AWS_DEFAULT_REGION", raising=False)
 

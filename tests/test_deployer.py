@@ -105,3 +105,22 @@ def test_second_cell_failure_still_reaches_teardown_for_every_cell(tmp_path):
     deletes = [argv[argv.index("--run-id") + 1] for argv, _ in run.calls if "scripts/delete_run.py" in argv]
     assert deletes == ["dep-01-ef", "dep-01-ke"]
     assert run.scripts().index("scripts.deploy_eks") < run.scripts().index("scripts/delete_run.py")
+
+
+def test_a_runner_that_raises_mid_deploy_still_reaches_teardown(tmp_path):
+    """SPEC section 10: teardown runs in a `finally` path. A missing `aws` binary raises after two stacks exist."""
+
+    class Raising(FakeRunner):
+        def __call__(self, argv, env):
+            if argv[0] == "aws":
+                self.calls.append((argv, env))
+                raise FileNotFoundError("aws")
+            return super().__call__(argv, env)
+
+    run = Raising()
+    nodes = {"deployer": make_deployer("sso", IMAGE, tmp_path, run=run), "teardown": make_teardown("sso", tmp_path, run=run)}
+    graph = build_graph(lambda s: {}, make_gate(auto_approve_under=100.0), InMemorySaver(), **nodes)
+    out = graph.invoke(state().model_copy(update={"estimate_usd": 1.0}), {"configurable": {"thread_id": "dep-01"}})
+    assert out["status"] == "failed" and "ecs-fargate" in out["errors"][0]
+    deletes = [argv[argv.index("--run-id") + 1] for argv, _ in run.calls if "scripts/delete_run.py" in argv]
+    assert deletes == ["dep-01-ef", "dep-01-ke"]

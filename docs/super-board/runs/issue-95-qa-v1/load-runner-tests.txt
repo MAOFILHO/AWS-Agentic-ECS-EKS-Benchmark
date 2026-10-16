@@ -1,0 +1,19 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- <repo>/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 8 items
+
+tests/test_load_runner.py::test_run_task_gets_the_four_overrides_and_the_harness_outputs PASSED [ 12%]
+tests/test_load_runner.py::test_summary_is_extracted_between_markers_and_passes_the_reader PASSED [ 25%]
+tests/test_load_runner.py::test_extract_summary_needs_both_markers_and_valid_json PASSED [ 37%]
+tests/test_load_runner.py::test_missing_marker_or_failed_task_is_a_gap_never_a_zero PASSED [ 50%]
+tests/test_load_runner.py::test_a_task_that_never_stops_is_stopped_and_becomes_a_gap PASSED [ 62%]
+tests/test_load_runner.py::test_a_failed_cell_does_not_stop_the_next_one_and_no_id_reaches_a_gap PASSED [ 75%]
+tests/test_load_runner.py::test_graph_goes_on_to_collector_and_teardown_after_a_load_gap PASSED [ 87%]
+tests/test_load_runner.py::test_raw_file_and_printed_gaps_hold_no_account_id_or_email PASSED [100%]
+
+============================== 8 passed in 0.49s ===============================
+exit 0

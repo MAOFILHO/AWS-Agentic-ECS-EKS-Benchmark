@@ -56,3 +56,5 @@ class RunState(BaseModel):
     status: str = "planned"
     errors: list[str] = []
     actual_usd: float | None = None
+    # Per platform cell: [load start, load end], ISO 8601. The load runner writes it, the collector reads it.
+    load_windows: dict[str, list[str]] = {}

@@ -21,6 +21,7 @@ including a NaN or Infinity number. The analyst turns a missing or bad file into
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -109,3 +110,23 @@ def read(path: Path, shape):
         return TypeAdapter(shape).validate_python(json.loads(path.read_text()))
     except (json.JSONDecodeError, ValidationError) as err:
         raise RawFormatError(f"{path.name}: {err}") from err
+
+
+# A 12-digit run is an AWS account id; an address is an email. Neither may reach a file or a log line.
+SENSITIVE = re.compile(r"(?<!\d)\d{12}(?!\d)|[\w.+-]+@[\w-]+\.[\w.-]+")
+
+
+def scrub(value):
+    """Mask account ids and emails in every string of `value`. Numbers are left alone."""
+    if isinstance(value, str):
+        return SENSITIVE.sub("*" * 12, value)
+    if isinstance(value, list):
+        return [scrub(v) for v in value]
+    if isinstance(value, dict):
+        return {k: scrub(v) for k, v in value.items()}
+    return value
+
+
+def write(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(scrub(data), indent=2) + "\n")

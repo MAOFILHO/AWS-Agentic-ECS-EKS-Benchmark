@@ -1,7 +1,7 @@
 """Command line: `python -m advisor run ...` and `python -m advisor resume <run-id>`.
 
 Prints the estimate and the run matrix, then asks y/N before any spend. A yes deploys every cell,
-then teardown deletes them on every path. Prints no account id.
+loads it with k6, then teardown deletes them on every path. Prints no account id.
 """
 
 import argparse
@@ -19,6 +19,7 @@ from langgraph.types import Command
 from advisor.deployer import make_deployer
 from advisor.gate import make_gate
 from advisor.graph import build_graph
+from advisor.load_runner import make_load_runner
 from advisor.planner import DEFAULT_CELLS, PROFILES, PlanConfig, make_planner
 from advisor.state import Capacity, CellName, CellSpec, RunState
 from advisor.store import create_run_dirs, open_checkpointer
@@ -79,10 +80,15 @@ def shielded(node):
     return run
 
 
-def deploy_nodes(root: Path) -> dict:
-    """Deployer and teardown. They read AWS_PROFILE and IMAGE_URI (repo:tag in ECR) from the env."""
+def deploy_nodes(root: Path, config: dict) -> dict:
+    """The nodes that touch AWS. They read AWS_PROFILE and IMAGE_URI (repo:tag in ECR) from the env."""
     profile = os.environ.get("AWS_PROFILE")
+
+    def aws(service: str, region: str):  # the default session reads AWS_PROFILE
+        return boto3.client(service, region_name=region)
+
     return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root),
+            "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
             "teardown": shielded(make_teardown(profile, root))}
 
 
@@ -154,7 +160,7 @@ def run_command(argv, pricing, ask, root) -> int:
         with open_checkpointer(create_run_dirs(args.run_id, root)) as saver:
             # The planner already ran, so it needs no pricing client here.
             planner = make_planner(None, PlanConfig(**config["plan"]))
-            nodes = deploy_nodes(root)
+            nodes = deploy_nodes(root, config)
             graph = build_graph(planner, make_gate(), saver, **nodes)
             return finish(graph, cfg, ask, nodes["teardown"])
 
@@ -171,7 +177,7 @@ def run_command(argv, pricing, ask, root) -> int:
     paths = create_run_dirs(args.run_id, root)
     with open_checkpointer(paths) as saver:
         planner = make_planner(pricing, PlanConfig(**config["plan"]))
-        nodes = deploy_nodes(root)
+        nodes = deploy_nodes(root, config)
         graph = build_graph(planner, make_gate(args.auto_approve_under), saver, **nodes)
         result = invoke(graph, cfg, state, nodes["teardown"])
         if result and "__interrupt__" not in result:

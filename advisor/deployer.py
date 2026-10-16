@@ -40,18 +40,31 @@ def cells_of(state: RunState) -> list[str]:
 
 
 def subprocess_runner(argv: list[str], env: dict[str, str]) -> tuple[int, str]:
-    done = subprocess.run(argv, cwd=ROOT, env={**os.environ, **env}, stdin=subprocess.DEVNULL,
-                          capture_output=True, text=True, check=False)
-    return done.returncode, done.stdout + done.stderr
+    """Run one command. An interrupt waits for the child to end (never kills it mid change set), then re-raises."""
+    proc = subprocess.Popen(argv, cwd=ROOT, env={**os.environ, **env}, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    interrupt = None
+    while True:
+        try:
+            out, err = proc.communicate()
+            break
+        except BaseException as exc:  # noqa: BLE001 - Ctrl+C, SIGTERM: keep waiting for the child
+            interrupt = interrupt or exc
+    if interrupt:
+        raise interrupt
+    return proc.returncode, out + err
 
 
 def run_logged(run: Runner, root: Path, run_id: str, argv: list[str], env: dict[str, str]):
     """Run one command, print its output masked, and record argv, env names, exit and duration."""
     start = time.monotonic()
+    interrupt = None
     try:
         code, out = run(argv, env)
     except Exception as exc:  # noqa: BLE001 - a missing binary must not skip teardown; treat it as exit 127
         code, out = 127, f"{type(exc).__name__}: {exc}"
+    except BaseException as exc:  # noqa: BLE001 - Ctrl+C, SIGTERM: record the command as exit 130, then re-raise
+        code, out, interrupt = 130, "", exc
     seconds = round(time.monotonic() - start, 3)
     if out.strip():
         print(mask(out.rstrip()), flush=True)
@@ -61,6 +74,8 @@ def run_logged(run: Runner, root: Path, run_id: str, argv: list[str], env: dict[
     entry = {"argv": [mask(a) for a in argv], "env": sorted(env), "exit": code, "seconds": seconds}
     with log.open("a") as f:
         f.write(json.dumps(entry) + "\n")
+    if interrupt:
+        raise interrupt
     return code, out
 
 

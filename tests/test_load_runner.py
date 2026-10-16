@@ -138,3 +138,14 @@ def test_graph_goes_on_to_collector_and_teardown_after_a_load_gap(tmp_path):
                         collector=spy("collector"), teardown=spy("teardown"))
     graph.invoke(state())
     assert seen == [("planner", "planned"), ("collector", "loaded"), ("teardown", "loaded")]
+
+
+def test_raw_file_and_printed_gaps_hold_no_account_id_or_email(tmp_path, capsys):
+    k6 = json.loads(K6.read_text()) | {"root_group": {"name": f"arn:aws:iam::{ACCOUNT}:role/x", "owner": EMAIL}}
+    ecs, logs, cfn = harness(lines=["K6-SUMMARY-BEGIN", json.dumps(k6), "K6-SUMMARY-END"])
+    node(tmp_path, ecs, logs, cfn)(state())
+    written = (raw(tmp_path) / "k6-steady.json").read_text()
+    assert not SENSITIVE.search(written) and rf.read(raw(tmp_path) / "k6-steady.json", rf.K6Summary)
+    ecs.responses["run_task"] = {"tasks": [], "failures": [{"arn": TASK, "reason": f"denied for {EMAIL}"}]}
+    out = node(tmp_path, ecs, logs, cfn)(state())
+    assert out["gaps"] and not SENSITIVE.search(out["gaps"][0] + capsys.readouterr().out)

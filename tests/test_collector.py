@@ -76,13 +76,14 @@ def state(**changes):
                     capacity=Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4))
 
 
-def collect(tmp_path, aws=None, run=kubectl, **changes):
+def collect(tmp_path, aws=None, run=kubectl, sleeps=None, **changes):
     for cell in ("ecs-fargate", "eks-ec2"):
         rf.write(tmp_path / "results" / "col-01" / "raw" / cell / "deploy.json", {
             "stack_create_start": "2026-10-14T19:50:00+00:00", "stack_create_end": "2026-10-14T19:53:30+00:00",
             "alb_dns_name": ALB}, rf.DeployStarted)
     aws = aws or clients()
-    out = make_collector(aws_of(**aws), "sso", tmp_path, run=run)(state(**changes))
+    out = make_collector(aws_of(**aws), "sso", tmp_path, run=run,
+                         sleep=[].append if sleeps is None else sleeps.append)(state(**changes))
     return out, tmp_path / "results" / "col-01" / "raw", aws
 
 
@@ -173,3 +174,29 @@ def test_no_5xx_datapoints_is_a_real_zero_when_requests_were_counted(tmp_path):
     aws["cloudwatch"].responses["get_metric_data"] = empty_series("e5xx")
     out, raw, _ = collect(tmp_path, aws)
     assert out["gaps"] == [] and json.loads((raw / "ecs-fargate" / "alb.json").read_text())["http_5xx"] == []
+
+
+def test_harness_cpu_waits_for_the_metric_lag_then_writes_the_file(tmp_path):
+    aws, calls = clients(), []
+    def lagging(MetricDataQueries, **kw):
+        harness = any(q["Id"] == "reserved" for q in MetricDataQueries)
+        calls.append(harness)
+        stub = empty_series("cpu") if harness and calls.count(True) % 3 else metric_data
+        return stub(MetricDataQueries)
+    aws["cloudwatch"].responses["get_metric_data"] = lagging
+    sleeps = []
+    out, raw, _ = collect(tmp_path, aws, sleeps=sleeps)
+    assert out["gaps"] == [] and (raw / "ecs-fargate" / "cloudwatch-harness-cpu.json").is_file()
+    assert sleeps == [60, 60, 60, 60]  # two empty reads for each of the two cells
+
+
+def test_a_harness_cpu_series_that_stays_empty_is_one_gap_after_the_waits(tmp_path):
+    aws = clients()
+    harness_only = lambda MetricDataQueries, **kw: (empty_series("cpu") if any(q["Id"] == "reserved" for q in MetricDataQueries)
+                                                    else metric_data)(MetricDataQueries)
+    aws["cloudwatch"].responses["get_metric_data"] = harness_only
+    sleeps = []
+    out, raw, _ = collect(tmp_path, aws, sleeps=sleeps)
+    assert [g.split(":")[0] for g in out["gaps"] if "harness-cpu" in g] == [
+        "ecs-fargate/cloudwatch-harness-cpu.json", "eks-ec2/cloudwatch-harness-cpu.json"]
+    assert (raw / "ecs-fargate" / "alb.json").is_file() and len(sleeps) == 4

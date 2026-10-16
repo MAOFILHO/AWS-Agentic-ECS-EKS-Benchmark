@@ -9,6 +9,7 @@ memory come from the AWS/ECS namespace, so only ECS cells get cloudwatch-cpu.jso
 
 import json
 import tempfile
+import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -22,6 +23,7 @@ from advisor.store import create_run_dirs
 ECS_PARTS = ("cluster", "service", "ALB", "autoscaling policy")
 EKS_PARTS = ("cluster", "node group", "controller", "add-ons")
 HELM = "infra/helm/workload"
+METRIC_TRIES, METRIC_WAIT_S = 3, 60  # Container Insights publishes 1 to 2 minutes after the task ends
 
 
 def config_files(cell: str) -> list[str]:
@@ -110,7 +112,8 @@ def eks_events(run: d.Runner, env: dict, cluster: str, region: str, start: datet
     return found
 
 
-def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | None = None):
+def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | None = None,
+                   sleep: Callable[[float], None] = time.sleep):
     def collector(state: RunState) -> dict:
         region, raw, gaps = state.region, create_run_dirs(state.run_id, root).raw, []
         env = {"AWS_PROFILE": profile} if profile else {}
@@ -147,9 +150,17 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                 harness = stack_outputs(aws("cloudformation", region), f"{rid}-harness")
                 family = harness["TaskDefinitionArn"].rsplit("/", 1)[1].rsplit(":", 1)[0]
                 dims = {"ClusterName": harness["ClusterName"], "TaskDefinitionFamily": family}
-                got = series(cw, [metric("used", "ECS/ContainerInsights", "CpuUtilized", dims, "Average", ReturnData=False),
-                                  metric("reserved", "ECS/ContainerInsights", "CpuReserved", dims, "Average", ReturnData=False),
-                                  {"Id": "cpu", "Expression": "100 * used / reserved"}], start, end)
+                queries = [metric("used", "ECS/ContainerInsights", "CpuUtilized", dims, "Average", ReturnData=False),
+                           metric("reserved", "ECS/ContainerInsights", "CpuReserved", dims, "Average", ReturnData=False),
+                           {"Id": "cpu", "Expression": "100 * used / reserved"}]
+                for attempt in range(METRIC_TRIES):
+                    try:
+                        got = series(cw, queries, start, end)
+                        break
+                    except LookupError:
+                        if attempt == METRIC_TRIES - 1:
+                            raise  # still empty: the section becomes a gap
+                        sleep(METRIC_WAIT_S)
                 rf.write(out / "cloudwatch-harness-cpu.json", got["cpu"], list[rf.Point])
 
             def alb_files():

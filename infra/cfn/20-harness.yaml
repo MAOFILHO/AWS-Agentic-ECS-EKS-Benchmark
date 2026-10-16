@@ -36,6 +36,9 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "${RunId}-harness"
+      # The collector reads CpuUtilized and CpuReserved from ECS/ContainerInsights. One short task, so the ingest is cents.
+      ClusterSettings:
+        - { Name: containerInsights, Value: enabled }
       Tags:
         - { Key: run-id, Value: !Ref RunId }
         - { Key: ttl-hours, Value: !Ref TtlHours }

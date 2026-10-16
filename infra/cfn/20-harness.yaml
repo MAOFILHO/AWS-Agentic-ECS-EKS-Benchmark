@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Benchmark load harness. A fixed-size Fargate cluster and one k6 task definition in the
+  private subnets of the run's VPC. It never autoscales, so it is not part of the measurement.
+
+# SubnetIds re-exports the network's subnet list so the load runner reads one stack. W6001 flags that.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks: [W6001]
+
+# No task starts here. The load runner calls RunTask and sets TARGET_URL, PROFILE, PEAK_RPS and
+# DURATION_S as environment overrides.
+
+Parameters:
+  RunId: { Type: String, AllowedPattern: "[a-z0-9-]+", Description: "Benchmark run id, written to the run-id tag." }
+  TtlHours: { Type: Number, Default: 4, MinValue: 1, Description: "Hours before the janitor deletes this stack." }
+  NetworkStackName: { Type: String, Description: "Name of the 10-network stack whose exports this stack reads." }
+  K6ImageUri: { Type: String, Description: "k6 image in ECR (loadtests/Dockerfile), with tag or digest." }
+  Cpu: { Type: String, Default: "1024", AllowedValues: ["256", "512", "1024", "2048", "4096"] }
+  Memory: { Type: String, Default: "2048", AllowedPattern: "[0-9]+", Description: "Fargate MB, a size allowed for the CPU." }
+
+Resources:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${RunId}-harness"
+      RetentionInDays: 7
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: harness }
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${RunId}-harness"
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: harness }
+
+  # No inbound rule. Egress is open: the task reaches the target ALB, the VPC endpoints and DNS.
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: k6 task, outbound only
+      VpcId: !ImportValue { "Fn::Sub": "${NetworkStackName}-VpcId" }
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: harness }
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: pull-image-write-logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt LogGroup.Arn
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: harness }
+
+  # k6 only calls the target over HTTP: no permission.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: harness }
+
+  # Runs /scripts/$PROFILE.js, then prints the summary between two markers for the collector to read
+  # from CloudWatch Logs. k6's exit code is kept.
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${RunId}-harness-k6"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: k6
+          Image: !Ref K6ImageUri
+          Essential: true
+          EntryPoint: [sh, -c]
+          Command:
+            - >-
+              k6 run --summary-export=/tmp/summary.json --summary-trend-stats="med,p(95),p(99)"
+              "/scripts/${PROFILE:?PROFILE is not set}.js";
+              rc=$?;
+              echo K6-SUMMARY-BEGIN; cat /tmp/summary.json; echo; echo K6-SUMMARY-END;
+              exit $rc
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: k6
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: harness }
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+  TaskDefinitionArn:
+    Value: !Ref TaskDefinition
+  SubnetIds:
+    Value: !ImportValue { "Fn::Sub": "${NetworkStackName}-PrivateSubnetIds" }
+  SecurityGroupId:
+    Value: !GetAtt TaskSecurityGroup.GroupId
+  LogGroupName:
+    Value: !Ref LogGroup

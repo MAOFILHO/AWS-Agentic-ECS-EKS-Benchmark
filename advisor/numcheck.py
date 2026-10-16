@@ -52,10 +52,8 @@ def check(text: str, metrics: Metrics) -> list[str]:
     known = _known_values(metrics)
     offenders = []
     for m in NUMBER_RE.finditer(text):
-        if ACCOUNT_ID_RE.fullmatch(m.group(1)):
-            offenders.append(m.group(0))
-            continue
-        if _is_plain_count_or_year(m):
+        # Account ids are caught by the whole-text scan below, even when glued to a name.
+        if ACCOUNT_ID_RE.fullmatch(m.group(1)) or _is_plain_count_or_year(m):
             continue
         shown, half_step = _parse(m)
         candidates = known + ([v * 100 for v in known] if m.group(4) else [])
@@ -64,4 +62,4 @@ def check(text: str, metrics: Metrics) -> list[str]:
             for v in candidates
         ):
             offenders.append(m.group(0))
-    return offenders + EMAIL_RE.findall(text)
+    return offenders + ACCOUNT_ID_RE.findall(text) + EMAIL_RE.findall(text)

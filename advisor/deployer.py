@@ -48,7 +48,10 @@ def subprocess_runner(argv: list[str], env: dict[str, str]) -> tuple[int, str]:
 def run_logged(run: Runner, root: Path, run_id: str, argv: list[str], env: dict[str, str]):
     """Run one command, print its output masked, and record argv, env names, exit and duration."""
     start = time.monotonic()
-    code, out = run(argv, env)
+    try:
+        code, out = run(argv, env)
+    except Exception as exc:  # noqa: BLE001 - a missing binary must not skip teardown; treat it as exit 127
+        code, out = 127, f"{type(exc).__name__}: {exc}"
     seconds = round(time.monotonic() - start, 3)
     if out.strip():
         print(mask(out.rstrip()), flush=True)
@@ -99,7 +102,7 @@ def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: R
             for argv in deploy_commands(cell, rid, state.region):
                 code, out = run_logged(runner, root, state.run_id, argv, env)
                 if code:
-                    return failed(f"{cell}: exit {code} from {' '.join(argv[1:])}")
+                    return failed(f"{cell}: exit {code} from {' '.join(argv[1:])}" + (f" ({out.strip()})" if code == 127 else ""))
             if cell.startswith("eks-"):
                 alb = match.group(1) if (match := ALB_LINE.search(out)) else None
             else:

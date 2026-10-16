@@ -19,7 +19,7 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = <test_deployer.test_a_runner_that_raises_mid_deploy_still_reaches_teardown.<locals>.Raising object at 0x1125bca10>
 argv = ['aws', 'cloudformation', 'describe-stacks', '--stack-name', 'dep-01-ef-ecs-fargate', '--region', ...]
-env = {'AWS_PROFILE': 'sso', 'IMAGE_URI': '123412341234.dkr.ecr.us-east-2.amazonaws.com/triage-workload:abc1234', 'RUN_ID': 'dep-01-ef', 'NETWORK_STACK': 'dep-01-ef-network'}
+env = {'AWS_PROFILE': 'sso', 'IMAGE_URI': '************.dkr.ecr.us-east-2.amazonaws.com/triage-workload:abc1234', 'RUN_ID': 'dep-01-ef', 'NETWORK_STACK': 'dep-01-ef-network'}
 
     def __call__(self, argv, env):
         if argv[0] == "aws":

@@ -36,6 +36,18 @@ def test_leftovers_set_the_status_and_print_masked_arns(tmp_path, capsys):
     assert '"exit": 1' in record and ACCOUNT not in record
 
 
+def test_a_delete_run_that_raises_marks_leftovers_and_tries_every_cell(tmp_path):
+    class Raising(FakeRunner):
+        def __call__(self, argv, env):
+            super().__call__(argv, env)
+            raise FileNotFoundError("python")
+
+    run = Raising()
+    out = make_teardown("sso", tmp_path, run=run)(state())
+    assert out["status"] == "leftovers" and "dep-01-ef" in out["errors"][-1] and "dep-01-ke" in out["errors"][-1]
+    assert len(run.calls) == 2
+
+
 def test_cli_exits_non_zero_when_teardown_leaves_resources(tmp_path, monkeypatch, capsys):
     def runner(argv, env):
         return (1, LEFTOVER) if "scripts/delete_run.py" in argv else (0, "")

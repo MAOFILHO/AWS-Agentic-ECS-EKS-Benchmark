@@ -50,3 +50,5 @@ class Metrics(BaseModel):
     figures: list[Figure] = []
     shared_costs: list[SharedCost] = []
     gaps: list[str] = []
+    # The load harness ran above its CPU threshold, so latency may reflect the harness (SPEC 12).
+    harness_bound: bool = False

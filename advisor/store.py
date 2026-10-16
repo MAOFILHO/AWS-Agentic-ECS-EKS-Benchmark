@@ -7,9 +7,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from advisor.state import RUN_ID_PATTERN
+
+# The state models a checkpoint may load back; any other class in the file is refused.
+STATE_TYPES = [("advisor.state", name) for name in ("RunState", "CellSpec", "Capacity", "CostLine")]
 
 
 @dataclass(frozen=True)
@@ -40,7 +44,7 @@ def open_checkpointer(paths: RunPaths) -> Iterator[SqliteSaver]:
     # check_same_thread=False is safe: SqliteSaver serialises access with its own lock.
     conn = sqlite3.connect(paths.checkpoint, check_same_thread=False)
     try:
-        saver = SqliteSaver(conn)
+        saver = SqliteSaver(conn, serde=JsonPlusSerializer(allowed_msgpack_modules=STATE_TYPES))
         saver.setup()
         yield saver
     finally:

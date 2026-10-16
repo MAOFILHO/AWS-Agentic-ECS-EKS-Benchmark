@@ -1,0 +1,9 @@
+{
+  "capacity": {"vcpu": 0.25, "memory_mib": 512, "min_replicas": 1, "max_replicas": 4, "cpu_target": 60},
+  "plan": {
+    "instance_type": "t3.medium",
+    "duration_s": 600,
+    "cell": {"replicas": 1, "nodes": 1, "lcus": 1, "log_gb": 0.1},
+    "shared": {"nat_gb": 1, "endpoints": 5, "harness_vcpu": 1, "harness_memory_mib": 2048, "harness_tasks": 1}
+  }
+}

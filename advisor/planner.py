@@ -26,9 +26,10 @@ class PlanConfig(BaseModel):
 
 
 def run_matrix(state: RunState) -> list[CellSpec]:
-    """Every chosen cell x every profile. No cells chosen means the default pair."""
+    """Every chosen cell x every chosen profile. None chosen means the default pair x every profile."""
     names = list(dict.fromkeys(c.name for c in state.cells)) or list(DEFAULT_CELLS)
-    return [CellSpec(name=name, profile=profile) for name in names for profile in PROFILES]
+    profiles = list(dict.fromkeys(c.profile for c in state.cells)) or list(PROFILES)
+    return [CellSpec(name=name, profile=profile) for name in names for profile in profiles]
 
 
 def make_planner(client: Any, config: PlanConfig) -> Callable[[RunState], dict]:

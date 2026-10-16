@@ -52,6 +52,7 @@ class RunState(BaseModel):
     prices_as_of: str | None = None
     gaps: list[str] = []
     approved: bool | None = None
+    approval: str | None = None  # who said yes or no: "human: yes", "auto: ..."
     status: str = "planned"
     errors: list[str] = []
     actual_usd: float | None = None

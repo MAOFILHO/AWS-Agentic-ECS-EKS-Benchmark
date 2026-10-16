@@ -1,0 +1,6 @@
+E         Use -v to get more diff
+
+tests/test_json_boundaries.py:57: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_json_boundaries.py::test_every_json_call_in_advisor_has_a_model_or_a_reason
+1 failed in 0.08s

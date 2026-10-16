@@ -36,10 +36,17 @@ def unmodelled(root: Path) -> list[tuple[str, str]]:
     found = []
     for path in sorted(root.glob("*.py")):
         tree = ast.parse(path.read_text())
+        # `import json as j` and `from json import loads as parse` count as json calls too.
+        modules = {"json"} | {a.asname or a.name for n in ast.walk(tree) if isinstance(n, ast.Import)
+                              for a in n.names if a.name == "json"}
+        funcs = {a.asname or a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == "json"
+                 for a in n.names if a.name in JSON_CALLS}
         for scope in [tree, *(n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)))]:
             own = list(_own_nodes(scope))
-            calls = [n for n in own if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
-                     and n.func.attr in JSON_CALLS and isinstance(n.func.value, ast.Name) and n.func.value.id == "json"]
+            calls = [n for n in own if isinstance(n, ast.Call) and (
+                (isinstance(n.func, ast.Attribute) and n.func.attr in JSON_CALLS
+                 and isinstance(n.func.value, ast.Name) and n.func.value.id in modules)
+                or (isinstance(n.func, ast.Name) and n.func.id in funcs))]
             names = {n.id for n in own if isinstance(n, ast.Name)} | {n.attr for n in own if isinstance(n, ast.Attribute)}
             if calls and not names & MODEL_NAMES:
                 found.append((path.name, getattr(scope, "name", "<module>")))
@@ -59,6 +66,12 @@ def test_scan_catches_a_new_unmodelled_json_load(tmp_path):
     (tmp_path / "ok.py").write_text("import json\nfrom pydantic import TypeAdapter\n\n"
                                     "def read(p):\n    return TypeAdapter(int).validate_python(json.load(open(p)))\n")
     assert unmodelled(tmp_path) == [("new.py", "read")]
+
+
+def test_scan_catches_an_aliased_or_imported_json_call(tmp_path):
+    (tmp_path / "alias.py").write_text("import json as j\n\ndef read(p):\n    return j.load(open(p))\n")
+    (tmp_path / "named.py").write_text("from json import loads as parse\n\ndef read(s):\n    return parse(s)\n")
+    assert unmodelled(tmp_path) == [("alias.py", "read"), ("named.py", "read")]
 
 
 METRICS = '{"run_id": "r1", "figures": [{"name": "p50_ms", "value": %s, "unit": "ms", "source": "a/k6.json", "cell": "ecs-ec2"}]}'

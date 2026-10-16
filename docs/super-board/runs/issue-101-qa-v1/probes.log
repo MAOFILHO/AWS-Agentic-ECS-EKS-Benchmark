@@ -1,0 +1,7 @@
+scan: [('alias.py', 'r'), ('cls.py', 'r'), ('fromimp.py', 'r'), ('modlevel.py', '<module>')]
+'{"run_id":"r1","figures":[]}' -> run_id='r1' figures=[] shared_costs=[] gaps=[] harness_bound=False
+'{"run_id":"r1"}' -> run_id='r1' figures=[] shared_costs=[] gaps=[] harness_bound=False
+'{}' -> MetricsError
+'[]' -> MetricsError
+'' -> MetricsError
+missing -> FileNotFoundError

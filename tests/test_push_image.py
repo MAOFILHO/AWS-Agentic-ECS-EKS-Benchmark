@@ -182,6 +182,7 @@ def test_mirror_pushes_exact_versions_and_skips_existing(ecr, capsys):
     _stub_token(stubber)
     stubber.add_client_error("describe_images", service_error_code="ImageNotFoundException")
     stubber.add_response("describe_images", {"imageDetails": [{"imageTags": ["uv-0.11.33"]}]})
+    stubber.add_client_error("describe_images", service_error_code="ImageNotFoundException")
     docker = Docker()
     push_image.mirror(client, docker)
 
@@ -193,6 +194,10 @@ def test_mirror_pushes_exact_versions_and_skips_existing(ecr, capsys):
     assert ["push", python] in cmds
     # uv tag already in the immutable repository: no second push.
     assert not any(c[0] == "push" and "uv-" in c[1] for c in cmds)
+    k6 = f"{REGISTRY}/base-images:k6-1.3.0"
+    assert [*amd64, "grafana/k6:1.3.0"] in cmds
+    assert ["tag", "grafana/k6:1.3.0", k6] in cmds
+    assert ["push", k6] in cmds
     _assert_clean(capsys.readouterr().out)
 
 
@@ -204,7 +209,7 @@ def test_platform_flag_overrides_build_and_mirror_pull(ecr):
     assert docker.calls[1][0][:3] == ["build", "--platform", "linux/arm64"]
 
     _stub_token(stubber)
-    for _ in range(2):
+    for _ in range(3):
         stubber.add_response("describe_images", {"imageDetails": [{"imageTags": ["x"]}]})
     docker = Docker()
     push_image.mirror(client, docker, platform="linux/arm64")

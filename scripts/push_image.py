@@ -1,4 +1,4 @@
-"""Build the workload image and push it to ECR, or mirror its base images into ECR.
+"""Build the workload image and push it to ECR, or mirror its base images (python, uv, k6) into ECR.
 
 Usage:
     AWS_PROFILE=<sso-profile> python scripts/push_image.py [--region R] [--allow-dirty] \
@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKLOAD_REPO = "triage-workload"
 BASE_REPO = "base-images"
 PYTHON_BASE = "python:3.12-slim"
+K6_BASE = "grafana/k6:1.3.0"
 DEFAULT_PLATFORM = "linux/amd64"
 ENV_FORMAT = "{{range .Config.Env}}{{println .}}{{end}}"
 ACCOUNT_ID = re.compile(r"\b\d{12}\b")
@@ -121,7 +122,7 @@ def tag_exists(ecr, tag):
 
 def mirror(ecr, runner, platform=DEFAULT_PLATFORM):
     registry = login(ecr, runner)
-    for source in (PYTHON_BASE, uv_image()):
+    for source in (PYTHON_BASE, uv_image(), K6_BASE):
         docker(runner, ["pull", "--platform", platform, source])
         if source == PYTHON_BASE:
             # 3.12-slim moves; tag the exact patch release the pull resolved to.
@@ -129,7 +130,7 @@ def mirror(ecr, runner, platform=DEFAULT_PLATFORM):
             version = re.search(r"^PYTHON_VERSION=(\S+)$", env, re.MULTILINE).group(1)
             tag = f"python-{version}-slim"
         else:
-            tag = "uv-" + source.rsplit(":", 1)[1]
+            tag = ("k6-" if source == K6_BASE else "uv-") + source.rsplit(":", 1)[1]
         target = f"{registry}/{BASE_REPO}:{tag}"
         if tag_exists(ecr, tag):
             say(f"{target} already mirrored")

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BOOTSTRAP = ROOT / "infra" / "cfn" / "00-bootstrap.yaml"
 ROLE_TEMPLATES = [
     ROOT / "infra" / "cfn" / name
-    for name in ("30-ecs.yaml", "40-eks.yaml", "41-eks-lbc-iam.yaml")
+    for name in ("20-harness.yaml", "30-ecs.yaml", "40-eks.yaml", "41-eks-lbc-iam.yaml")
 ]
 
 ECS_AGENT_ACTIONS = {

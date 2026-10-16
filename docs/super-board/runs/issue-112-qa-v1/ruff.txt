@@ -1,0 +1,3 @@
+Creating virtual environment at: .venv
+Installed 59 packages in 238ms
+All checks passed!

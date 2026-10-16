@@ -1,0 +1,15 @@
+{
+  "run_id": "chart-01",
+  "figures": [
+    {"name": "p95_ms", "value": 120.4, "unit": "ms", "source": "ecs-fargate/k6-steady.json", "cell": "ecs-fargate", "profile": "steady"},
+    {"name": "p95_ms", "value": 98.7, "unit": "ms", "source": "eks-ec2/k6-steady.json", "cell": "eks-ec2", "profile": "steady"},
+    {"name": "scale_out_s", "value": 64.0, "unit": "s", "source": "ecs-fargate/events.json", "cell": "ecs-fargate"},
+    {"name": "scale_out_s", "value": 41.5, "unit": "s", "source": "eks-ec2/events.json", "cell": "eks-ec2"},
+    {"name": "cold_start_s", "value": 38.2, "unit": "s", "source": "ecs-fargate/events.json", "cell": "ecs-fargate"},
+    {"name": "deploy_time_s", "value": 412.0, "unit": "s", "source": "ecs-fargate/deploy.json", "cell": "ecs-fargate"},
+    {"name": "deploy_time_s", "value": 1104.0, "unit": "s", "source": "eks-ec2/deploy.json", "cell": "eks-ec2"},
+    {"name": "idle_usd_per_hour", "value": 0.0123, "unit": "USD/h", "source": "ecs-fargate/cost.json", "cell": "ecs-fargate"},
+    {"name": "idle_usd_per_hour", "value": 0.1832, "unit": "USD/h", "source": "eks-ec2/cost.json", "cell": "eks-ec2"}
+  ],
+  "gaps": ["eks-ec2 cold_start_s: events.json has no first ready pod"]
+}

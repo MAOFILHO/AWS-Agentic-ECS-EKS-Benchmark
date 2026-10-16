@@ -9,12 +9,20 @@ ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
 
+class FakeBedrock:
+    def converse(self, **kwargs):
+        return {"output": {"message": {"content": [{"text": "## Verdict\nNo figures yet.\n"}]}}}
+
+
 @pytest.fixture(autouse=True)
 def no_aws(monkeypatch):
     def refuse(*args, **kwargs):
         raise AssertionError("AWS call")
 
-    monkeypatch.setattr(cli.boto3, "client", refuse)
+    def client(service, **kwargs):  # the reporter gets a fake Bedrock; every other client is refused
+        return FakeBedrock() if service == "bedrock-runtime" else refuse()
+
+    monkeypatch.setattr(cli.boto3, "client", client)
     # A yes deploys: every deploy and teardown command goes to a runner that succeeds and does nothing.
     monkeypatch.setattr(deployer, "subprocess_runner", lambda argv, env: (0, ""))
     monkeypatch.setenv("AWS_PROFILE", "test")

@@ -9,18 +9,22 @@ import os
 import signal
 import sys
 import time
+from functools import partial
 from pathlib import Path
 from typing import get_args
 
 import boto3
 from langgraph.types import Command
 
+from advisor import rawformats as rf
+from advisor.analyst import analyst_node
 from advisor.collector import make_collector
 from advisor.deployer import make_deployer
 from advisor.gate import make_gate
 from advisor.graph import build_graph
 from advisor.load_runner import make_load_runner
 from advisor.planner import DEFAULT_CELLS, PROFILES, PlanConfig, make_planner
+from advisor.reporter import BedrockLLM, make_reporter
 from advisor.schemas import RunConfig
 from advisor.state import Capacity, CellName, CellSpec, RunState
 from advisor.store import create_run_dirs, open_checkpointer
@@ -92,7 +96,25 @@ def deploy_nodes(root: Path, config: dict) -> dict:
                                              k6_image_uri=os.environ.get("K6_IMAGE_URI")),
             "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
             "collector": make_collector(aws, profile, root),
+            "analyst": partial(analyst_node, root=root,
+                               harness_cpu_threshold=config.get("harness_cpu_threshold", 70.0)),
+            "reporter": make_bedrock_reporter(aws, root),
             "teardown": shielded(make_teardown(profile, root))}
+
+
+def make_bedrock_reporter(aws, root: Path):
+    """The reporter on Bedrock in the run's region. The client is made only when the node runs.
+
+    Any error, such as no Bedrock access, becomes status "report_failed", so the run still reaches teardown.
+    """
+
+    def reporter(state: RunState) -> dict:
+        try:
+            return make_reporter(BedrockLLM(aws("bedrock-runtime", state.region)), root)(state)
+        except Exception as err:  # noqa: BLE001 - a reporter error must not skip teardown
+            return {"status": "report_failed", "errors": [*state.errors, rf.scrub(f"reporter: {type(err).__name__}: {err}")]}
+
+    return reporter
 
 
 def invoke(graph, cfg: dict, payload, teardown):
@@ -139,7 +161,7 @@ def finish(graph, cfg: dict, ask, teardown) -> int:
     print(f"run {values['run_id']}: {values['status']}{approval}")
     if values["status"] == "interrupted":
         return 130
-    return 1 if values["status"] in ("failed", "leftovers") else 0
+    return 1 if values["status"] in ("failed", "leftovers", "report_failed") else 0
 
 
 def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int:

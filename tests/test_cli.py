@@ -82,3 +82,25 @@ def test_output_has_no_account_id_or_email(tmp_path, capsys):
     out = capsys.readouterr()
     for text in (out.out, out.err):
         assert not ACCOUNT_ID.search(text) and not EMAIL.search(text)
+
+
+def test_eof_at_the_prompt_is_a_no(tmp_path, capsys):
+    def eof(prompt):
+        raise EOFError
+
+    argv = ["run", "--region", "us-east-1", "--run-id", "cli-08", "--profile", "steady"]
+    assert cli.main(argv, pricing=StubPricing(), ask=eof, root=tmp_path) == 0
+    assert "stopped (human: no)" in capsys.readouterr().out
+
+
+# In files, a UUID tail (LangGraph task ids end in twelve zeros) is not an account id; an ARN's `::<id>:` still is.
+FILE_ACCOUNT_ID = re.compile(r"(?<![\w-])\d{12}(?!\w)")
+
+
+def test_run_folder_files_have_no_account_id_or_email(tmp_path):
+    main(["run", "--region", "us-east-1", "--run-id", "cli-09"], tmp_path, answer="y")
+    files = [p for p in (tmp_path / "runs").rglob("*") if p.is_file()]
+    assert files  # the checkpoint at least
+    for path in files:
+        text = path.read_bytes().decode("latin-1")
+        assert not FILE_ACCOUNT_ID.search(text) and not EMAIL.search(text), path

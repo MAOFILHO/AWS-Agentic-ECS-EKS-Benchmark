@@ -87,3 +87,38 @@ def test_every_step_after_the_gate_fails_to_teardown():
         nodes = {step: Recorder({"status": "failed"}), "teardown": teardown}
         run(make_gate(), answer="y", **nodes)
         assert teardown.calls == 1, step
+
+
+def planner_with_errors(estimate_usd=0.5, errors=("pricing: throttled",)):
+    def planner(state):
+        cells = [CellSpec(name="ecs-fargate", profile="steady")]
+        return {"cells": cells, "estimate_usd": estimate_usd, "errors": list(errors)}
+
+    return planner
+
+
+def test_errors_block_auto_approval():
+    deployer = Recorder()
+    out = run(make_gate(auto_approve_under=3.0), planner=planner_with_errors(), deployer=deployer)
+    assert "__interrupt__" in out and deployer.calls == 0
+
+
+def test_unknown_estimate_blocks_auto_approval():
+    deployer = Recorder()
+    out = run(make_gate(auto_approve_under=3.0), planner=planner_with(None), deployer=deployer)
+    assert "__interrupt__" in out and deployer.calls == 0
+
+
+def test_blank_or_unclear_answer_is_a_no():
+    for answer in ("", " ", "N", "no", "maybe", "yess"):
+        deployer, teardown = Recorder(), Recorder()
+        out = run(make_gate(), answer=answer, deployer=deployer, teardown=teardown)
+        assert deployer.calls == 0 and teardown.calls == 0, answer
+        assert out["status"] == "stopped" and out["approval"] == "human: no", answer
+
+
+def test_yes_is_case_and_space_insensitive():
+    for answer in ("Y", " yes ", "YES"):
+        deployer = Recorder()
+        out = run(make_gate(), answer=answer, deployer=deployer)
+        assert deployer.calls == 1 and out["approval"] == "human: yes", answer

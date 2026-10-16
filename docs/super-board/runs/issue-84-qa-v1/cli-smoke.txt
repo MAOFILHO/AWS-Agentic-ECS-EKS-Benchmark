@@ -1,0 +1,13 @@
+$ env -u AWS_REGION -u AWS_DEFAULT_REGION uv run --locked python -m advisor run --run-id qa-noregion
+error: no region. Pass --region or set AWS_REGION or AWS_DEFAULT_REGION.
+exit=1
+runs/qa-noregion exists: no
+
+$ make benchmark (no RUN_ID)
+error: RUN_ID is not set. Run: make benchmark RUN_ID=<id>
+make: *** [benchmark] Error 1
+exit=2
+
+$ uv run --locked python -m advisor resume nope
+error: no checkpoint for run nope
+exit=1

@@ -69,3 +69,8 @@ def test_task_is_fargate_x86_and_runs_k6_with_the_summary_markers():
     begin, end = script.index("K6-SUMMARY-BEGIN"), script.index("K6-SUMMARY-END")
     assert script.index("k6 run") < begin < script.index("cat /tmp/summary.json") < end
     assert "exit $rc" in script  # the task still fails when k6 fails
+
+
+def test_cluster_turns_container_insights_on():
+    settings = RESOURCES["Cluster"]["Properties"]["ClusterSettings"]
+    assert settings == [{"Name": "containerInsights", "Value": "enabled"}]

@@ -1,0 +1,6 @@
+E         Use -v to get more diff
+
+tests/test_cost_edges.py:120: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cost_edges.py::test_alb_hour_reads_the_region_price_from_live_shaped_rows
+1 failed, 219 passed in 4.44s

@@ -30,6 +30,13 @@ class Capacity(BaseModel):
     cpu_target: int = 60
 
 
+class CostLine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    item: str
+    usd: float
+
+
 class RunState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -39,6 +46,11 @@ class RunState(BaseModel):
     region: str
     ttl_hours: int = 4
     estimate_usd: float | None = None
+    estimate_lines: list[CostLine] = []
+    # On-demand USD prices from the Pricing API at plan time, and that response's publication date.
+    prices: dict[str, float] = {}
+    prices_as_of: str | None = None
+    gaps: list[str] = []
     approved: bool | None = None
     status: str = "planned"
     errors: list[str] = []

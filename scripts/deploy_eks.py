@@ -2,14 +2,15 @@
 
 Usage:
     AWS_PROFILE=<sso-profile> AWS_REGION=<region> IMAGE_URI=<ecr-image-uri> \
-    python -m scripts.deploy_eks --cell eks-ec2|eks-fargate --run-id <id> [--region <region>]
+    python -m scripts.deploy_eks --cell eks-ec2|eks-fargate --run-id <id> [--region <region>] [--yes]
 
-Stacks go through deploy_stack.py (change sets, y/N per stack). The kubeconfig is a temp file,
+Stacks go through deploy_stack.py (change sets, y/N per stack; --yes skips the prompts). The kubeconfig is a temp file,
 never ~/.kube/config. Credentials come from the AWS_PROFILE profile through boto3. Output masks
 12-digit account ids.
 """
 
 import argparse
+import functools
 import os
 import re
 import subprocess
@@ -145,6 +146,7 @@ def main(argv=None):
     parser.add_argument("--cell", required=True, choices=sorted(CELLS))
     parser.add_argument("--run-id", default="")
     parser.add_argument("--region")
+    parser.add_argument("--yes", action="store_true", help="Execute every change set without the y/N prompt.")
     args = parser.parse_args(argv)
 
     region = args.region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
@@ -154,8 +156,11 @@ def main(argv=None):
 
     try:
         session = boto3.Session(profile_name=profile, region_name=region)
+        deploy_one = deploy_stack.deploy
+        if args.yes:
+            deploy_one = functools.partial(deploy_stack.deploy, answer=lambda _prompt: "y")
         deploy(session.client("cloudformation"), session.client("ssm"), session.client("eks"),
-               args.run_id, args.cell, region, image_uri)
+               args.run_id, args.cell, region, image_uri, deploy_one=deploy_one)
     except (BotoCoreError, ClientError) as err:
         raise SystemExit(mask(f"error: {err}")) from None
 

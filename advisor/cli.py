@@ -1,6 +1,7 @@
 """Command line: `python -m advisor run ...` and `python -m advisor resume <run-id>`.
 
-Prints the estimate and the run matrix, then asks y/N before any spend. Prints no account id.
+Prints the estimate and the run matrix, then asks y/N before any spend. A yes deploys every cell,
+then teardown deletes them on every path. Prints no account id.
 """
 
 import argparse
@@ -14,11 +15,13 @@ from typing import get_args
 import boto3
 from langgraph.types import Command
 
+from advisor.deployer import make_deployer
 from advisor.gate import make_gate
 from advisor.graph import build_graph
 from advisor.planner import DEFAULT_CELLS, PROFILES, PlanConfig, make_planner
 from advisor.state import Capacity, CellName, CellSpec, RunState
 from advisor.store import create_run_dirs, open_checkpointer
+from advisor.teardown import make_teardown
 
 # Capacity and usage per run; the values match the 30-ecs and 40-eks template defaults.
 RUN_CONFIG = Path(__file__).resolve().parent.parent / "runs" / "default.json"
@@ -52,6 +55,13 @@ def parse_args(argv):
     return args
 
 
+def deploy_nodes(root: Path) -> dict:
+    """Deployer and teardown. They read AWS_PROFILE and IMAGE_URI (repo:tag in ECR) from the env."""
+    profile = os.environ.get("AWS_PROFILE")
+    return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root),
+            "teardown": make_teardown(profile, root)}
+
+
 def show(values: dict) -> None:
     print(f"run {values['run_id']} in {values['region']}")
     print("matrix: " + ", ".join(f"{c.name}/{c.profile}" for c in values["cells"]))
@@ -77,7 +87,7 @@ def finish(graph, cfg: dict, ask) -> int:
     values = graph.get_state(cfg).values
     approval = f" ({values['approval']})" if values.get("approval") else ""
     print(f"run {values['run_id']}: {values['status']}{approval}")
-    return 1 if values["status"] == "failed" else 0
+    return 1 if values["status"] in ("failed", "leftovers") else 0
 
 
 def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int:
@@ -92,7 +102,8 @@ def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int
             return 1
         with open_checkpointer(create_run_dirs(args.run_id, root)) as saver:
             # The planner already ran, so it needs no pricing client here.
-            graph = build_graph(make_planner(None, PlanConfig(**config["plan"])), make_gate(), saver)
+            planner = make_planner(None, PlanConfig(**config["plan"]))
+            graph = build_graph(planner, make_gate(), saver, **deploy_nodes(root))
             return finish(graph, cfg, ask)
 
     region = resolve_region(args.region)
@@ -108,7 +119,7 @@ def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int
     paths = create_run_dirs(args.run_id, root)
     with open_checkpointer(paths) as saver:
         planner = make_planner(pricing, PlanConfig(**config["plan"]))
-        graph = build_graph(planner, make_gate(args.auto_approve_under), saver)
+        graph = build_graph(planner, make_gate(args.auto_approve_under), saver, **deploy_nodes(root))
         result = graph.invoke(state, cfg)
         if "__interrupt__" not in result:
             show(result)

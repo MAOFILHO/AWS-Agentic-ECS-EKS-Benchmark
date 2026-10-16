@@ -41,7 +41,8 @@ teardown:
 	uv run --locked python scripts/delete_run.py --run-id "$(RUN_ID)"
 
 # Plan one run, print its estimate and matrix, then ask y/N before any spend. Needs RUN_ID and a region
-# (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). ARGS="--cells ecs-fargate,eks-ec2 --profile steady
+# (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). A yes deploys every cell and always tears it down;
+# that needs AWS_PROFILE and IMAGE_URI (repo:tag in ECR). ARGS="--cells ecs-fargate,eks-ec2 --profile steady
 # --auto-approve-under 3.00" narrows it. Resume a run: uv run --locked python -m advisor resume <run-id>.
 benchmark:
 	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make benchmark RUN_ID=<id>"; exit 1; }

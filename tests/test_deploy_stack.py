@@ -161,16 +161,27 @@ def test_make_bootstrap_runs_the_deploy_script():
 # Optional env parameters (issue #33).
 
 
-def _run_main(monkeypatch, argv):
-    sent = {}
-    monkeypatch.setattr(deploy_stack.boto3, "Session", lambda **_kw: _FakeSession())
-    monkeypatch.setattr(
-        deploy_stack,
-        "deploy",
-        lambda _cfn, _stack, _body, parameters: sent.update(parameters),
-    )
+def _run_main(monkeypatch, argv, seen=None):
+    sent, seen = {}, {} if seen is None else seen
+    monkeypatch.setattr(deploy_stack.boto3, "Session", lambda **kw: seen.update(kw) or _FakeSession())
+
+    def fake_deploy(_cfn, _stack, _body, parameters, answer=input):
+        seen["answer"] = answer
+        sent.update(parameters)
+
+    monkeypatch.setattr(deploy_stack, "deploy", fake_deploy)
     deploy_stack.main(argv)
     return sent
+
+
+def test_yes_and_region_skip_the_prompt_and_set_the_client_region(monkeypatch):
+    monkeypatch.setenv("AWS_PROFILE", "demo")
+    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+    plain, yes = {}, {}
+    _run_main(monkeypatch, BOOTSTRAP_ARGS, plain)
+    _run_main(monkeypatch, [*BOOTSTRAP_ARGS, "--region", "us-east-2", "--yes"], yes)
+    assert plain["answer"] is input and plain["region_name"] is None
+    assert yes["answer"]("Execute? ") == "y" and yes["region_name"] == "us-east-2"
 
 
 class _FakeSession:

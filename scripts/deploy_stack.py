@@ -4,7 +4,7 @@ Usage:
     AWS_PROFILE=<sso-profile> BUDGET_EMAIL=<address> \
     python scripts/deploy_stack.py --stack <name> --template <file> \
         [--env-param <CfnParameter>=<ENV_VAR> ...] \
-        [--optional-env-param <CfnParameter>=<ENV_VAR> ...]
+        [--optional-env-param <CfnParameter>=<ENV_VAR> ...] [--region <region>] [--yes]
 
 Credentials come from the AWS_PROFILE profile through boto3. This script never reads or prints them.
 """
@@ -108,6 +108,8 @@ def main(argv=None):
         metavar="PARAM=ENV_VAR",
         help="Like --env-param, but leave PARAM out when ENV_VAR is unset.",
     )
+    parser.add_argument("--region", help="Region for the client (default: from the profile or env).")
+    parser.add_argument("--yes", action="store_true", help="Execute the change set without the y/N prompt.")
     args = parser.parse_args(argv)
 
     profile = required_env("AWS_PROFILE")
@@ -120,8 +122,9 @@ def main(argv=None):
         if os.environ.get(env_var):
             parameters[param] = os.environ[env_var]
 
-    cfn = boto3.Session(profile_name=profile).client("cloudformation")
-    deploy(cfn, args.stack, args.template.read_text(), parameters)
+    cfn = boto3.Session(profile_name=profile, region_name=args.region).client("cloudformation")
+    answer = (lambda _prompt: "y") if args.yes else input
+    deploy(cfn, args.stack, args.template.read_text(), parameters, answer=answer)
 
 
 if __name__ == "__main__":

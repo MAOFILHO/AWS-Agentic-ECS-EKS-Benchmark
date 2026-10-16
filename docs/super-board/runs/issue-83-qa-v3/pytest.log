@@ -1,0 +1,34 @@
+........................................................................ [ 23%]
+........................................................................ [ 46%]
+........................................................................ [ 69%]
+..............................................FF........................ [ 92%]
+......................                                                   [100%]
+=================================== FAILURES ===================================
+___________ test_dot_dot_range_checks_the_second_number[120..777 ms] ___________
+
+text = '120..777 ms'
+
+    @pytest.mark.parametrize("text", ["120..777 ms", "120...777 ms", "120 .. 777 ms"])
+    def test_dot_dot_range_checks_the_second_number(text):
+>       assert "777" in check(text, make_metrics())
+E       AssertionError: assert '777' in []
+E        +  where [] = check('120..777 ms', Metrics(run_id='qa-83', figures=[Figure(name='p95_ms', value=120.4, unit='ms', source='k6.json', cell='ecs-fargate', profile=None)], shared_costs=[], gaps=[], harness_bound=False))
+E        +    where Metrics(run_id='qa-83', figures=[Figure(name='p95_ms', value=120.4, unit='ms', source='k6.json', cell='ecs-fargate', profile=None)], shared_costs=[], gaps=[], harness_bound=False) = make_metrics()
+
+tests/test_numcheck_qa.py:20: AssertionError
+__________ test_dot_dot_range_checks_the_second_number[120...777 ms] ___________
+
+text = '120...777 ms'
+
+    @pytest.mark.parametrize("text", ["120..777 ms", "120...777 ms", "120 .. 777 ms"])
+    def test_dot_dot_range_checks_the_second_number(text):
+>       assert "777" in check(text, make_metrics())
+E       AssertionError: assert '777' in []
+E        +  where [] = check('120...777 ms', Metrics(run_id='qa-83', figures=[Figure(name='p95_ms', value=120.4, unit='ms', source='k6.json', cell='ecs-fargate', profile=None)], shared_costs=[], gaps=[], harness_bound=False))
+E        +    where Metrics(run_id='qa-83', figures=[Figure(name='p95_ms', value=120.4, unit='ms', source='k6.json', cell='ecs-fargate', profile=None)], shared_costs=[], gaps=[], harness_bound=False) = make_metrics()
+
+tests/test_numcheck_qa.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_numcheck_qa.py::test_dot_dot_range_checks_the_second_number[120..777 ms]
+FAILED tests/test_numcheck_qa.py::test_dot_dot_range_checks_the_second_number[120...777 ms]
+2 failed, 308 passed in 4.94s

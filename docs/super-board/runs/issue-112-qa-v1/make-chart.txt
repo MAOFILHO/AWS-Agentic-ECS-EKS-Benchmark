@@ -1,0 +1,21 @@
+$ make chart RUN_ID=qa-112
+uv run --locked python -m scripts.make_chart --run-id "qa-112" 
+results/qa-112/chart.svg
+exit=0
+$ make chart RUN_ID=qa-112-bad
+uv run --locked python -m scripts.make_chart --run-id "qa-112-bad" 
+error: metrics.json: 1 validation error for Metrics
+figures.0.value
+  Input should be a finite number [type=finite_number, input_value=nan, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/finite_number
+make: *** [chart] Error 1
+exit=2
+metrics.json
+$ make chart
+error: RUN_ID is not set. Run: make chart RUN_ID=<id>
+make: *** [chart] Error 1
+exit=2
+$ make chart RUN_ID=qa-112-empty
+uv run --locked python -m scripts.make_chart --run-id "qa-112-empty" 
+results/qa-112-empty/chart.svg
+exit=0

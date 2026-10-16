@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: bootstrap ecs-fargate ecs-ec2 eks-ec2 eks-fargate benchmark teardown report workload-docker push-image mirror-base
+.PHONY: bootstrap ecs-fargate ecs-ec2 eks-ec2 eks-fargate benchmark teardown report workload-docker push-image push-k6 mirror-base
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 # Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
@@ -42,8 +42,9 @@ teardown:
 
 # Plan one run, print its estimate and matrix, then ask y/N before any spend. Needs RUN_ID and a region
 # (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). A yes deploys every cell and always tears it down;
-# that needs AWS_PROFILE and IMAGE_URI (repo:tag in ECR). ARGS="--cells ecs-fargate,eks-ec2 --profile steady
-# --auto-approve-under 3.00" narrows it. Resume a run: uv run --locked python -m advisor resume <run-id>.
+# that needs AWS_PROFILE, IMAGE_URI and K6_IMAGE_URI (repo:tag in ECR; make push-k6 prints the k6 one).
+# ARGS="--cells ecs-fargate,eks-ec2 --profile steady --auto-approve-under 3.00" narrows it.
+# Resume a run: uv run --locked python -m advisor resume <run-id>.
 benchmark:
 	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make benchmark RUN_ID=<id>"; exit 1; }
 	uv run --locked python -m advisor run --run-id "$(RUN_ID)" $(ARGS)
@@ -62,6 +63,11 @@ workload-docker:
 # even on an M1 Mac; ARGS="--platform linux/arm64" overrides it for Graviton.
 push-image:
 	uv run --locked python scripts/push_image.py $(ARGS)
+
+# Build loadtests/ FROM the mirrored k6 base (run mirror-base first) and push it to ECR as triage-workload:k6-<sha>,
+# linux/amd64. Prints the image URI: export it as K6_IMAGE_URI for make benchmark. Same needs and ARGS as push-image.
+push-k6:
+	uv run --locked python scripts/push_image.py --k6 $(ARGS)
 
 # Mirror python:3.12-slim and the pinned uv image into the base-images ECR repository.
 mirror-base:

@@ -21,6 +21,7 @@ def env(monkeypatch):
     monkeypatch.setattr(cli.boto3, "client", lambda *a, **k: pytest.fail("AWS call"))
     monkeypatch.setenv("AWS_PROFILE", "test")
     monkeypatch.setenv("IMAGE_URI", "repo:tag")
+    monkeypatch.setenv("K6_IMAGE_URI", "repo:k6-tag")
 
 
 def interrupting(monkeypatch, sig, teardown_sig=None):
@@ -58,6 +59,22 @@ def test_sigterm_during_deploy_runs_teardown(tmp_path, monkeypatch):
     calls = interrupting(monkeypatch, signal.SIGTERM)
     assert run(tmp_path) == 130
     assert torn_down(calls) == ["int-01-ef", "int-01-ke"]
+
+
+def test_ctrl_c_during_the_harness_deploy_tears_down_that_cell(tmp_path, monkeypatch):
+    """The harness stack is `<cell run id>-harness`, so delete_run.py for that run id removes it (issue #103)."""
+    calls = []
+
+    def runner(argv, env):
+        calls.append(argv)
+        if "infra/cfn/20-harness.yaml" in argv:
+            os.kill(os.getpid(), signal.SIGINT)
+        return 0, ""
+
+    monkeypatch.setattr(deployer, "subprocess_runner", runner)
+    assert run(tmp_path) == 130
+    assert any("int-01-ef-harness" in a for a in calls)
+    assert torn_down(calls)[0] == "int-01-ef"
 
 
 def test_a_second_interrupt_during_teardown_does_not_stop_it(tmp_path, monkeypatch, capsys):

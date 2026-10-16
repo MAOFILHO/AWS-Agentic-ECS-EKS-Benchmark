@@ -1,12 +1,15 @@
-"""Build the workload image and push it to ECR, or mirror its base images (python, uv, k6) into ECR.
+"""Build the workload or k6 image and push it to ECR, or mirror their base images (python, uv, k6) into ECR.
 
 Usage:
     AWS_PROFILE=<sso-profile> python scripts/push_image.py [--region R] [--allow-dirty] \
         [--base-image <base-images tag>] [--platform linux/amd64]
     AWS_PROFILE=<sso-profile> python scripts/push_image.py --mirror-base [--region R] \
         [--platform linux/amd64]
+    AWS_PROFILE=<sso-profile> python scripts/push_image.py --k6 [--region R] [--allow-dirty] \
+        [--platform linux/amd64]
 
-The image tag is the short git sha. Images are built and pulled for linux/amd64 by default (Fargate
+The image tag is the short git sha. --k6 builds loadtests/ FROM the mirrored k6 base (run --mirror-base
+first) into the workload repository as `k6-<sha>`; export the printed URI as K6_IMAGE_URI. Images are built and pulled for linux/amd64 by default (Fargate
 x86_64), whatever the host CPU; pass --platform linux/arm64 for Graviton. Credentials come from the
 AWS_PROFILE profile through boto3. The ECR token goes to `docker login` on stdin only. Output masks the account id.
 """
@@ -91,15 +94,20 @@ def login(ecr, runner):
     return registry
 
 
-def push(ecr, runner, tag, base_tag=None, platform=DEFAULT_PLATFORM):
+def push(ecr, runner, tag, base_tag=None, platform=DEFAULT_PLATFORM, context="workload/"):
     registry = login(ecr, runner)
     image = f"{registry}/{WORKLOAD_REPO}:{tag}"
     build = ["build", "--platform", platform, "-t", image]
     if base_tag:
         build += ["--build-arg", f"BASE_IMAGE={registry}/{BASE_REPO}:{base_tag}"]
-    docker(runner, [*build, "workload/"])
+    docker(runner, [*build, context])
     docker(runner, ["push", image])
     say(image)
+
+
+def push_k6(ecr, runner, sha, platform=DEFAULT_PLATFORM):
+    """The harness image: loadtests/ on the mirrored k6 base, tagged k6-<sha> (the repository is IMMUTABLE)."""
+    push(ecr, runner, f"k6-{sha}", "k6-" + K6_BASE.rsplit(":", 1)[1], platform, "loadtests/")
 
 
 def uv_image():
@@ -147,6 +155,7 @@ def main(argv=None):
     parser.add_argument("--base-image", metavar="TAG", help="Build FROM this base-images tag.")
     parser.add_argument("--platform", default=DEFAULT_PLATFORM, help="Target platform (default: %(default)s).")
     parser.add_argument("--mirror-base", action="store_true", help="Mirror base images only.")
+    parser.add_argument("--k6", action="store_true", help="Build and push the k6 harness image (loadtests/).")
     args = parser.parse_args(argv)
 
     region = resolve_region(args.region)
@@ -156,6 +165,8 @@ def main(argv=None):
     ecr = boto3.Session(profile_name=profile, region_name=region).client("ecr")
     if args.mirror_base:
         mirror(ecr, run_docker, args.platform)
+    elif args.k6:
+        push_k6(ecr, run_docker, image_tag(ROOT, args.allow_dirty), args.platform)
     else:
         push(ecr, run_docker, image_tag(ROOT, args.allow_dirty), args.base_image, args.platform)
 

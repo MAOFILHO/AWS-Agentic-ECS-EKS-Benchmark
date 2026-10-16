@@ -169,6 +169,43 @@ def test_push_from_mirrored_base(ecr):
     assert f"BASE_IMAGE={REGISTRY}/base-images:python-3.12.13-slim" in build
 
 
+def test_k6_builds_loadtests_from_the_mirrored_k6_base_for_amd64(ecr, capsys):
+    client, stubber = ecr
+    _stub_token(stubber)
+    docker = Docker()
+    push_image.push_k6(client, docker, "abc1234")
+    _, build, push = docker.calls
+    image = f"{REGISTRY}/triage-workload:k6-abc1234"
+    assert build[0] == ["build", "--platform", "linux/amd64", "-t", image,
+                        "--build-arg", f"BASE_IMAGE={REGISTRY}/base-images:k6-1.3.0", "loadtests/"]
+    assert push[0] == ["push", image]
+    out = capsys.readouterr().out
+    assert "<account>.dkr.ecr.us-east-1.amazonaws.com/triage-workload:k6-abc1234" in out
+    _assert_clean(out)
+
+
+def test_cli_k6_mode_uses_the_git_sha_and_the_platform(monkeypatch):
+    seen = []
+    monkeypatch.setenv("AWS_PROFILE", "stub")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setattr(push_image.boto3, "Session", lambda **kw: type("S", (), {"client": lambda *a: None})())
+    monkeypatch.setattr(push_image, "image_tag", lambda *a: "abc1234")
+    monkeypatch.setattr(push_image, "push_k6", lambda *a: seen.append(a[2:]))
+    push_image.main(["--k6"])
+    push_image.main(["--k6", "--platform", "linux/arm64"])
+    assert seen == [("abc1234", "linux/amd64"), ("abc1234", "linux/arm64")]
+
+
+def test_make_push_k6_runs_the_k6_mode():
+    out = subprocess.run(["make", "-n", "push-k6"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    assert "scripts/push_image.py --k6" in out
+
+
+def test_k6_dockerfile_takes_the_base_image_argument():
+    text = (ROOT / "loadtests/Dockerfile").read_text()
+    assert f"ARG BASE_IMAGE={push_image.K6_BASE}" in text and "FROM ${BASE_IMAGE}" in text
+
+
 def test_docker_failure_hides_token_and_account(ecr, capsys):
     client, stubber = ecr
     _stub_token(stubber)

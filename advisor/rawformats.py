@@ -1,7 +1,7 @@
 """Raw file contract: what the collector writes under results/<run-id>/raw/<cell>/.
 
-Every file is JSON. Readers validate on read and raise RawFormatError on a bad file.
-The analyst turns a missing or bad file into a gap, never into a zero.
+Every file is JSON. Readers validate on read and raise RawFormatError on a bad file,
+including a NaN or Infinity number. The analyst turns a missing or bad file into a gap, never into a zero.
 
 - `k6-<profile>.json`: the k6 `--summary-export` JSON. Read: `metrics.http_req_duration`
   (`med`, `p(95)`, `p(99)` in ms; p(99) needs `--summary-trend-stats` to include it),
@@ -38,10 +38,12 @@ class RawFormatError(ValueError):
 
 
 class Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class Duration(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     med: float | None = Field(None, ge=0)
     p95: float | None = Field(None, ge=0, alias="p(95)")
     p99: float | None = Field(None, ge=0, alias="p(99)")

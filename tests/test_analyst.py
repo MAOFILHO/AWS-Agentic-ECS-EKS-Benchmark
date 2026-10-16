@@ -129,3 +129,21 @@ def test_fixtures_and_outputs_hold_no_account_id_or_email():
     texts += [analyse("real-01", REAL, REAL_CELLS).model_dump_json()]
     texts += [analyse("edge-01", EDGE, EDGE_CELLS).model_dump_json()]
     assert not [t for t in texts if pattern.search(t)]
+
+
+def test_nan_harness_cpu_is_a_gap_not_below_threshold(tmp_path):
+    raw = real_copy(tmp_path)
+    cpu = '[{"timestamp": "2026-10-14T20:10:00Z", "value": NaN}]'
+    (raw / "eks-ec2" / "cloudwatch-harness-cpu.json").write_text(cpu)
+    assert "eks-ec2/cloudwatch-harness-cpu.json" in "\n".join(analyse("r", raw, REAL_CELLS).gaps)
+
+
+@pytest.mark.parametrize("bad", ["Infinity", "-Infinity", "NaN"])
+def test_non_finite_cost_is_a_gap_and_metrics_json_reloads(tmp_path, bad):
+    raw = tmp_path / "results" / "real-01" / "raw"
+    shutil.copytree(REAL, raw)
+    (raw / "eks-ec2" / "cost.json").write_text(f'{{"load_usd": {bad}, "idle_usd_per_hour": 0.1}}')
+    capacity = Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4)
+    analyst_node(RunState(run_id="real-01", cells=REAL_CELLS, capacity=capacity, region="r"), root=tmp_path)
+    written = Metrics.model_validate_json((raw.parent / "metrics.json").read_text())
+    assert "eks-ec2/cost.json" in "\n".join(written.gaps)

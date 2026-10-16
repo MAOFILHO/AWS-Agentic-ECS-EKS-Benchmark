@@ -1,69 +1,73 @@
 """Number check for the report: every number must come from metrics.json (ADR 0004).
 
-`check` returns the offenders and never raises. A shown number passes when it equals a figure
-rounded to the shown precision. Percentages may show a ratio times 100. The plain counts 1 to 4
-(list items) and plain years pass. Account-id-shaped numbers and email addresses always fail.
+`check` returns the offenders and never raises. It denies by default: every run of digits in the
+text is a number, whatever characters surround it (a range dash, dots, a slash, "to", a word).
+A number passes only when
+- it equals a figure in metrics.json rounded to the shown precision (a percentage may show a
+  ratio times 100), or
+- it sits inside one allowed label form from ALLOWED_LABELS (or the run id), or
+- it is a list number 1 to 4 at the start of a line ("1. first", "2) second").
+Dates, years, plain counts and version numbers are not allowed forms. Account-id-shaped
+numbers and email addresses always fail, even when glued to a name.
 
-Every number in a range or pair is checked: "120-777", "120–777", "120—777", "120 to 777",
-"120/777", "120 -777" and "$5-$99" each check both sides. Only these label forms are skipped:
-- a digit inside a word: "p95", "ec2", "eks-ec2", "v1.2"
-- a number after a hyphen that follows a word with a letter: "smoke-01", "us-east-1"
-- the month and day of a valid ISO date "2026-10-15" (the year is checked as a plain year);
-  a dashed group that is not a valid date ("2024-5555-6666") is checked like any range
+Allowed label forms, matched as whole words (a digit or letter next to one breaks the match):
+p50 p95 p99 ec2 ecs-ec2 ecs-fargate eks-ec2 eks-fargate us-east-1 and the run id,
+in any letter case.
 """
 
 import re
 
 from advisor.schemas import Metrics
 
-# Not inside a word ("ec2", "p95") or a decimal ("v1.2"); hyphen labels are filtered below.
+ALLOWED_LABELS = (
+    "p50",
+    "p95",
+    "p99",
+    "ecs-ec2",
+    "ecs-fargate",
+    "eks-ec2",
+    "eks-fargate",
+    "ec2",
+    "us-east-1",
+)
+LIST_NUMBER_RE = re.compile(r"(?m)^[ \t]*([1-4])(?=[.)][ \t])")
 NUMBER_RE = re.compile(
-    r"(?<![\w.])\$?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(?:([kKM])(?![A-Za-z]))?(%)?"
+    r"\$?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(?:([kKM])(?![A-Za-z]))?(%)?"
 )
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 ACCOUNT_ID_RE = re.compile(r"(?<!\d)\d{12}(?!\d)")
-DATE_RE = re.compile(r"(?<![\w.-])(\d{4})-(\d{2})-(\d{2})(?![\w-])")
-NUMBER_TOKEN_RE = re.compile(r"\$?[\d.,]*\d[kKM]?%?")
-LEFT_TOKEN_RE = re.compile(r"[\w.,$%]*$")
 MULTIPLIERS = {"k": 1e3, "K": 1e3, "M": 1e6}
 
 
-def _date_interiors(text: str) -> set[int]:
-    """Start offsets of the month and day of each valid ISO date."""
-    starts = set()
-    for d in DATE_RE.finditer(text):
-        year, month, day = (int(g) for g in d.groups())
-        if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
-            starts.update({d.start(2), d.start(3)})
-    return starts
+def _blank(text: str, run_id: str | None) -> str:
+    """Replace allowed labels and list numbers with spaces of the same length."""
+    labels = sorted(
+        ALLOWED_LABELS + ((run_id,) if run_id else ()), key=len, reverse=True
+    )
+    label_re = re.compile(
+        r"(?<!\w)(?:" + "|".join(map(re.escape, labels)) + r")(?!\w)", re.IGNORECASE
+    )
+
+    def blank(m: re.Match) -> str:
+        return " " * len(m.group(0))
+
+    text = label_re.sub(blank, text)
+    return LIST_NUMBER_RE.sub(lambda m: m.group(0).replace(m.group(1), " "), text)
 
 
-def _is_label(text: str, start: int, date_interiors: set[int]) -> bool:
-    if start in date_interiors:
-        return True
-    if start == 0 or text[start - 1] != "-":
-        return False
-    left = LEFT_TOKEN_RE.search(text, 0, start - 1).group(0)
-    # A bare number on the left is a range ("120-777"); a word with a letter is a name.
-    return bool(left) and not NUMBER_TOKEN_RE.fullmatch(left)
+def _numbers(text: str, run_id: str | None = None) -> list[re.Match]:
+    return list(NUMBER_RE.finditer(_blank(text, run_id)))
 
 
-def _numbers(text: str) -> list[re.Match]:
-    interiors = _date_interiors(text)
-    return [
-        m for m in NUMBER_RE.finditer(text) if not _is_label(text, m.start(), interiors)
-    ]
-
-
-def extract_numbers(text: str) -> list[str]:
-    return [m.group(0) for m in _numbers(text)]
+def extract_numbers(text: str, run_id: str | None = None) -> list[str]:
+    return [m.group(0) for m in _numbers(text, run_id)]
 
 
 def _known_values(metrics: Metrics) -> list[float]:
     values = [f.value for f in metrics.figures] + [c.usd for c in metrics.shared_costs]
     # Numbers written inside units and gaps ("usd/1k") may be restated as they are.
     words = [f.unit for f in metrics.figures] + [c.item for c in metrics.shared_costs]
-    for m in NUMBER_RE.finditer(" ".join(words + metrics.gaps)):
+    for m in _numbers(" ".join(words + metrics.gaps), metrics.run_id):
         values.append(_parse(m)[0])
     return values
 
@@ -78,19 +82,12 @@ def _parse(m: re.Match) -> tuple[float, float]:
     ) * mult, 0.5 * 10**-decimals * mult
 
 
-def _is_plain_count_or_year(m: re.Match) -> bool:
-    whole, frac, suffix, pct = m.groups()
-    if frac or suffix or pct or m.group(0).startswith("$") or "," in whole:
-        return False
-    return 1 <= int(whole) <= 4 or (len(whole) == 4 and 1900 <= int(whole) <= 2100)
-
-
 def check(text: str, metrics: Metrics) -> list[str]:
     known = _known_values(metrics)
     offenders = []
-    for m in _numbers(text):
+    for m in _numbers(text, metrics.run_id):
         # Account ids are caught by the whole-text scan below, even when glued to a name.
-        if ACCOUNT_ID_RE.fullmatch(m.group(1)) or _is_plain_count_or_year(m):
+        if ACCOUNT_ID_RE.fullmatch(m.group(1)):
             continue
         shown, half_step = _parse(m)
         candidates = known + ([v * 100 for v in known] if m.group(4) else [])

@@ -49,6 +49,8 @@ def build_prompt(metrics: Metrics) -> str:
         "a comparison table, the trade-offs, and a recommendation.\n"
         "Use only the figures in metrics.json below, as given or rounded. Do not compute new "
         "figures: no percentage difference, ratio, sum or average that is not already there.\n"
+        "Write no other numbers: no dates, years, counts or versions. Number list items 1 to 4 "
+        "only, at the start of a line.\n"
         f"metrics.json:\n{metrics.model_dump_json(indent=2)}\n"
     )
 

@@ -20,6 +20,6 @@ def test_dot_dot_range_checks_the_second_number(text):
     assert "777" in check(text, make_metrics())
 
 
-@pytest.mark.parametrize("text", ["v1.2", "120.4 ms"])
+@pytest.mark.parametrize("text", ["120.4 ms"])
 def test_a_real_decimal_still_reads_as_one_number(text):
     assert check(text, make_metrics()) == []

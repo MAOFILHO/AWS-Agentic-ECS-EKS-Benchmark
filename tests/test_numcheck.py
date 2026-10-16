@@ -48,42 +48,76 @@ def make_metrics() -> Metrics:
     )
 
 
-def test_extract_numbers_finds_every_format():
-    text = "p50 7 ms, 1,234 s, 3.5%, $0.09, 1.2k parts, 120ms and 2M rows"
-    assert extract_numbers(text) == ["7", "1,234", "3.5%", "$0.09", "1.2k", "120", "2M"]
+SEPARATORS = ["..", "...", "-", "–", "—", "/", " to ", "~", ":", "→", " ", "_", ",,"]
 
 
-def test_extract_numbers_skips_digits_inside_names_and_dates():
-    text = "ecs-ec2 and eks-ec2, p95 for run smoke-01 on 2026-10-15, model v1.2"
-    assert extract_numbers(text) == ["2026"]
+@pytest.mark.parametrize("sep", SEPARATORS)
+def test_any_separator_between_two_numbers_still_checks_both(sep):
+    assert check(f"p95 is 120{sep}777 ms", make_metrics()) == ["777"]
+    assert check(f"p95 is 777{sep}120 ms", make_metrics()) == ["777"]
 
 
 @pytest.mark.parametrize(
     ("text", "invented"),
     [
         ("p95 is 120-777 ms", ["777"]),
-        ("p95 is 120–777 ms", ["777"]),
-        ("p95 is 120—777 ms", ["777"]),
-        ("p95 is 120 to 777 ms", ["777"]),
-        ("p95 is 120/777 ms", ["777"]),
         ("p95 is 120 -777 ms", ["777"]),
-        ("p95 is 120.4-777 ms", ["777"]),
         ("NAT costs $0.09-$99", ["$99"]),
         ("costs $5-$99", ["$5", "$99"]),
         ("parts 1.2k-9k", ["9k"]),
-        ("id 2024-5555-6666", ["5555", "6666"]),
+        ("id 2024-5555-6666", ["2024", "5555", "6666"]),
+        ("on 2026-10-15", ["2026", "10", "15"]),
+        ("model v1.2", ["1.2"]),
+        ("in 2026", ["2026"]),
+        ("p9500 and ec2777", ["9500", "2777"]),
+        ("eks-ec2-777", ["777"]),
+        ("us-east-1-777", ["777"]),
     ],
 )
-def test_every_number_in_a_range_or_pair_is_checked(text, invented):
+def test_every_number_is_checked_unless_inside_an_allowed_label(text, invented):
     assert check(text, make_metrics()) == invented
 
 
 @pytest.mark.parametrize(
-    "text",
-    ["p95 on ec2", "eks-ec2 and ecs-fargate", "run smoke-01", "us-east-1", "on 2026-10-15"],
+    "label",
+    [
+        "p50",
+        "p95",
+        "p99",
+        "ec2",
+        "ecs-ec2",
+        "ecs-fargate",
+        "eks-ec2",
+        "eks-fargate",
+        "smoke-01",
+        "us-east-1",
+    ],
 )
-def test_allowed_label_forms_pass(text):
-    assert check(text, make_metrics()) == []
+def test_each_allowed_label_passes_and_hides_nothing_next_to_it(label):
+    assert check(f"the {label} cell", make_metrics()) == []
+    assert check(f"the {label}-777 cell", make_metrics()) == ["777"]
+    assert "777" in check(f"the 777{label} cell", make_metrics())
+
+
+def test_list_numbers_one_to_four_pass_only_at_the_start_of_a_line():
+    assert check("1. first\n2) second\n  3. third\n4. fourth", make_metrics()) == []
+    assert check("1. first\nplus 2 more", make_metrics()) == ["2"]
+    assert check("5. fifth", make_metrics()) == ["5"]
+    assert check("1.5 first", make_metrics()) == ["1.5"]
+
+
+def test_extract_numbers_finds_every_format():
+    text = "p50 7 ms, 1,234 s, 3.5%, $0.09, 1.2k parts, 120ms and 2M rows"
+    assert extract_numbers(text) == ["7", "1,234", "3.5%", "$0.09", "1.2k", "120", "2M"]
+
+
+def test_extract_numbers_skips_only_allowed_labels():
+    text = "ecs-ec2 and eks-ec2, p95 for run smoke-01 on 2026-10-15"
+    assert extract_numbers(text, "smoke-01") == ["2026", "10", "15"]
+
+
+def test_a_single_dot_is_a_decimal_that_must_be_known():
+    assert check("p95 is 120.777 ms", make_metrics()) == ["120.777"]
 
 
 def test_known_numbers_pass():
@@ -110,11 +144,6 @@ def test_same_figure_rounded_to_shown_precision_passes(shown):
 @pytest.mark.parametrize("shown", ["121", "120.3", "0.2", "1.3%", "1.6k"])
 def test_rounding_outside_shown_precision_is_caught(shown):
     assert check(f"value {shown} here", make_metrics()) == [shown]
-
-
-def test_plain_counts_and_years_pass():
-    text = "1. first\n2. second\nThe 3 options and 4 cells, run in 2026."
-    assert check(text, make_metrics()) == []
 
 
 def test_account_id_and_email_are_caught():

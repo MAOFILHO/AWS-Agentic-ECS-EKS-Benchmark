@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: bootstrap ecs-fargate ecs-ec2 eks-ec2 eks-fargate benchmark teardown report workload-docker push-image push-k6 mirror-base
+.PHONY: bootstrap ecs-fargate ecs-ec2 eks-ec2 eks-fargate benchmark teardown report chart workload-docker push-image push-k6 mirror-base
 
 # Deploy the bootstrap stack through a change set. Needs AWS_PROFILE (SSO or `aws login`) and BUDGET_EMAIL.
 # Set OIDC_PROVIDER_ARN when the account already has the GitHub OIDC provider.
@@ -51,6 +51,11 @@ benchmark:
 
 report:
 	@echo "not implemented yet"; exit 1
+
+# Draw results/RUN_ID/chart.svg from results/RUN_ID/metrics.json. ARGS="--out <path>" writes it elsewhere.
+chart:
+	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make chart RUN_ID=<id>"; exit 1; }
+	uv run --locked python -m scripts.make_chart --run-id "$(RUN_ID)" $(ARGS)
 
 # Build and run the workload image on :8080. LLM_MODE=bedrock uses BEDROCK_MODEL_ID, default amazon.nova-micro-v1:0.
 workload-docker:

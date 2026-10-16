@@ -12,7 +12,7 @@ Profile = Literal["steady", "step", "spike", "scale-from-min"]
 
 
 class CellSpec(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     name: CellName
     profile: Profile
@@ -21,7 +21,7 @@ class CellSpec(BaseModel):
 class Capacity(BaseModel):
     """One capacity block, applied to every cell (SPEC section 4)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     vcpu: float = Field(gt=0)
     memory_mib: int = Field(gt=0)
@@ -31,14 +31,14 @@ class Capacity(BaseModel):
 
 
 class CostLine(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     item: str
     usd: float
 
 
 class RunState(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     run_id: str = Field(pattern=RUN_ID_PATTERN)
     cells: list[CellSpec]

@@ -1,10 +1,12 @@
-"""Shape of results/<run-id>/metrics.json (SPEC sections 7 and 8)."""
+"""Shape of results/<run-id>/metrics.json (SPEC sections 7 and 8) and of runs/default.json."""
 
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from advisor.state import RUN_ID_PATTERN, CellName, Profile
+from advisor.planner import PlanConfig
+from advisor.state import RUN_ID_PATTERN, Capacity, CellName, Profile
 
 MetricName = Literal[
     "p50_ms",
@@ -22,7 +24,7 @@ MetricName = Literal[
 
 
 class Figure(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     name: MetricName
     value: float
@@ -36,7 +38,7 @@ class Figure(BaseModel):
 class SharedCost(BaseModel):
     """NAT gateway, VPC endpoints, harness: reported on their own line, not spread across cells."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     item: str
     usd: float
@@ -44,7 +46,7 @@ class SharedCost(BaseModel):
 
 
 class Metrics(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     run_id: str = Field(pattern=RUN_ID_PATTERN)
     figures: list[Figure] = []
@@ -52,3 +54,31 @@ class Metrics(BaseModel):
     gaps: list[str] = []
     # The load harness ran above its CPU threshold, so latency may reflect the harness (SPEC 12).
     harness_bound: bool = False
+
+
+class MetricsError(ValueError):
+    pass
+
+
+def read_metrics(path: Path) -> Metrics:
+    """Parse metrics.json. A bad file, or a NaN or Infinity number, raises MetricsError, never a default."""
+    try:
+        return Metrics.model_validate_json(path.read_text())
+    except ValidationError as err:
+        raise MetricsError(f"{path.name}: {err}") from err
+
+
+class LoadConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    peak_rps: int = Field(gt=0)
+
+
+class RunConfig(BaseModel):
+    """runs/default.json: the capacity block, the plan inputs and the load."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    capacity: Capacity
+    plan: PlanConfig
+    load: LoadConfig

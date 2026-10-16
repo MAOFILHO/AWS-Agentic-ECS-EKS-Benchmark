@@ -67,7 +67,9 @@ def state(cells=("ecs-fargate",), profiles=("steady",)):
 
 def node(tmp_path, ecs, logs, cfn, clock=lambda: 0):
     for cell in ("ecs-fargate", "eks-ec2"):
-        rf.write(tmp_path / "results" / "load-01" / "raw" / cell / "deploy.json", {"alb_dns_name": "alb.example.com"})
+        rf.write(tmp_path / "results" / "load-01" / "raw" / cell / "deploy.json", {
+            "stack_create_start": "2026-10-14T19:50:00+00:00", "stack_create_end": "2026-10-14T19:53:30+00:00",
+            "alb_dns_name": "alb.example.com"}, rf.DeployStarted)
     aws = aws_of(ecs=ecs, logs=logs, cloudformation=cfn)
     return make_load_runner(aws, tmp_path, 600, 50, sleep=lambda s: None, clock=clock,
                             now=lambda: datetime(2026, 10, 14, 20, 0, tzinfo=UTC))

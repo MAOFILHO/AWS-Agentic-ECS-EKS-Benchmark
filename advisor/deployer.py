@@ -15,6 +15,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from advisor import rawformats as rf
 from advisor.state import RunState
 from advisor.store import create_run_dirs
 
@@ -122,9 +123,8 @@ def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: R
                 alb = match.group(1) if (match := ALB_LINE.search(out)) else None
             else:
                 alb = out.strip() or None
-            (raw / cell).mkdir(parents=True, exist_ok=True)
             record = {"stack_create_start": start.isoformat(), "stack_create_end": now().isoformat(), "alb_dns_name": alb}
-            (raw / cell / "deploy.json").write_text(json.dumps(record, indent=2) + "\n")
+            rf.write(raw / cell / "deploy.json", record, rf.DeployStarted)
         return {"status": "deployed"}
 
     return deployer

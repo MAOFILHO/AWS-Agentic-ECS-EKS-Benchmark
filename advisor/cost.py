@@ -11,7 +11,7 @@ from advisor.state import Capacity, CellSpec, CostLine
 class CellUsage(BaseModel):
     """Per cell x profile run. `nodes` is ignored on Fargate cells."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     replicas: int = Field(ge=1)
     nodes: int = Field(ge=1)
@@ -22,7 +22,7 @@ class CellUsage(BaseModel):
 class SharedUsage(BaseModel):
     """One NAT gateway per run (Decision 6), the VPC endpoints, and the Fargate k6 harness."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     nat_gb: float = Field(ge=0)
     endpoints: int = Field(ge=0)
@@ -32,7 +32,7 @@ class SharedUsage(BaseModel):
 
 
 class Breakdown(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     lines: list[CostLine] = []
     gaps: list[str] = []

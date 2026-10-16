@@ -62,7 +62,7 @@ def make_load_runner(aws: Aws, root: Path, duration_s: float, peak_rps: int, sle
     def run_profile(state: RunState, cell: str, profile: str, raw: Path) -> None:
         region, rid = state.region, d.cell_run_id(state.run_id, cell)
         harness = stack_outputs(aws("cloudformation", region), f"{rid}-harness")
-        alb = json.loads((raw / cell / "deploy.json").read_text()).get("alb_dns_name")
+        alb = rf.read(raw / cell / "deploy.json", rf.DeployStarted).alb_dns_name
         if not alb:
             raise LoadError("deploy.json has no alb_dns_name")
         env = {"TARGET_URL": f"http://{alb}", "PROFILE": profile, "PEAK_RPS": str(peak_rps),
@@ -95,7 +95,7 @@ def make_load_runner(aws: Aws, root: Path, duration_s: float, peak_rps: int, sle
             rf.K6Summary.model_validate(summary)
         except ValueError as err:
             raise LoadError("k6 summary is not in the --summary-export shape") from err
-        rf.write(raw / cell / f"k6-{profile}.json", summary)
+        rf.write(raw / cell / f"k6-{profile}.json", summary, rf.K6Summary)
 
     def load_runner(state: RunState) -> dict:
         raw, gaps, windows = create_run_dirs(state.run_id, root).raw, [], {}

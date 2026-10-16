@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-107-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-107-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 52 items / 36 deselected / 16 selected
+
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[subnet-subnet-0abc-describe_subnets-SubnetIds-InvalidSubnetID.NotFound-_found0] PASSED [  6%]
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[security-group-sg-0abc-describe_security_groups-GroupIds-InvalidGroup.NotFound-_found1] PASSED [ 12%]
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[vpc-vpc-0abc-describe_vpcs-VpcIds-InvalidVpcID.NotFound-_found2] PASSED [ 18%]
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[route-table-rtb-0abc-describe_route_tables-RouteTableIds-InvalidRouteTableID.NotFound-_found3] PASSED [ 25%]
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[internet-gateway-igw-0abc-describe_internet_gateways-InternetGatewayIds-InvalidInternetGatewayID.NotFound-_found4] PASSED [ 31%]
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[elastic-ip-eipalloc-0abc-describe_addresses-AllocationIds-InvalidAllocationID.NotFound-_found5] PASSED [ 37%]
+tests/test_delete_run.py::test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown[network-interface-eni-0abc-describe_network_interfaces-NetworkInterfaceIds-InvalidNetworkInterfaceID.NotFound-_found6] PASSED [ 43%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[subnet-subnet-0abc-describe_subnets-SubnetIds-InvalidSubnetID.NotFound-found0] PASSED [ 50%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[security-group-sg-0abc-describe_security_groups-GroupIds-InvalidGroup.NotFound-found1] PASSED [ 56%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[vpc-vpc-0abc-describe_vpcs-VpcIds-InvalidVpcID.NotFound-found2] PASSED [ 62%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[route-table-rtb-0abc-describe_route_tables-RouteTableIds-InvalidRouteTableID.NotFound-found3] PASSED [ 68%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[internet-gateway-igw-0abc-describe_internet_gateways-InternetGatewayIds-InvalidInternetGatewayID.NotFound-found4] PASSED [ 75%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[elastic-ip-eipalloc-0abc-describe_addresses-AllocationIds-InvalidAllocationID.NotFound-found5] PASSED [ 81%]
+tests/test_delete_run.py::test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout[network-interface-eni-0abc-describe_network_interfaces-NetworkInterfaceIds-InvalidNetworkInterfaceID.NotFound-found6] PASSED [ 87%]
+tests/test_delete_run.py::test_unknown_ec2_kind_still_counts_as_live PASSED [ 93%]
+tests/test_delete_run.py::test_other_ec2_error_is_not_read_as_gone PASSED [100%]
+
+====================== 16 passed, 36 deselected in 0.59s =======================

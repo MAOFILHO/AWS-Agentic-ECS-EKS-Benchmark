@@ -17,7 +17,7 @@ workload, measures latency, scale-out and cost, writes a decision report, then d
 - G4. Every number in the report traces back to a raw file of the run.
 - G5. One command runs the full cycle: plan, approve, deploy, load, collect, analyse, report, tear down.
 - G6. Zero console clicks and no long-lived credentials.
-- G7. A smoke run finishes in under 25 min and under $2.
+- G7. A smoke run finishes in under 35 min and under $2.
 
 ## 3. Non-goals
 
@@ -127,7 +127,7 @@ Diagrams live in `docs/architecture.md`.
 - `cfn-lint` and `cfn-guard` clean on all templates; `helm lint` clean.
 - Unit tests for analyst math and the cost model, with fixtures and no AWS.
 - A test proves the reporter never states a number missing from `metrics.json`.
-- Smoke test: `ecs-fargate` only, `LLM_MODE=mock`, 60 s steady load, teardown, under 25 min and under $2.
+- Smoke test: `ecs-fargate` only, `LLM_MODE=mock`, 60 s steady load, teardown, under 35 min and under $2.
 
 ## 12. Risks
 

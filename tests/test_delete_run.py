@@ -697,3 +697,70 @@ def test_cluster_albs_batches_describe_tags_by_20(eks_clients):
             {"ResourceArns": chunk},
         )
     assert delete_run.cluster_albs(made["elbv2"], CLUSTER) == [arns[3], arns[22]]
+
+
+# --- Stale tag entries for other EC2 kinds (issue #107) ---
+
+EC2_CASES = [
+    ("subnet", "subnet-0abc", "describe_subnets", "SubnetIds", "InvalidSubnetID.NotFound",
+     {"Subnets": [{"SubnetId": "subnet-0abc"}]}),
+    ("security-group", "sg-0abc", "describe_security_groups", "GroupIds", "InvalidGroup.NotFound",
+     {"SecurityGroups": [{"GroupId": "sg-0abc"}]}),
+    ("vpc", "vpc-0abc", "describe_vpcs", "VpcIds", "InvalidVpcID.NotFound",
+     {"Vpcs": [{"VpcId": "vpc-0abc"}]}),
+    ("route-table", "rtb-0abc", "describe_route_tables", "RouteTableIds", "InvalidRouteTableID.NotFound",
+     {"RouteTables": [{"RouteTableId": "rtb-0abc"}]}),
+    ("internet-gateway", "igw-0abc", "describe_internet_gateways", "InternetGatewayIds",
+     "InvalidInternetGatewayID.NotFound", {"InternetGateways": [{"InternetGatewayId": "igw-0abc"}]}),
+    ("elastic-ip", "eipalloc-0abc", "describe_addresses", "AllocationIds", "InvalidAllocationID.NotFound",
+     {"Addresses": [{"AllocationId": "eipalloc-0abc"}]}),
+    ("network-interface", "eni-0abc", "describe_network_interfaces", "NetworkInterfaceIds",
+     "InvalidNetworkInterfaceID.NotFound", {"NetworkInterfaces": [{"NetworkInterfaceId": "eni-0abc"}]}),
+]
+
+
+def _ec2_arn(kind, resource_id):
+    return f"arn:aws:ec2:us-east-1:{ACCOUNT}:{kind}/{resource_id}"
+
+
+@pytest.mark.parametrize("kind,resource_id,method,param,not_found,_found", EC2_CASES)
+def test_ec2_resource_ec2_reports_not_found_does_not_fail_teardown(
+    clients, capsys, kind, resource_id, method, param, not_found, _found
+):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [_ec2_arn(kind, resource_id)])
+    stubs["ec2"].add_client_error(method, not_found, expected_params={param: [resource_id]})
+    delete_run.check_leftovers(
+        made["resourcegroupstaggingapi"], made["ec2"], made["ecs"], RUN, timeout=0, sleep=lambda _s: None
+    )
+    assert "no leftovers" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("kind,resource_id,method,param,_not_found,found", EC2_CASES)
+def test_ec2_resource_ec2_still_returns_fails_teardown_after_timeout(
+    clients, capsys, kind, resource_id, method, param, _not_found, found
+):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [_ec2_arn(kind, resource_id)])
+    stubs["ec2"].add_response(method, found, {param: [resource_id]})
+    with pytest.raises(SystemExit) as exc:
+        delete_run.check_leftovers(
+            made["resourcegroupstaggingapi"], made["ec2"], made["ecs"], RUN, timeout=0, sleep=lambda _s: None
+        )
+    assert "1 resource(s)" in str(exc.value.code)
+    assert f"{kind}/{resource_id}" in capsys.readouterr().err
+
+
+def test_unknown_ec2_kind_still_counts_as_live(clients):
+    made, stubs = clients
+    arn = _ec2_arn("transit-gateway", "tgw-0abc")
+    _stub_tags(stubs["resourcegroupstaggingapi"], [arn])
+    assert _leftovers(made) == [arn]
+
+
+def test_other_ec2_error_is_not_read_as_gone(clients):
+    made, stubs = clients
+    _stub_tags(stubs["resourcegroupstaggingapi"], [_ec2_arn("subnet", "subnet-0abc")])
+    stubs["ec2"].add_client_error("describe_subnets", "UnauthorizedOperation")
+    with pytest.raises(delete_run.ClientError):
+        _leftovers(made)

@@ -146,3 +146,30 @@ def test_a_failing_kubectl_is_a_gap(tmp_path):
     out, raw, _ = collect(tmp_path, run=lambda argv, env: (1, ""))
     assert any(g.startswith("eks-ec2/events.json") for g in out["gaps"])
     assert not (raw / "eks-ec2" / "events.json").exists()
+
+
+def empty_series(*ids):
+    """A get_metric_data stub that returns no datapoints for the given query ids."""
+    def stub(MetricDataQueries, **_):
+        results = metric_data(MetricDataQueries)["MetricDataResults"]
+        return {"MetricDataResults": [{**r, "Timestamps": [], "Values": []} if r["Id"] in ids else r for r in results]}
+    return stub
+
+
+def test_an_empty_series_is_a_gap_and_no_file_not_a_zero(tmp_path):
+    aws = clients()
+    aws["cloudwatch"].responses["get_metric_data"] = empty_series("cpu", "memory", "count", "time")
+    out, raw, _ = collect(tmp_path, aws)
+    names = {g.split(":")[0] for g in out["gaps"]}
+    assert {"ecs-fargate/cloudwatch-cpu/memory", "ecs-fargate/cloudwatch-harness-cpu.json",
+            "ecs-fargate/alb.json + deploy.json", "eks-ec2/cloudwatch-harness-cpu.json"} <= names
+    for cell in ("ecs-fargate", "eks-ec2"):
+        assert not (raw / cell / "cloudwatch-harness-cpu.json").exists() and not (raw / cell / "alb.json").exists()
+    assert not (raw / "ecs-fargate" / "cloudwatch-cpu.json").exists()
+
+
+def test_no_5xx_datapoints_is_a_real_zero_when_requests_were_counted(tmp_path):
+    aws = clients()
+    aws["cloudwatch"].responses["get_metric_data"] = empty_series("e5xx")
+    out, raw, _ = collect(tmp_path, aws)
+    assert out["gaps"] == [] and json.loads((raw / "ecs-fargate" / "alb.json").read_text())["http_5xx"] == []

@@ -43,11 +43,19 @@ def metric(id: str, namespace: str, name: str, dims: dict, stat: str, **extra) -
     return {"Id": id, "MetricStat": stat_spec, **extra}
 
 
-def series(cw, queries: list[dict], start: datetime, end: datetime) -> dict[str, list[dict]]:
-    """One get_metric_data call -> {query id: [{"timestamp", "value"}]}, oldest first."""
+def series(cw, queries: list[dict], start: datetime, end: datetime, optional: tuple[str, ...] = ()) -> dict[str, list[dict]]:
+    """One get_metric_data call -> {query id: [{"timestamp", "value"}]}, oldest first.
+
+    A series with no datapoints is a missing source, so it raises and the section becomes a gap. `optional` ids
+    may be empty: CloudWatch publishes no HTTPCode_Target_5XX_Count datapoint when there were no 5xx.
+    """
     got = cw.get_metric_data(MetricDataQueries=queries, StartTime=start, EndTime=end, ScanBy="TimestampAscending")
-    return {r["Id"]: [{"timestamp": t.isoformat(), "value": v} for t, v in zip(r["Timestamps"], r["Values"])]
-            for r in got["MetricDataResults"]}
+    found = {r["Id"]: [{"timestamp": t.isoformat(), "value": v} for t, v in zip(r["Timestamps"], r["Values"])]
+             for r in got["MetricDataResults"]}
+    for q in queries:
+        if q.get("ReturnData", True) and not found.get(q["Id"]) and q["Id"] not in optional:
+            raise LookupError(f"no datapoints for {q['Id']}")
+    return found
 
 
 def event(when: datetime, kind: str, message: str) -> dict:
@@ -154,7 +162,8 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                 dims = {"LoadBalancer": lb_dim}
                 got = series(cw, [metric("count", "AWS/ApplicationELB", "RequestCount", dims, "Sum"),
                                   metric("e5xx", "AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", dims, "Sum"),
-                                  metric("time", "AWS/ApplicationELB", "TargetResponseTime", dims, "Average")], start, end)
+                                  metric("time", "AWS/ApplicationELB", "TargetResponseTime", dims, "Average")], start, end,
+                             optional=("e5xx",))
                 rf.write(out / "alb.json", {"request_count": got["count"], "http_5xx": got["e5xx"],
                                             "response_time": got["time"]})
                 # The ALB API has no transition time: the first minute with a healthy target is the closest record.

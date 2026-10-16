@@ -1,0 +1,5 @@
+{"metrics": {
+  "http_req_duration": {"avg": 42.0, "min": 19.0, "med": 38.0, "max": 300.0, "p(90)": 70.0, "p(95)": 88.0, "p(99)": 150.0},
+  "http_reqs": {"count": 3000, "rate": 50.0},
+  "http_req_failed": {"passes": 0, "fails": 3000, "value": 0}
+}}

@@ -5,6 +5,7 @@ tests. A price that cannot be read becomes a gap; it is never replaced by a gues
 """
 
 import json
+import re
 from typing import Any
 
 PRICING_ENDPOINT_REGION = "us-east-1"
@@ -50,6 +51,12 @@ def _products(client: Any, service_code: str, filters: list[dict[str, str]]) -> 
         kwargs["NextToken"] = page["NextToken"]
 
 
+def _usage_is(product: dict, usage: str) -> bool:
+    """True when usagetype is `usage`, bare or behind a region prefix (USE1-). Not TS-, not Outposts-."""
+    usagetype = product.get("product", {}).get("attributes", {}).get("usagetype", "")
+    return re.fullmatch(rf"(?:[A-Z]{{2,4}}\d-)?{re.escape(usage)}", usagetype) is not None
+
+
 def _usd(product: dict) -> set[float]:
     terms = product.get("terms", {}).get("OnDemand", {}).values()
     dims = [d for t in terms for d in t.get("priceDimensions", {}).values()]
@@ -67,6 +74,8 @@ def read_prices(client: Any, region: str, instance_type: str) -> tuple[dict[str,
         except Exception as err:  # noqa: BLE001 - any API failure is a gap, never a made-up price
             gaps.append(f"price {key}: Pricing API error {type(err).__name__}")
             continue
+        if key in USAGE_PRICES:
+            products = [p for p in products if _usage_is(p, USAGE_PRICES[key][2])]
         found = set().union(*(_usd(p) for p in products)) - {0.0}
         dates += [p["publicationDate"] for p in products if p.get("publicationDate")]
         if len(found) == 1:

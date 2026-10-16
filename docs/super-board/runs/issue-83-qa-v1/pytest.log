@@ -1,0 +1,10 @@
+........................................................................ [ 30%]
+........................................................................ [ 60%]
+........................................................................ [ 90%]
+....FFFF...............                                                  [100%]
+=========================== short test summary info ============================
+FAILED tests/test_reporter_qa.py::test_account_id_anywhere_in_the_draft_is_an_offender[cdk-bucket]
+FAILED tests/test_reporter_qa.py::test_account_id_anywhere_in_the_draft_is_an_offender[snake-case]
+FAILED tests/test_reporter_qa.py::test_account_id_anywhere_in_the_draft_is_an_offender[prefixed]
+FAILED tests/test_reporter_qa.py::test_a_leaking_draft_never_reaches_report_md[account]
+4 failed, 235 passed in 4.35s

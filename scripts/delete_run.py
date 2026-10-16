@@ -27,6 +27,16 @@ LAGGING = {
     "natgateway": ("describe_nat_gateways", "Filter", "nat-gateway-id", "NatGateways"),
     "vpc-endpoint": ("describe_vpc_endpoints", "Filters", "vpc-endpoint-id", "VpcEndpoints"),
 }
+# The tag index keeps these for up to hours after delete; EC2 answers `*.NotFound` once they are gone.
+EC2_KINDS = {
+    "subnet": ("describe_subnets", "SubnetIds"),
+    "vpc": ("describe_vpcs", "VpcIds"),
+    "security-group": ("describe_security_groups", "GroupIds"),
+    "route-table": ("describe_route_tables", "RouteTableIds"),
+    "internet-gateway": ("describe_internet_gateways", "InternetGatewayIds"),
+    "elastic-ip": ("describe_addresses", "AllocationIds"),
+    "network-interface": ("describe_network_interfaces", "NetworkInterfaceIds"),
+}
 ECS_KINDS = {"cluster", "service", "task-definition", "task"}
 CHECK_INTERVAL = 30
 WORKLOAD_RELEASE = "workload"
@@ -206,6 +216,15 @@ def _gone(ec2, ecs, arn):
             raise
         found = [i for r in reservations for i in r["Instances"]]
         return all(i["State"]["Name"] in {"terminated", "shutting-down"} for i in found)
+    if kind in EC2_KINDS:
+        method, ids_param = EC2_KINDS[kind]
+        try:
+            getattr(ec2, method)(**{ids_param: [resource_id]})
+        except ClientError as err:
+            if err.response["Error"]["Code"].endswith(".NotFound"):
+                return True
+            raise
+        return False
     if kind not in LAGGING:
         return False
     method, filter_param, filter_name, key = LAGGING[kind]

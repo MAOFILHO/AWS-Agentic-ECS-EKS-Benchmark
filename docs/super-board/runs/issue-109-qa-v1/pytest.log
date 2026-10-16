@@ -1,0 +1,32 @@
+.....................................................................F.. [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 47%]
+........................................................................ [ 63%]
+...........................................ssss......................... [ 78%]
+........................................................................ [ 94%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+________________ test_no_tracked_text_file_holds_an_account_id _________________
+
+    def test_no_tracked_text_file_holds_an_account_id():
+        account_id = re.compile(rb"(?<![0-9A-Za-z])[0-9]{12}(?![0-9A-Za-z])")
+        files = subprocess.run(
+            ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
+        ).stdout.split(b"\0")
+        hits = []
+        for name in filter(None, files):
+            data = (ROOT / name.decode()).read_bytes()
+            if b"\0" in data:
+                continue  # binary file
+            if account_id.search(data):
+                hits.append(name.decode())
+>       assert hits == []
+E       AssertionError: assert ['tests/test_run_graph.py'] == []
+E         
+E         Left contains one more item: 'tests/test_run_graph.py'
+E         Use -v to get more diff
+
+tests/test_bootstrap_oidc.py:154: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_bootstrap_oidc.py::test_no_tracked_text_file_holds_an_account_id
+1 failed, 451 passed, 4 skipped in 7.36s

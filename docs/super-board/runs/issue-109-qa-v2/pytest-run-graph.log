@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-109-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-109-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 6 items
+
+tests/test_run_graph.py::test_deploy_nodes_has_analyst_and_reporter PASSED [ 16%]
+tests/test_run_graph.py::test_deploy_nodes_makes_no_bedrock_client PASSED [ 33%]
+tests/test_run_graph.py::test_run_past_the_collector_writes_metrics_and_report PASSED [ 50%]
+tests/test_run_graph.py::test_failed_reporter_still_ends_in_teardown[error0] PASSED [ 66%]
+tests/test_run_graph.py::test_failed_reporter_still_ends_in_teardown[None] PASSED [ 83%]
+tests/test_run_graph.py::test_resume_builds_the_same_nodes_as_run PASSED [100%]
+
+============================== 6 passed in 0.87s ===============================

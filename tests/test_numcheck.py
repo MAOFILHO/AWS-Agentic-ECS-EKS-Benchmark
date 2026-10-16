@@ -58,6 +58,34 @@ def test_extract_numbers_skips_digits_inside_names_and_dates():
     assert extract_numbers(text) == ["2026"]
 
 
+@pytest.mark.parametrize(
+    ("text", "invented"),
+    [
+        ("p95 is 120-777 ms", ["777"]),
+        ("p95 is 120–777 ms", ["777"]),
+        ("p95 is 120—777 ms", ["777"]),
+        ("p95 is 120 to 777 ms", ["777"]),
+        ("p95 is 120/777 ms", ["777"]),
+        ("p95 is 120 -777 ms", ["777"]),
+        ("p95 is 120.4-777 ms", ["777"]),
+        ("NAT costs $0.09-$99", ["$99"]),
+        ("costs $5-$99", ["$5", "$99"]),
+        ("parts 1.2k-9k", ["9k"]),
+        ("id 2024-5555-6666", ["5555", "6666"]),
+    ],
+)
+def test_every_number_in_a_range_or_pair_is_checked(text, invented):
+    assert check(text, make_metrics()) == invented
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["p95 on ec2", "eks-ec2 and ecs-fargate", "run smoke-01", "us-east-1", "on 2026-10-15"],
+)
+def test_allowed_label_forms_pass(text):
+    assert check(text, make_metrics()) == []
+
+
 def test_known_numbers_pass():
     text = "ECS on EC2 costs $0.0912 per 1k requests. p95 is 120.4 ms. NAT costs $0.09."
     assert check(text, make_metrics()) == []

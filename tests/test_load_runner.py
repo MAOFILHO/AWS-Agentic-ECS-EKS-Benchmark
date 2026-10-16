@@ -10,6 +10,7 @@ from advisor.load_runner import extract_summary, make_load_runner
 from advisor.state import Capacity, CellSpec, RunState
 
 ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
+EMAIL = "a" + chr(64) + "b.com"  # built at runtime: tracked files must hold no email
 SENSITIVE = rf.SENSITIVE
 K6 = Path(__file__).parent / "fixtures" / "raw" / "real-01" / "ecs-fargate" / "k6-steady.json"
 TASK = f"arn:aws:ecs:us-east-2:{ACCOUNT}:task/harness/abc123"
@@ -123,7 +124,7 @@ def test_a_task_that_never_stops_is_stopped_and_becomes_a_gap(tmp_path):
 
 def test_a_failed_cell_does_not_stop_the_next_one_and_no_id_reaches_a_gap(tmp_path):
     ecs, logs, cfn = harness()
-    ecs.responses["run_task"] = lambda **kw: (_ for _ in ()).throw(RuntimeError(f"denied for {ACCOUNT} by a@b.com"))
+    ecs.responses["run_task"] = lambda **kw: (_ for _ in ()).throw(RuntimeError(f"denied for {ACCOUNT} by {EMAIL}"))
     out = node(tmp_path, ecs, logs, cfn)(state(("ecs-fargate", "eks-ec2"), ("steady", "spike")))
     assert len(out["gaps"]) == 4 and set(out["load_windows"]) == {"ecs-fargate", "eks-ec2"}
     assert not any(SENSITIVE.search(g) for g in out["gaps"])

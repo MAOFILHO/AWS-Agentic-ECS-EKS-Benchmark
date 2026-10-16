@@ -27,7 +27,7 @@ def make_teardown(profile: str | None, root: Path, run: d.Runner | None = None) 
             why = f"teardown: delete_run.py failed for {', '.join(left)}; check the leftovers above"
             print(why, file=sys.stderr)
             return {"status": "leftovers", "errors": [*state.errors, why]}
-        # A failed run stays "failed" after a clean teardown.
-        return {} if state.status == "failed" else {"status": "done"}
+        # A failed or interrupted run keeps that status after a clean teardown.
+        return {} if state.status in ("failed", "interrupted") else {"status": "done"}
 
     return teardown

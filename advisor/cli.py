@@ -7,6 +7,7 @@ then teardown deletes them on every path. Prints no account id.
 import argparse
 import json
 import os
+import signal
 import sys
 import time
 from pathlib import Path
@@ -55,11 +56,51 @@ def parse_args(argv):
     return args
 
 
+class Terminated(KeyboardInterrupt):
+    """SIGTERM, raised the way Ctrl+C is so both take one path."""
+
+
+def raise_terminated(signum, frame):
+    raise Terminated
+
+
+def shielded(node):
+    """Run a node with Ctrl+C and SIGTERM ignored (children inherit that): a stop must not leave stacks up."""
+
+    def run(state):
+        old = {s: signal.signal(s, signal.SIG_IGN) for s in (signal.SIGINT, signal.SIGTERM)}
+        print("teardown is running, please wait", flush=True)
+        try:
+            return node(state)
+        finally:
+            for sig, handler in old.items():
+                signal.signal(sig, handler)
+
+    return run
+
+
 def deploy_nodes(root: Path) -> dict:
     """Deployer and teardown. They read AWS_PROFILE and IMAGE_URI (repo:tag in ECR) from the env."""
     profile = os.environ.get("AWS_PROFILE")
     return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root),
-            "teardown": make_teardown(profile, root)}
+            "teardown": shielded(make_teardown(profile, root))}
+
+
+def invoke(graph, cfg: dict, payload, teardown):
+    """graph.invoke, but an interrupt after the yes runs teardown and records the status "interrupted".
+
+    Before the yes nothing is deployed, so the interrupt passes through.
+    """
+    try:
+        return graph.invoke(payload, cfg)
+    except KeyboardInterrupt:
+        values = graph.get_state(cfg).values
+        if not values.get("approved"):
+            raise
+        print("interrupted: tearing down", flush=True)
+        done = teardown(RunState(**{**values, "status": "interrupted"}))
+        graph.update_state(cfg, {"status": "interrupted", **done}, as_node="teardown")
+        return None
 
 
 def show(values: dict) -> None:
@@ -75,7 +116,7 @@ def show(values: dict) -> None:
         print(f"  error: {error}")
 
 
-def finish(graph, cfg: dict, ask) -> int:
+def finish(graph, cfg: dict, ask, teardown) -> int:
     """Answer a pending gate, if any, then print where the run ended."""
     if graph.get_state(cfg).interrupts:
         show(graph.get_state(cfg).values)
@@ -83,14 +124,24 @@ def finish(graph, cfg: dict, ask) -> int:
             answer = ask("Approve this spend? [y/N] ")
         except EOFError:
             answer = "n"
-        graph.invoke(Command(resume=answer), cfg)
+        invoke(graph, cfg, Command(resume=answer), teardown)
     values = graph.get_state(cfg).values
     approval = f" ({values['approval']})" if values.get("approval") else ""
     print(f"run {values['run_id']}: {values['status']}{approval}")
+    if values["status"] == "interrupted":
+        return 130
     return 1 if values["status"] in ("failed", "leftovers") else 0
 
 
 def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int:
+    old = signal.signal(signal.SIGTERM, raise_terminated)
+    try:
+        return run_command(argv, pricing, ask, root)
+    finally:
+        signal.signal(signal.SIGTERM, old)
+
+
+def run_command(argv, pricing, ask, root) -> int:
     args = parse_args(argv)
     root = root or Path.cwd()
     config = json.loads(RUN_CONFIG.read_text())
@@ -103,8 +154,9 @@ def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int
         with open_checkpointer(create_run_dirs(args.run_id, root)) as saver:
             # The planner already ran, so it needs no pricing client here.
             planner = make_planner(None, PlanConfig(**config["plan"]))
-            graph = build_graph(planner, make_gate(), saver, **deploy_nodes(root))
-            return finish(graph, cfg, ask)
+            nodes = deploy_nodes(root)
+            graph = build_graph(planner, make_gate(), saver, **nodes)
+            return finish(graph, cfg, ask, nodes["teardown"])
 
     region = resolve_region(args.region)
     profiles = [args.profile] if args.profile else list(PROFILES)
@@ -119,8 +171,9 @@ def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int
     paths = create_run_dirs(args.run_id, root)
     with open_checkpointer(paths) as saver:
         planner = make_planner(pricing, PlanConfig(**config["plan"]))
-        graph = build_graph(planner, make_gate(args.auto_approve_under), saver, **deploy_nodes(root))
-        result = graph.invoke(state, cfg)
-        if "__interrupt__" not in result:
+        nodes = deploy_nodes(root)
+        graph = build_graph(planner, make_gate(args.auto_approve_under), saver, **nodes)
+        result = invoke(graph, cfg, state, nodes["teardown"])
+        if result and "__interrupt__" not in result:
             show(result)
-        return finish(graph, cfg, ask)
+        return finish(graph, cfg, ask, nodes["teardown"])

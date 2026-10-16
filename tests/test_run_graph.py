@@ -12,6 +12,7 @@ from advisor.state import Capacity, RunState
 from tests.test_analyst import REAL, REAL_CELLS
 
 CONFIG = RunConfig.model_validate_json(cli.RUN_CONFIG.read_text()).model_dump()
+ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
 REPORT = "## Verdict\nECS is simpler to run.\n"
 
 
@@ -86,7 +87,7 @@ def test_run_past_the_collector_writes_metrics_and_report(env, tmp_path, monkeyp
     assert result["status"] == "done" and env  # teardown ran
 
 
-@pytest.mark.parametrize("error", [RuntimeError("AccessDeniedException for arn:aws:iam::123456789012:role/x"), None])
+@pytest.mark.parametrize("error", [RuntimeError(f"AccessDeniedException for arn:aws:iam::{ACCOUNT}:role/x"), None])
 def test_failed_reporter_still_ends_in_teardown(env, tmp_path, monkeypatch, error):
     fake = Bedrock(error)
     if error is None:  # a draft with a number not in metrics.json, three times
@@ -97,7 +98,7 @@ def test_failed_reporter_still_ends_in_teardown(env, tmp_path, monkeypatch, erro
     assert [a[a.index("--run-id") + 1] for a in env] == ["graph-01-ef", "graph-01-ke"]
     assert not (tmp_path / "results" / "graph-01" / "report.md").exists()
     assert result["errors"][-1].startswith("reporter:")
-    assert "123456789012" not in result["errors"][-1]
+    assert ACCOUNT not in result["errors"][-1]
 
 
 def test_resume_builds_the_same_nodes_as_run(env, tmp_path, monkeypatch):

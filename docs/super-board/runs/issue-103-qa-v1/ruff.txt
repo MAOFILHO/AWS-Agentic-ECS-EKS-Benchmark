@@ -1,0 +1,5 @@
+Using CPython 3.12.14
+Creating virtual environment at: .venv
+Installed 59 packages in 201ms
+All checks passed!
+ruff rc=0

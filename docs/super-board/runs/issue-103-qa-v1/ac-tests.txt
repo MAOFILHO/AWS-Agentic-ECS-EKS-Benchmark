@@ -1,0 +1,12 @@
+tests/test_push_image.py::test_k6_builds_loadtests_from_the_mirrored_k6_base_for_amd64 PASSED [ 12%]
+tests/test_push_image.py::test_cli_k6_mode_uses_the_git_sha_and_the_platform PASSED [ 13%]
+tests/test_push_image.py::test_make_push_k6_runs_the_k6_mode PASSED      [ 15%]
+tests/test_push_image.py::test_k6_dockerfile_takes_the_base_image_argument PASSED [ 16%]
+tests/test_deployer.py::test_harness_stack_gets_the_network_and_the_k6_image PASSED [ 27%]
+tests/test_deployer.py::test_unset_k6_image_fails_before_any_stack_is_created PASSED [ 28%]
+tests/test_delete_run.py::test_one_teardown_call_deletes_the_harness_with_the_cell PASSED [ 42%]
+tests/test_delete_run.py::test_delete_failed_exits_and_prints_failed_resources_masked PASSED [ 43%]
+tests/test_interrupt.py::test_ctrl_c_during_deploy_runs_teardown_and_exits_130 PASSED [ 82%]
+tests/test_interrupt.py::test_ctrl_c_during_the_harness_deploy_tears_down_that_cell PASSED [ 85%]
+tests/test_teardown.py::test_clean_teardown_keeps_a_failed_status PASSED [ 96%]
+============================== 80 passed in 2.49s ==============================

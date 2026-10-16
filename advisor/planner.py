@@ -17,7 +17,7 @@ PROFILES: tuple[Profile, ...] = get_args(Profile)
 class PlanConfig(BaseModel):
     """What the estimate needs. All fields are required: the planner has no hidden defaults."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     instance_type: str
     duration_s: float = Field(gt=0)  # one cell x profile run; runs are counted back to back

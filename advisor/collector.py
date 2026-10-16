@@ -124,7 +124,7 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
 
         def collect_cell(cell: str) -> None:
             out, rid = raw / cell, d.cell_run_id(state.run_id, cell)
-            section(cell, "config.json", lambda: rf.write(out / "config.json", config(cell)))
+            section(cell, "config.json", lambda: rf.write(out / "config.json", config(cell), rf.Config))
             if cell not in state.load_windows:
                 gaps.append(f"{cell}: no load window, so no CloudWatch, ALB or event files")
                 return
@@ -141,7 +141,7 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                 got = series(cw, [metric("cpu", "AWS/ECS", "CPUUtilization", dims, "Average"),
                                   metric("memory", "AWS/ECS", "MemoryUtilization", dims, "Average")], start, end)
                 for name in ("cpu", "memory"):
-                    rf.write(out / f"cloudwatch-{name}.json", got[name])
+                    rf.write(out / f"cloudwatch-{name}.json", got[name], list[rf.Point])
 
             def harness_cpu():
                 harness = stack_outputs(aws("cloudformation", region), f"{rid}-harness")
@@ -150,12 +150,12 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                 got = series(cw, [metric("used", "ECS/ContainerInsights", "CpuUtilized", dims, "Average", ReturnData=False),
                                   metric("reserved", "ECS/ContainerInsights", "CpuReserved", dims, "Average", ReturnData=False),
                                   {"Id": "cpu", "Expression": "100 * used / reserved"}], start, end)
-                rf.write(out / "cloudwatch-harness-cpu.json", got["cpu"])
+                rf.write(out / "cloudwatch-harness-cpu.json", got["cpu"], list[rf.Point])
 
             def alb_files():
-                deploy = json.loads((out / "deploy.json").read_text())
+                deploy = rf.read(out / "deploy.json", rf.DeployStarted)
                 elb = aws("elbv2", region)
-                lb = next(b for b in elb.describe_load_balancers()["LoadBalancers"] if b["DNSName"] == deploy["alb_dns_name"])
+                lb = next(b for b in elb.describe_load_balancers()["LoadBalancers"] if b["DNSName"] == deploy.alb_dns_name)
                 lb_dim = lb["LoadBalancerArn"].split("loadbalancer/", 1)[1]
                 tg = elb.describe_target_groups(LoadBalancerArn=lb["LoadBalancerArn"])["TargetGroups"][0]
                 tg_dim = tg["TargetGroupArn"].rsplit(":", 1)[1]
@@ -165,22 +165,22 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                                   metric("time", "AWS/ApplicationELB", "TargetResponseTime", dims, "Average")], start, end,
                              optional=("e5xx",))
                 rf.write(out / "alb.json", {"request_count": got["count"], "http_5xx": got["e5xx"],
-                                            "response_time": got["time"]})
+                                            "response_time": got["time"]}, rf.Alb)
                 # The ALB API has no transition time: the first minute with a healthy target is the closest record.
-                since = datetime.fromisoformat(deploy["stack_create_start"])
+                since = deploy.stack_create_start
                 up = series(cw, [metric("up", "AWS/ApplicationELB", "HealthyHostCount",
                                         {**dims, "TargetGroup": tg_dim}, "Maximum")], since, end + timedelta(minutes=5))
                 healthy = next((p["timestamp"] for p in up["up"] if p["value"] >= 1), None)
                 if healthy is None:
                     raise LookupError("no healthy target found for the deploy.json target_healthy field")
-                rf.write(out / "deploy.json", {**deploy, "target_healthy": healthy})
+                rf.write(out / "deploy.json", {**deploy.model_dump(mode="json"), "target_healthy": healthy}, rf.Deploy)
 
             def events():
                 if ecs:
                     found = ecs_events(aws, region, cell_stack["ClusterName"], cell_stack["ServiceName"], start)
                 else:
                     found = eks_events(run or d.subprocess_runner, env, cell_stack["ClusterName"], region, start)
-                rf.write(out / "events.json", sorted(found, key=lambda e: e["timestamp"]))
+                rf.write(out / "events.json", sorted(found, key=lambda e: e["timestamp"]), list[rf.Event])
 
             if ecs:
                 section(cell, "cloudwatch-cpu/memory", service_metrics)

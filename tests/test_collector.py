@@ -80,7 +80,7 @@ def collect(tmp_path, aws=None, run=kubectl, **changes):
     for cell in ("ecs-fargate", "eks-ec2"):
         rf.write(tmp_path / "results" / "col-01" / "raw" / cell / "deploy.json", {
             "stack_create_start": "2026-10-14T19:50:00+00:00", "stack_create_end": "2026-10-14T19:53:30+00:00",
-            "alb_dns_name": ALB})
+            "alb_dns_name": ALB}, rf.DeployStarted)
     aws = aws or clients()
     out = make_collector(aws_of(**aws), "sso", tmp_path, run=run)(state(**changes))
     return out, tmp_path / "results" / "col-01" / "raw", aws

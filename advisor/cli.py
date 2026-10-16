@@ -5,7 +5,6 @@ loads it with k6, collects the raw files, then teardown deletes them on every pa
 """
 
 import argparse
-import json
 import os
 import signal
 import sys
@@ -22,6 +21,7 @@ from advisor.gate import make_gate
 from advisor.graph import build_graph
 from advisor.load_runner import make_load_runner
 from advisor.planner import DEFAULT_CELLS, PROFILES, PlanConfig, make_planner
+from advisor.schemas import RunConfig
 from advisor.state import Capacity, CellName, CellSpec, RunState
 from advisor.store import create_run_dirs, open_checkpointer
 from advisor.teardown import make_teardown
@@ -152,7 +152,7 @@ def main(argv=None, *, pricing=None, ask=input, root: Path | None = None) -> int
 def run_command(argv, pricing, ask, root) -> int:
     args = parse_args(argv)
     root = root or Path.cwd()
-    config = json.loads(RUN_CONFIG.read_text())
+    config = RunConfig.model_validate_json(RUN_CONFIG.read_text()).model_dump()
     cfg = {"configurable": {"thread_id": args.run_id}}
 
     if args.command == "resume":

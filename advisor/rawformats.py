@@ -1,6 +1,6 @@
 """Raw file contract: what the collector writes under results/<run-id>/raw/<cell>/.
 
-Every file is JSON. Readers validate on read and raise RawFormatError on a bad file,
+Every file is JSON. `read` and `write` validate against the file's model and raise RawFormatError on bad data,
 including a NaN or Infinity number. The analyst turns a missing or bad file into a gap, never into a zero.
 
 - `k6-<profile>.json`: the k6 `--summary-export` JSON. Read: `metrics.http_req_duration`
@@ -15,7 +15,7 @@ including a NaN or Infinity number. The analyst turns a missing or bad file into
   `alarm` = autoscaling alarm or HPA decision, `scheduled` = task or pod placed,
   `healthy` = replica passed its health check (`/readyz` 200 or ALB target healthy).
 - `deploy.json`: `{"stack_create_start", "stack_create_end", "target_healthy"}`, ISO 8601, and
-  `alb_dns_name`. The deployer writes all but `target_healthy`, which the collector adds.
+  `alb_dns_name`. The deployer writes all but `target_healthy` (DeployStarted), which the collector adds.
 - `config.json`: `{"config_lines": int, "moving_parts": int}`.
 - `cost.json`: `{"load_usd": number, "idle_usd_per_hour": number}`, from the cost model.
 """
@@ -87,11 +87,16 @@ class Event(Strict):
     message: str
 
 
-class Deploy(Strict):
+class DeployStarted(Strict):
+    """deploy.json as the deployer writes it, before the collector adds target_healthy."""
+
     stack_create_start: AwareDatetime
     stack_create_end: AwareDatetime
-    target_healthy: AwareDatetime
     alb_dns_name: str | None = None
+
+
+class Deploy(DeployStarted):
+    target_healthy: AwareDatetime
 
 
 class Config(Strict):
@@ -127,6 +132,11 @@ def scrub(value):
     return value
 
 
-def write(path: Path, data) -> None:
+def write(path: Path, data, shape) -> None:
+    """Write one raw file. Data that fails `shape` raises RawFormatError and nothing is written."""
+    try:
+        TypeAdapter(shape).validate_python(data)
+    except ValidationError as err:
+        raise RawFormatError(f"{path.name}: {err}") from err
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(scrub(data), indent=2) + "\n")

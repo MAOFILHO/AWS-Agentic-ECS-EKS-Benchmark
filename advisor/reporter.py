@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Protocol
 
 from advisor.numcheck import ACCOUNT_ID_RE, EMAIL_RE, check
-from advisor.schemas import Metrics
+from advisor.schemas import Metrics, read_metrics
 from advisor.state import RunState
 from advisor.store import create_run_dirs
 
@@ -64,7 +64,7 @@ def _redact(offender: str) -> str:
 def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
     def reporter(state: RunState) -> dict:
         paths = create_run_dirs(state.run_id, root)
-        metrics = Metrics.model_validate_json(paths.metrics.read_text())
+        metrics = read_metrics(paths.metrics)
         prompt = build_prompt(metrics)
         for _ in range(MAX_TRIES):
             draft = llm.complete(prompt)

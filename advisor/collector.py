@@ -1,0 +1,185 @@
+"""Collector node (SPEC section 10): after the load, write the raw files the analyst reads.
+
+Reads only: it never changes AWS state. Every file goes through rf.write, which masks account ids
+and emails. A section that fails becomes a gap in state.gaps; its file is not written, so the analyst
+reports the gap too. Needs the harness stack to output ClusterName and TaskDefinitionArn, and Container
+Insights on the harness cluster (the harness CPU percent is CpuUtilized over CpuReserved). Service CPU and
+memory come from the AWS/ECS namespace, so only ECS cells get cloudwatch-cpu.json and cloudwatch-memory.json.
+"""
+
+import json
+import tempfile
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from advisor import deployer as d
+from advisor import rawformats as rf
+from advisor.load_runner import Aws, stack_outputs
+from advisor.state import RunState
+from advisor.store import create_run_dirs
+
+ECS_PARTS = ("cluster", "service", "ALB", "autoscaling policy")
+EKS_PARTS = ("cluster", "node group", "controller", "add-ons")
+HELM = "infra/helm/workload"
+
+
+def config_files(cell: str) -> list[str]:
+    if cell.startswith("ecs-"):
+        return ["infra/cfn/30-ecs.yaml"]
+    return ["infra/cfn/40-eks.yaml", "infra/cfn/41-eks-lbc-iam.yaml", f"{HELM}/values.yaml",
+            f"{HELM}/values-{cell.removeprefix('eks-')}.yaml"]
+
+
+def config(cell: str) -> dict:
+    lines = sum(len((d.ROOT / f).read_text().splitlines()) for f in config_files(cell))
+    return {"config_lines": lines, "moving_parts": len(ECS_PARTS if cell.startswith("ecs-") else EKS_PARTS)}
+
+
+def metric(id: str, namespace: str, name: str, dims: dict, stat: str, **extra) -> dict:
+    dimensions = [{"Name": k, "Value": v} for k, v in dims.items()]
+    stat_spec = {"Metric": {"Namespace": namespace, "MetricName": name, "Dimensions": dimensions},
+                 "Period": 60, "Stat": stat}
+    return {"Id": id, "MetricStat": stat_spec, **extra}
+
+
+def series(cw, queries: list[dict], start: datetime, end: datetime) -> dict[str, list[dict]]:
+    """One get_metric_data call -> {query id: [{"timestamp", "value"}]}, oldest first."""
+    got = cw.get_metric_data(MetricDataQueries=queries, StartTime=start, EndTime=end, ScanBy="TimestampAscending")
+    return {r["Id"]: [{"timestamp": t.isoformat(), "value": v} for t, v in zip(r["Timestamps"], r["Values"])]
+            for r in got["MetricDataResults"]}
+
+
+def event(when: datetime, kind: str, message: str) -> dict:
+    return {"timestamp": when.isoformat(), "kind": kind, "message": message}
+
+
+def ecs_events(aws: Aws, region: str, cluster: str, service: str, start: datetime) -> list[dict]:
+    """Service events (tasks started, steady state) plus the autoscaling alarms and scaling activities."""
+    resource = f"service/{cluster}/{service}"
+    found = []
+    for e in aws("ecs", region).describe_services(cluster=cluster, services=[service])["services"][0]["events"]:
+        kind = "scheduled" if "has started" in e["message"] else "healthy" if "steady state" in e["message"] else None
+        if kind and e["createdAt"] >= start:
+            found.append(event(e["createdAt"], kind, e["message"]))
+    history = aws("cloudwatch", region).describe_alarm_history(
+        AlarmTypes=["MetricAlarm"], HistoryItemType="StateUpdate", StartDate=start)["AlarmHistoryItems"]
+    found += [event(h["Timestamp"], "alarm", h["HistorySummary"]) for h in history
+              if resource in h["AlarmName"] and h["HistorySummary"].endswith("to ALARM")]
+    activities = aws("application-autoscaling", region).describe_scaling_activities(
+        ServiceNamespace="ecs", ResourceId=resource)["ScalingActivities"]
+    return found + [event(a["StartTime"], "alarm", a["Description"]) for a in activities if a["StartTime"] >= start]
+
+
+def kubectl(run: d.Runner, env: dict, kubeconfig: str, *args: str) -> dict:
+    code, out = run(["kubectl", *args, "-o", "json", "--kubeconfig", kubeconfig], env)
+    if code:
+        raise RuntimeError(f"kubectl {args[0]} {args[1]} exited {code}")
+    return json.loads(out)
+
+
+def eks_events(run: d.Runner, env: dict, cluster: str, region: str, start: datetime) -> list[dict]:
+    """HPA scale-up decisions and pod placements from `kubectl get events`; a pod's Ready time from `get pods`."""
+    found = []
+    with tempfile.TemporaryDirectory() as tmp:
+        kubeconfig = f"{tmp}/config"  # never ~/.kube/config
+        code, _ = run(["aws", "eks", "update-kubeconfig", "--name", cluster, "--region", region,
+                       "--kubeconfig", kubeconfig], env)
+        if code:
+            raise RuntimeError(f"update-kubeconfig exited {code}")
+        for e in kubectl(run, env, kubeconfig, "get", "events")["items"]:
+            when = datetime.fromisoformat(e.get("lastTimestamp") or e["eventTime"])
+            what, reason = e["involvedObject"]["kind"], e["reason"]
+            if when >= start and what == "HorizontalPodAutoscaler" and "above target" in e["message"]:
+                found.append(event(when, "alarm", e["message"]))
+            elif when >= start and what == "Pod" and reason == "Scheduled":
+                found.append(event(when, "scheduled", e["message"]))
+        for pod in kubectl(run, env, kubeconfig, "get", "pods")["items"]:
+            for c in pod["status"].get("conditions", []):
+                if c["type"] == "Ready" and c["status"] == "True" and datetime.fromisoformat(c["lastTransitionTime"]) >= start:
+                    found.append(event(datetime.fromisoformat(c["lastTransitionTime"]), "healthy",
+                                       f"pod {pod['metadata']['name']} Ready"))
+    return found
+
+
+def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | None = None):
+    def collector(state: RunState) -> dict:
+        region, raw, gaps = state.region, create_run_dirs(state.run_id, root).raw, []
+        env = {"AWS_PROFILE": profile} if profile else {}
+
+        def section(cell: str, name: str, fn: Callable[[], None]) -> None:
+            try:
+                fn()
+            except Exception as err:  # noqa: BLE001 - one failed section is a gap, the others still run
+                gaps.append(rf.scrub(f"{cell}/{name}: {type(err).__name__}: {err}"))
+                print(gaps[-1], flush=True)
+
+        def collect_cell(cell: str) -> None:
+            out, rid = raw / cell, d.cell_run_id(state.run_id, cell)
+            section(cell, "config.json", lambda: rf.write(out / "config.json", config(cell)))
+            if cell not in state.load_windows:
+                gaps.append(f"{cell}: no load window, so no CloudWatch, ALB or event files")
+                return
+            start, end = (datetime.fromisoformat(t) for t in state.load_windows[cell])
+            cell_stack: dict[str, str] = {}
+            section(cell, "stack outputs", lambda: cell_stack.update(stack_outputs(aws("cloudformation", region), f"{rid}-{cell}")))
+            if not cell_stack:
+                return
+            cw = aws("cloudwatch", region)  # a client is made, nothing is called yet
+            ecs = cell.startswith("ecs-")
+
+            def service_metrics():
+                dims = {"ClusterName": cell_stack["ClusterName"], "ServiceName": cell_stack["ServiceName"]}
+                got = series(cw, [metric("cpu", "AWS/ECS", "CPUUtilization", dims, "Average"),
+                                  metric("memory", "AWS/ECS", "MemoryUtilization", dims, "Average")], start, end)
+                for name in ("cpu", "memory"):
+                    rf.write(out / f"cloudwatch-{name}.json", got[name])
+
+            def harness_cpu():
+                harness = stack_outputs(aws("cloudformation", region), f"{rid}-harness")
+                family = harness["TaskDefinitionArn"].rsplit("/", 1)[1].rsplit(":", 1)[0]
+                dims = {"ClusterName": harness["ClusterName"], "TaskDefinitionFamily": family}
+                got = series(cw, [metric("used", "ECS/ContainerInsights", "CpuUtilized", dims, "Average", ReturnData=False),
+                                  metric("reserved", "ECS/ContainerInsights", "CpuReserved", dims, "Average", ReturnData=False),
+                                  {"Id": "cpu", "Expression": "100 * used / reserved"}], start, end)
+                rf.write(out / "cloudwatch-harness-cpu.json", got["cpu"])
+
+            def alb_files():
+                deploy = json.loads((out / "deploy.json").read_text())
+                elb = aws("elbv2", region)
+                lb = next(b for b in elb.describe_load_balancers()["LoadBalancers"] if b["DNSName"] == deploy["alb_dns_name"])
+                lb_dim = lb["LoadBalancerArn"].split("loadbalancer/", 1)[1]
+                tg = elb.describe_target_groups(LoadBalancerArn=lb["LoadBalancerArn"])["TargetGroups"][0]
+                tg_dim = tg["TargetGroupArn"].rsplit(":", 1)[1]
+                dims = {"LoadBalancer": lb_dim}
+                got = series(cw, [metric("count", "AWS/ApplicationELB", "RequestCount", dims, "Sum"),
+                                  metric("e5xx", "AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", dims, "Sum"),
+                                  metric("time", "AWS/ApplicationELB", "TargetResponseTime", dims, "Average")], start, end)
+                rf.write(out / "alb.json", {"request_count": got["count"], "http_5xx": got["e5xx"],
+                                            "response_time": got["time"]})
+                # The ALB API has no transition time: the first minute with a healthy target is the closest record.
+                since = datetime.fromisoformat(deploy["stack_create_start"])
+                up = series(cw, [metric("up", "AWS/ApplicationELB", "HealthyHostCount",
+                                        {**dims, "TargetGroup": tg_dim}, "Maximum")], since, end + timedelta(minutes=5))
+                healthy = next((p["timestamp"] for p in up["up"] if p["value"] >= 1), None)
+                if healthy is None:
+                    raise LookupError("no healthy target found for the deploy.json target_healthy field")
+                rf.write(out / "deploy.json", {**deploy, "target_healthy": healthy})
+
+            def events():
+                if ecs:
+                    found = ecs_events(aws, region, cell_stack["ClusterName"], cell_stack["ServiceName"], start)
+                else:
+                    found = eks_events(run or d.subprocess_runner, env, cell_stack["ClusterName"], region, start)
+                rf.write(out / "events.json", sorted(found, key=lambda e: e["timestamp"]))
+
+            if ecs:
+                section(cell, "cloudwatch-cpu/memory", service_metrics)
+            section(cell, "cloudwatch-harness-cpu.json", harness_cpu)
+            section(cell, "alb.json + deploy.json", alb_files)
+            section(cell, "events.json", events)
+        for cell in d.cells_of(state):
+            collect_cell(cell)
+        return {"status": "collected", "gaps": [*state.gaps, *gaps]}
+
+    return collector

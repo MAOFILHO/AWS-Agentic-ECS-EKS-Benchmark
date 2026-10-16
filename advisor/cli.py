@@ -1,7 +1,7 @@
 """Command line: `python -m advisor run ...` and `python -m advisor resume <run-id>`.
 
 Prints the estimate and the run matrix, then asks y/N before any spend. A yes deploys every cell,
-loads it with k6, then teardown deletes them on every path. Prints no account id.
+loads it with k6, collects the raw files, then teardown deletes them on every path. Prints no account id.
 """
 
 import argparse
@@ -16,6 +16,7 @@ from typing import get_args
 import boto3
 from langgraph.types import Command
 
+from advisor.collector import make_collector
 from advisor.deployer import make_deployer
 from advisor.gate import make_gate
 from advisor.graph import build_graph
@@ -89,6 +90,7 @@ def deploy_nodes(root: Path, config: dict) -> dict:
 
     return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root),
             "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
+            "collector": make_collector(aws, profile, root),
             "teardown": shielded(make_teardown(profile, root))}
 
 

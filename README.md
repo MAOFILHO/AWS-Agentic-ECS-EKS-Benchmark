@@ -20,17 +20,22 @@ returned an error. Read the limits below before you generalise it.
 Copied from [`results/sample/report.md`](results/sample/report.md), which the reporter wrote from
 [`results/sample/metrics.json`](results/sample/metrics.json).
 
-| Metric                            | ECS Fargate | EKS EC2 | ECS EC2 |
-|-----------------------------------|-------------|---------|---------|
-| p50 latency (ms)                  | 3.878       | 5.228   | 5.279   |
-| p95 latency (ms)                  | 4.317       | 7.796   | 6.434   |
-| p99 latency (ms)                  | 6.815       | 16.118  | 12.580  |
-| Error rate                        | 0.000       | 0.000   | 0.000   |
-| Deploy time (s)                   | 371.24      | 1127.23 | 471.29  |
-| Config lines                      | 436.0       | 534.0   | 436.0   |
-| Moving parts                      | 4.0         | 4.0     | 4.0     |
-| Idle cost (USD/h)                 | 0.0348425   | 0.1641  | 0.0641  |
-| Cost per thousand requests (USD)  | 0.00192     | 0.00270 | 0.00211 |
+| Metric              | ECS Fargate | EKS EC2   | ECS EC2   |
+|---------------------|-------------|-----------|-----------|
+| P50 latency (ms)    | 3.88        | 5.23      | 5.28      |
+| P95 latency (ms)    | 4.32        | 7.80      | 6.43      |
+| P99 latency (ms)    | 6.82        | 16.12     | 12.58     |
+| Error rate          | no errors   | no errors | no errors |
+| Deploy time (s)     | 371.24      | 1127.23   | 471.29    |
+| Config lines        | 436.0       | 534.0     | 436.0     |
+| Moving parts        | 4.0         | 4.0       | 4.0       |
+| Idle cost (USD/h)   | 0.03        | 0.16      | 0.06      |
+| USD per 1k requests | 0.0019      | 0.0027    | 0.0021    |
+
+The report's own verdict: ECS Fargate is the pick for a fleet that needs low latency at low cost;
+EKS EC2 suits a team that wants Kubernetes control and accepts a slower deploy and a higher idle
+cost. The report also lists the shared costs (NAT gateway, NAT data, VPC endpoints, harness),
+broken down under [Cost of this run](#cost-of-this-run).
 
 Scale out and cold start were measured on ECS EC2 only (58.683 s and 56.58 s); the other cells
 logged no alarm-to-healthy or scheduled-to-healthy pair, and `metrics.json` lists those as gaps.

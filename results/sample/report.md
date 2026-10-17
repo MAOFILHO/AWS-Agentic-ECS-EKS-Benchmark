@@ -1,32 +1,34 @@
-# ECS vs EKS for Hosting an AI Agent Fleet: A Verdict
+# ECS vs EKS for Hosting an AI Agent Fleet
+
+## Verdict
+When deciding between Amazon Elastic Container Service (ECS) and Amazon Elastic Kubernetes Service (EKS) for hosting an AI agent fleet, both platforms offer advantages. ECS-Fargate provides a serverless, fully managed container service with lower latency and costs, whereas EKS-EC2 offers a more flexible Kubernetes environment but at a higher idle cost and longer deployment time.
 
 ## Comparison Table
 
-| Metric                   | ECS Fargate (USD/h) | EKS EC2 (USD/h) | ECS EC2 (USD/h) |
-|--------------------------|---------------------|-----------------|-----------------|
-| P50 Response Time (ms)   | 3.878               | 5.228           | 5.279           |
-| P95 Response Time (ms)    | 4.317               | 7.796           | 6.434           |
-| P99 Response Time (ms)    | 6.815               | 16.118          | 12.580          |
-| Error Rate               | 0.000               | 0.000           | 0.000           |
-| Deploy Time (s)          | 371.24              | 1127.23         | 471.29          |
-| Config Lines             | 436.0               | 534.0           | 436.0           |
-| Moving Parts             | 4.0                 | 4.0             | 4.0             |
-| Idle Cost (USD/h)        | 0.0348425           | 0.1641          | 0.0641          |
-| Cost per 1k Requests (USD)| 0.0019232632145      | 0.00270         | 0.00211         |
+| Metric                          | ECS-Fargate | EKS-EC2 | ECS-EC2 |
+|---------------------------------|-------------|---------|----------|
+| P50 latency (ms)                | 3.88         | 5.23    | 5.28     |
+| P95 latency (ms)                | 4.32         | 7.80    | 6.43     |
+| P99 latency (ms)                | 6.82         | 16.12   | 12.58    |
+| Error rate                      | no errors    | no errors| no errors|
+| Deploy time (s)                 | 371.24       | 1127.23 | 471.29   |
+| Config lines                    | 436.0        | 534.0   | 436.0    |
+| Moving parts                    | 4.0          | 4.0     | 4.0      |
+| Idle cost (USD/h)               | 0.03        | 0.16    | 0.06     |
+| USD per 1k requests              | 0.0019       | 0.0027  | 0.0021   |
 
 ## Trade-offs
 
-1. **Performance**: ECS Fargate shows better response times (P50, P95, P99) compared to EKS EC2 and ECS EC2.
-2. **Cost**: ECS Fargate has the lowest idle cost and cost per 1k requests.
-3. **Deployment Complexity**: EKS EC2 requires more configuration lines and has a longer deploy time.
-4. **Shared Costs**: No errors in any cell and shared costs are:
-   - Shared NAT Gateway: 0.02441 USD
-   - Shared NAT Data: 0.045 USD
-   - Shared VPC Endpoints: 0.02712 USD
-   - Shared Harness VCPU: 0.022 USD
-   - Shared Harness Memory: 0.00482 USD
+1. **Cost vs Performance:** ECS-Fargate offers lower idle costs and better performance (lower latencies) compared to EKS-EC2.
+2. **Deployment Complexity:** EKS-EC2 requires more configuration lines and has a longer deployment time compared to ECS-Fargate.
+3. **Resource Management:** ECS-Fargate abstracts the underlying infrastructure, making it easier to manage but less flexible. EKS-EC2 offers more control over the Kubernetes environment but requires more expertise.
 
 ## Recommendation
+For an AI agent fleet requiring low latency and cost-effective solutions, ECS-Fargate is recommended. It offers better performance metrics and lower idle costs. For teams needing more control over the Kubernetes environment and are willing to invest in longer deployment times and higher idle costs, EKS-EC2 is a suitable choice.
 
-For an AI agent fleet that prioritizes performance and cost-efficiency, **ECS Fargate** is recommended. It offers better response times, lower idle costs, and more economical per-request pricing. However, the choice should also consider the operational overhead and deployment time, where EKS EC2 is more complex but potentially offers benefits in specific use cases.
-
+## Shared Costs
+- Shared nat gateway: 0.024 USD
+- Shared nat data: 0.045 USD
+- Shared vpc endpoints: 0.027 USD
+- Shared harness vcpu: 0.022 USD
+- Shared harness memory: 0.005 USD

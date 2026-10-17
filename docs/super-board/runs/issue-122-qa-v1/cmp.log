@@ -1,0 +1,1 @@
+cmp: results/sample/report.md == report-new.md (identical)

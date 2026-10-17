@@ -73,3 +73,13 @@ def test_published_files_hold_no_alb_host_or_email():
         if b"\0" not in data and bad.search(data):
             hits.append(name.decode())
     assert hits == []
+
+
+def test_tables_put_units_on_row_labels_only():
+    # Issue #122: the report and README table carried "(USD/h)" on every column header.
+    for path in (README, SAMPLE / "report.md"):
+        text = path.read_text()
+        header = re.search(r"^\| *Metric *\|.*$", text, re.MULTILINE)
+        assert header, path.name
+        assert "(" not in header.group(0), path.name
+    assert re.search(r"^## Verdict\n+\S", (SAMPLE / "report.md").read_text(), re.MULTILINE)

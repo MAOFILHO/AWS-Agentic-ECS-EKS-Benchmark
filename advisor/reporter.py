@@ -2,11 +2,12 @@
 
 The reporter cannot compute new figures, such as a percentage difference. A derived figure must
 already be in metrics.json: add the field to the analyst first. Every draft goes through
-`numcheck.check`; offenders go back to the LLM, at most 3 tries in all. After the third failed
+`numcheck.check` and `unsupported_claims`; offenders go back to the LLM, at most 3 tries in all. After the third failed
 try the step fails, metrics.json stays, and no report is written.
 """
 
 import os
+import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Protocol
@@ -18,6 +19,10 @@ from advisor.store import create_run_dirs
 
 DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-micro-v1:0"
 MAX_TRIES = 3
+# "higher error rate", "error rate is worse": a comparison word within five words of "error", same sentence.
+_NEAR = r"(?:[^\w.!?\n]+\w+){0,5}?[^\w.!?\n]+"
+_MORE = r"(?:higher|lower|worse|more)"
+ERROR_CLAIM_RE = re.compile(rf"\b{_MORE}\b{_NEAR}error\w*|\berror\w*{_NEAR}{_MORE}\b", re.IGNORECASE)
 
 
 class LLM(Protocol):
@@ -44,6 +49,20 @@ class BedrockLLM:
 
 
 def build_prompt(metrics: Metrics) -> str:
+    profiles = sorted({f.profile for f in metrics.figures if f.profile})
+    rules = [f"Profiles that ran: {', '.join(profiles) or 'none'}. Name no other profile."]
+    if set(profiles) <= {"steady"}:
+        rules.append(
+            "The steady profile measures no scaling: make no claim about scaling, scale-out or cold start."
+        )
+    error_rates = [f.value for f in metrics.figures if f.name == "error_rate"]
+    if error_rates and not any(error_rates):
+        rules.append('Every error rate is zero: write "no errors in any cell" and compare no error rates.')
+    if metrics.shared_costs:
+        rules.append(
+            "Shared costs, not part of any cell: list each on its own line under a shared cost heading.\n"
+            + "\n".join(f"- {c.item}: {c.usd} USD" for c in metrics.shared_costs)
+        )
     return (
         "Write a short Markdown report on ECS vs EKS for hosting an AI agent fleet: a verdict, "
         "a comparison table, the trade-offs, and a recommendation.\n"
@@ -51,8 +70,18 @@ def build_prompt(metrics: Metrics) -> str:
         "figures: no percentage difference, ratio, sum or average that is not already there.\n"
         "Write no other numbers: no dates, years, counts or versions. Number list items 1 to 4 "
         "only, at the start of a line.\n"
-        f"metrics.json:\n{metrics.model_dump_json(indent=2)}\n"
+        "Make no claim the figures do not show.\n"
+        + "".join(f"{rule}\n" for rule in rules)
+        + f"metrics.json:\n{metrics.model_dump_json(indent=2)}\n"
     )
+
+
+def unsupported_claims(text: str, metrics: Metrics) -> list[str]:
+    """Comparative error claims ("higher error rates") when every error_rate figure is the same."""
+    error_rates = {f.value for f in metrics.figures if f.name == "error_rate"}
+    if len(error_rates) != 1:
+        return []
+    return [m.group(0) for m in ERROR_CLAIM_RE.finditer(text)]
 
 
 def _redact(offender: str) -> str:
@@ -69,17 +98,24 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
         for _ in range(MAX_TRIES):
             draft = llm.complete(prompt)
             offenders = check(draft, metrics)
-            if not offenders:
+            claims = unsupported_claims(draft, metrics)
+            if not offenders and not claims:
                 paths.report.write_text(draft)
                 return {"status": "reported"}
+            problems = []
+            if offenders:
+                problems.append(f"These numbers are not in metrics.json: {', '.join(offenders)}.")
+            if claims:
+                problems.append(
+                    f"Every error rate is the same, so these claims are false: {'; '.join(claims)}."
+                )
             prompt = (
                 f"{build_prompt(metrics)}\nYour last draft:\n{draft}\n"
-                f"These numbers are not in metrics.json: {', '.join(offenders)}. "
-                "Rewrite the report without them."
+                f"{' '.join(problems)} Rewrite the report without them."
             )
         error = (
-            f"reporter: numbers not in metrics.json after {MAX_TRIES} tries: "
-            + ", ".join(map(_redact, offenders))
+            f"reporter: numbers not in metrics.json or unsupported claims after {MAX_TRIES} tries: "
+            + ", ".join([*map(_redact, offenders), *claims])
         )
         return {"status": "report_failed", "errors": [*state.errors, error]}
 

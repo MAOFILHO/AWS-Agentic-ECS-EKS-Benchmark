@@ -18,6 +18,8 @@ including a NaN or Infinity number. The analyst turns a missing or bad file into
   `alb_dns_name`. The deployer writes all but `target_healthy` (DeployStarted), which the collector adds.
 - `config.json`: `{"config_lines": int, "moving_parts": int}`.
 - `cost.json`: `{"load_usd": number, "idle_usd_per_hour": number}`, from the cost model.
+- `shared-cost.json` (in raw/, not in a cell): a list of `{"item": str, "usd": number}`, the run's shared
+  lines (NAT gateway, VPC endpoints, harness). They are never added into a cell's `load_usd`.
 """
 
 import json
@@ -107,6 +109,11 @@ class Config(Strict):
 class Cost(Strict):
     load_usd: float = Field(ge=0)
     idle_usd_per_hour: float = Field(ge=0)
+
+
+class SharedCostLine(Strict):
+    item: str
+    usd: float = Field(ge=0)
 
 
 def read(path: Path, shape):

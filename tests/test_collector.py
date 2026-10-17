@@ -3,19 +3,28 @@
 import json
 from datetime import UTC, datetime
 
+import pytest
 from test_load_runner import ACCOUNT, HARNESS, SENSITIVE, Client, aws_of
 
 from advisor import deployer as d
 from advisor import rawformats as rf
 from advisor.analyst import analyse
 from advisor.collector import make_collector
+from advisor.cost import CellUsage, SharedUsage
+from advisor.planner import PlanConfig
 from advisor.state import Capacity, CellSpec, RunState
 
 ALB = "alb.example.com"
 ARN = f"arn:aws:elasticloadbalancing:us-east-2:{ACCOUNT}"
 WINDOWS = {"ecs-fargate": ["2026-10-14T20:05:00+00:00", "2026-10-14T20:15:00+00:00"],
            "eks-ec2": ["2026-10-14T21:50:00+00:00", "2026-10-14T22:00:00+00:00"]}
-READERS = {"alb.json": rf.Alb, "events.json": list[rf.Event], "deploy.json": rf.Deploy, "config.json": rf.Config}
+READERS = {"alb.json": rf.Alb, "events.json": list[rf.Event], "deploy.json": rf.Deploy, "config.json": rf.Config,
+           "cost.json": rf.Cost, "shared-cost.json": list[rf.SharedCostLine]}
+PRICES = {"eks_cluster_hour": 0.10, "fargate_vcpu_hour": 0.04, "fargate_gb_hour": 0.004, "ec2_instance_hour": 0.0416,
+          "alb_hour": 0.0225, "alb_lcu_hour": 0.008, "cw_ingest_gb": 0.5, "nat_hour": 0.045, "nat_gb": 0.045,
+          "vpce_hour": 0.01}
+PLAN = PlanConfig(instance_type="t3.medium", duration_s=600, cell=CellUsage(replicas=2, nodes=1, lcus=1, log_gb=0.1),
+                  shared=SharedUsage(nat_gb=1, endpoints=5, harness_vcpu=1, harness_memory_mib=2048, harness_tasks=1))
 
 
 def at(h, m, s=0):
@@ -72,7 +81,7 @@ def kubectl(argv, env):
 
 def state(**changes):
     cells = [CellSpec(name=c, profile="steady") for c in ("ecs-fargate", "eks-ec2")]
-    return RunState(run_id="col-01", cells=cells, region="us-east-2", **{"load_windows": WINDOWS, **changes},
+    return RunState(run_id="col-01", cells=cells, region="us-east-2", **{"load_windows": WINDOWS, "prices": PRICES, **changes},
                     capacity=Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4))
 
 
@@ -83,7 +92,7 @@ def collect(tmp_path, aws=None, run=kubectl, sleeps=None, **changes):
             "alb_dns_name": ALB}, rf.DeployStarted)
     aws = aws or clients()
     out = make_collector(aws_of(**aws), "sso", tmp_path, run=run,
-                         sleep=[].append if sleeps is None else sleeps.append)(state(**changes))
+                         sleep=[].append if sleeps is None else sleeps.append, plan=PLAN)(state(**changes))
     return out, tmp_path / "results" / "col-01" / "raw", aws
 
 
@@ -139,7 +148,7 @@ def test_a_failed_section_is_a_gap_and_the_others_still_run(tmp_path):
 
 def test_a_cell_without_a_load_window_is_a_gap_not_empty_files(tmp_path):
     out, raw, _ = collect(tmp_path, load_windows={})
-    assert len(out["gaps"]) == 2 and all("no load window" in g for g in out["gaps"])
+    assert len(out["gaps"]) == 3 and all("no load window" in g for g in out["gaps"])
     assert not (raw / "ecs-fargate" / "events.json").exists() and (raw / "ecs-fargate" / "config.json").is_file()
 
 
@@ -200,3 +209,52 @@ def test_a_harness_cpu_series_that_stays_empty_is_one_gap_after_the_waits(tmp_pa
     assert [g.split(":")[0] for g in out["gaps"] if "harness-cpu" in g] == [
         "ecs-fargate/cloudwatch-harness-cpu.json", "eks-ec2/cloudwatch-harness-cpu.json"]
     assert (raw / "ecs-fargate" / "alb.json").is_file() and len(sleeps) == 4
+
+
+def cost_of(raw, cell):
+    return json.loads((raw / cell / "cost.json").read_text())
+
+
+def test_cost_json_for_an_ecs_and_an_eks_cell(tmp_path):
+    out, raw, _ = collect(tmp_path)
+    assert out["gaps"] == []
+    # 10 min load: 2 replicas x (0.25 vCPU x 0.04 + 0.5 GB x 0.004) + ALB hour + 1 LCU, over 1/6 h, + 0.1 GB logs x 0.5.
+    ecs = cost_of(raw, "ecs-fargate")
+    assert ecs["load_usd"] == pytest.approx((2 * (0.25 * 0.04 + 0.5 * 0.004) + 0.0225 + 0.008) / 6 + 0.05)
+    assert ecs["idle_usd_per_hour"] == pytest.approx(0.25 * 0.04 + 0.5 * 0.004 + 0.0225)  # min_replicas=1, no LCU, no logs
+    eks = cost_of(raw, "eks-ec2")
+    assert eks["idle_usd_per_hour"] == pytest.approx(0.10 + 0.0416 + 0.0225)  # control plane + 1 node + ALB
+    assert eks["load_usd"] == pytest.approx((0.10 + 0.0416 + 0.0225 + 0.008) / 6 + 0.05)
+
+
+@pytest.mark.parametrize("key", ["eks_cluster_hour", "alb_hour"])
+def test_a_missing_price_leaves_out_cost_json_and_is_a_gap_not_zero(tmp_path, key):
+    out, raw, _ = collect(tmp_path, prices={k: v for k, v in PRICES.items() if k != key})
+    assert not (raw / "eks-ec2" / "cost.json").exists()
+    assert any(g.startswith("eks-ec2/cost.json") and key in g for g in out["gaps"])
+    metrics = analyse("col-01", raw, state().cells)
+    assert not [f for f in metrics.figures if f.cell == "eks-ec2" and "usd" in f.unit]
+    assert "eks-ec2/cost.json: missing" in metrics.gaps
+
+
+def test_analyst_makes_cost_figures_from_the_collected_files(tmp_path):
+    _, raw, _ = collect(tmp_path)
+    for cell in ("ecs-fargate", "eks-ec2"):
+        k6 = {"metrics": {"http_reqs": {"count": 1000}, "http_req_failed": {"passes": 0, "fails": 1000}}}
+        (raw / cell / "k6-steady.json").write_text(json.dumps(k6))
+    metrics = analyse("col-01", raw, state().cells)
+    got = {(f.cell, f.name): f.value for f in metrics.figures}
+    for cell in ("ecs-fargate", "eks-ec2"):
+        assert got[(cell, "idle_usd_per_hour")] == pytest.approx(cost_of(raw, cell)["idle_usd_per_hour"])
+        assert got[(cell, "usd_per_1k_requests")] == pytest.approx(cost_of(raw, cell)["load_usd"])  # 1000 requests
+    assert [c.item for c in metrics.shared_costs][:1] == ["shared nat gateway"]
+
+
+def test_shared_costs_are_their_own_file_and_never_in_a_cell(tmp_path):
+    _, raw, _ = collect(tmp_path)
+    shared = json.loads((raw / "shared-cost.json").read_text())
+    nat = next(line["usd"] for line in shared if line["item"] == "shared nat gateway")
+    assert nat == pytest.approx(0.045 * 20 / 60)  # two 10 min load windows
+    assert {line["item"] for line in shared} >= {"shared vpc endpoints", "shared harness vcpu"}
+    ecs_cell_only = (2 * (0.25 * 0.04 + 0.5 * 0.004) + 0.0225 + 0.008) / 6 + 0.05
+    assert cost_of(raw, "ecs-fargate")["load_usd"] == pytest.approx(ecs_cell_only)

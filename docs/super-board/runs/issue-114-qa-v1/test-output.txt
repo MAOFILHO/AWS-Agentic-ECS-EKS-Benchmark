@@ -1,0 +1,22 @@
+# head 2969c34
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-114-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-114-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 17 items / 11 deselected / 6 selected
+
+tests/test_collector.py::test_analyst_yields_the_scale_out_time_for_both_fixtures PASSED [ 16%]
+tests/test_collector.py::test_cost_json_for_an_ecs_and_an_eks_cell PASSED [ 33%]
+tests/test_collector.py::test_a_missing_price_leaves_out_cost_json_and_is_a_gap_not_zero[eks_cluster_hour] PASSED [ 50%]
+tests/test_collector.py::test_a_missing_price_leaves_out_cost_json_and_is_a_gap_not_zero[alb_hour] PASSED [ 66%]
+tests/test_collector.py::test_analyst_makes_cost_figures_from_the_collected_files PASSED [ 83%]
+tests/test_collector.py::test_shared_costs_are_their_own_file_and_never_in_a_cell PASSED [100%]
+
+======================= 6 passed, 11 deselected in 0.64s =======================
+
+$ uv run --locked ruff check
+All checks passed!
+$ uv run --locked pytest -q
+468 passed, 4 skipped in 7.11s
+changed lines: 121

@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from advisor import rawformats as rf
-from advisor.schemas import Figure, Metrics
+from advisor.schemas import Figure, Metrics, SharedCost
 from advisor.state import CellSpec, RunState
 from advisor.store import create_run_dirs
 
@@ -107,7 +107,14 @@ def analyse(
             profiles[spec.name].append(spec.profile)
     run = _Run(raw)
     bound = [_cell(run, c, p, harness_cpu_threshold) for c, p in profiles.items()]
-    return Metrics(run_id=run_id, figures=run.figures, gaps=run.gaps, harness_bound=any(bound))
+    shared = []
+    if (raw / "shared-cost.json").is_file():  # the collector records a gap when it could not write it
+        try:
+            lines = rf.read(raw / "shared-cost.json", list[rf.SharedCostLine])
+            shared = [SharedCost(item=line.item, usd=line.usd, source="shared-cost.json") for line in lines]
+        except rf.RawFormatError as err:
+            run.gaps.append(str(err))
+    return Metrics(run_id=run_id, figures=run.figures, shared_costs=shared, gaps=run.gaps, harness_bound=any(bound))
 
 
 def analyst_node(state: RunState, *, root: Path, harness_cpu_threshold: float = 70.0) -> dict:

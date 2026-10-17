@@ -5,6 +5,8 @@ and emails. A section that fails becomes a gap in state.gaps; its file is not wr
 reports the gap too. Needs the harness stack to output ClusterName and TaskDefinitionArn, and Container
 Insights on the harness cluster (the harness CPU percent is CpuUtilized over CpuReserved). Service CPU and
 memory come from the AWS/ECS namespace, so only ECS cells get cloudwatch-cpu.json and cloudwatch-memory.json.
+cost.json and shared-cost.json come from the cost model (SPEC section 8): the measured load window times the plan's
+usage and the plan-time prices in state.prices. A missing price or input leaves the file out and is a gap.
 """
 
 import json
@@ -14,9 +16,11 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from advisor import cost
 from advisor import deployer as d
 from advisor import rawformats as rf
 from advisor.load_runner import Aws, stack_outputs
+from advisor.planner import PlanConfig
 from advisor.state import RunState
 from advisor.store import create_run_dirs
 
@@ -112,8 +116,25 @@ def eks_events(run: d.Runner, env: dict, cluster: str, region: str, start: datet
     return found
 
 
+def priced(part: cost.Breakdown) -> float:
+    """A breakdown's total; any missing price raises, so the file is left out and the section is a gap."""
+    if part.gaps:
+        raise LookupError("; ".join(part.gaps))
+    return part.total
+
+
+def cell_cost(state: RunState, cell: str, load_s: float, plan: PlanConfig | None) -> dict:
+    """cost.json: the cell over its load window, and the cell for one hour at min replicas with no load."""
+    if plan is None:
+        raise LookupError("no plan usage given to the collector")
+    spec = next(c for c in state.cells if c.name == cell)
+    idle = plan.cell.model_copy(update={"replicas": state.capacity.min_replicas, "lcus": 0, "log_gb": 0})
+    return {"load_usd": priced(cost.estimate(spec, state.capacity, load_s, state.prices, plan.cell)),
+            "idle_usd_per_hour": priced(cost.estimate(spec, state.capacity, 3600, state.prices, idle))}
+
+
 def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | None = None,
-                   sleep: Callable[[float], None] = time.sleep):
+                   sleep: Callable[[float], None] = time.sleep, plan: PlanConfig | None = None):
     def collector(state: RunState) -> dict:
         region, raw, gaps = state.region, create_run_dirs(state.run_id, root).raw, []
         env = {"AWS_PROFILE": profile} if profile else {}
@@ -132,6 +153,8 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                 gaps.append(f"{cell}: no load window, so no CloudWatch, ALB or event files")
                 return
             start, end = (datetime.fromisoformat(t) for t in state.load_windows[cell])
+            load_s = (end - start).total_seconds()
+            section(cell, "cost.json", lambda: rf.write(out / "cost.json", cell_cost(state, cell, load_s, plan), rf.Cost))
             cell_stack: dict[str, str] = {}
             section(cell, "stack outputs", lambda: cell_stack.update(stack_outputs(aws("cloudformation", region), f"{rid}-{cell}")))
             if not cell_stack:
@@ -198,8 +221,18 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
             section(cell, "cloudwatch-harness-cpu.json", harness_cpu)
             section(cell, "alb.json + deploy.json", alb_files)
             section(cell, "events.json", events)
+        def shared_cost():
+            if plan is None or not state.load_windows:
+                raise LookupError("no plan usage" if plan is None else "no load window")
+            run_s = sum((datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds()
+                        for a, b in state.load_windows.values())
+            part = cost.shared_costs(run_s, state.prices, plan.shared)
+            priced(part)
+            rf.write(raw / "shared-cost.json", [line.model_dump() for line in part.lines], list[rf.SharedCostLine])
+
         for cell in d.cells_of(state):
             collect_cell(cell)
+        section("run", "shared-cost.json", shared_cost)
         return {"status": "collected", "gaps": [*state.gaps, *gaps]}
 
     return collector

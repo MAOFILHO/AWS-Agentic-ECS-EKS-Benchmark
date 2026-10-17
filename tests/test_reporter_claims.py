@@ -8,7 +8,7 @@ from advisor.schemas import Figure, Metrics, read_metrics
 from advisor.state import Capacity, CellSpec, RunState
 from scripts import make_report
 
-# results/sample3/metrics.json from the first full run: steady only, every error_rate 0.0.
+# Cut from results/sample3/metrics.json (first full run): p95 and error_rate figures, every shared cost line.
 SAMPLE3 = Path(__file__).resolve().parent / "fixtures" / "reporter" / "sample3-metrics.json"
 HIGHER_ERRORS = "## Verdict\nECS wins.\n\necs-ec2 has slightly higher error rates.\n"
 NO_ERRORS = "## Verdict\nECS wins.\n\nNo errors in any cell.\n"

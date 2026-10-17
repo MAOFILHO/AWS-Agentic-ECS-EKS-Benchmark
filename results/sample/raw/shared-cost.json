@@ -1,0 +1,22 @@
+[
+  {
+    "item": "shared nat gateway",
+    "usd": 0.024409987574999997
+  },
+  {
+    "item": "shared nat data",
+    "usd": 0.045
+  },
+  {
+    "item": "shared vpc endpoints",
+    "usd": 0.027122208416666665
+  },
+  {
+    "item": "shared harness vcpu",
+    "usd": 0.021958139934133335
+  },
+  {
+    "item": "shared harness memory",
+    "usd": 0.004822328656483334
+  }
+]

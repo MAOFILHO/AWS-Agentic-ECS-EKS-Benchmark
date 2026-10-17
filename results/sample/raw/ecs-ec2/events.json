@@ -1,0 +1,27 @@
+[
+  {
+    "timestamp": "2026-10-17T15:31:15.320000-04:00",
+    "kind": "alarm",
+    "message": "Alarm updated from OK to ALARM"
+  },
+  {
+    "timestamp": "2026-10-17T15:31:15.506000-04:00",
+    "kind": "alarm",
+    "message": "Setting desired count to 2."
+  },
+  {
+    "timestamp": "2026-10-17T15:31:17.423000-04:00",
+    "kind": "scheduled",
+    "message": "(service sample3-ee-ecs-ec2) has started 1 tasks: (task 24bbef16d1684149a2b03fce3f420b88)."
+  },
+  {
+    "timestamp": "2026-10-17T15:31:21.212000-04:00",
+    "kind": "scheduled",
+    "message": "(service sample3-ee-ecs-ec2, taskSet ecs-svc/6832448773841357535) has started 1 tasks: (task 24bbef16d1684149a2b03fce3f420b88)."
+  },
+  {
+    "timestamp": "2026-10-17T15:32:14.003000-04:00",
+    "kind": "healthy",
+    "message": "(service sample3-ee-ecs-ec2) has reached a steady state."
+  }
+]

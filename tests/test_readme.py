@@ -52,6 +52,12 @@ def test_readme_shows_chart_table_verdict_cost_and_limits():
         assert phrase in limits, phrase
 
 
+def test_published_chart_matches_the_published_metrics():
+    from scripts.make_chart import render
+
+    assert (SAMPLE / "chart.svg").read_text() == render(read_metrics(SAMPLE / "metrics.json"))
+
+
 def test_published_files_hold_no_alb_host_or_email():
     # Account ids: test_bootstrap_oidc.py scans every tracked file. Elsewhere, tests hold placeholder hosts.
     files = subprocess.run(

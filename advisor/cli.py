@@ -95,7 +95,7 @@ def deploy_nodes(root: Path, config: dict) -> dict:
     return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root,
                                              k6_image_uri=os.environ.get("K6_IMAGE_URI")),
             "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
-            "collector": make_collector(aws, profile, root),
+            "collector": make_collector(aws, profile, root, plan=PlanConfig(**config["plan"])),
             "analyst": partial(analyst_node, root=root,
                                harness_cpu_threshold=config.get("harness_cpu_threshold", 70.0)),
             "reporter": make_bedrock_reporter(aws, root),

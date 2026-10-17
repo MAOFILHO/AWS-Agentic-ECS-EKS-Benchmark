@@ -36,6 +36,7 @@ def test_all_zero_error_rates_reject_a_comparative_error_claim():
         "Pick ecs-ec2 despite more errors.",
         "The error rate of eks-ec2 is worse.",
         "eks-ec2 has a lower error_rate than ecs-ec2.",
+        "No errors on ecs, but eks has more errors.",
     ):
         assert unsupported_claims(draft, metrics) != [], draft
 
@@ -44,6 +45,13 @@ def test_all_zero_error_rates_accept_no_errors_and_unrelated_comparatives():
     metrics = sample3()
     assert unsupported_claims(NO_ERRORS, metrics) == []
     assert unsupported_claims("EKS has more moving parts. No errors in any cell.", metrics) == []
+    for draft in (
+        "ecs-fargate has lower cost and no errors in any cell.",
+        "No errors in any cell; eks costs more.",
+        "Zero errors anywhere: eks-ec2 costs more.",
+        "eks-ec2 ran without errors but costs more.",
+    ):
+        assert unsupported_claims(draft, metrics) == [], draft
 
 
 def test_different_error_rates_allow_a_comparison():

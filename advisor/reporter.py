@@ -19,10 +19,14 @@ from advisor.store import create_run_dirs
 
 DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-micro-v1:0"
 MAX_TRIES = 3
-# "higher error rate", "error rate is worse": a comparison word within five words of "error", same sentence.
-_NEAR = r"(?:[^\w.!?\n]+\w+){0,5}?[^\w.!?\n]+"
+# "higher error rate", "error rate is worse": a comparison word within five words of "error", same clause.
+_NEAR = r"(?:[^\w.!?;:\n]+\w+){0,5}?[^\w.!?;:\n]+"
 _MORE = r"(?:higher|lower|worse|more)"
-ERROR_CLAIM_RE = re.compile(rf"\b{_MORE}\b{_NEAR}error\w*|\berror\w*{_NEAR}{_MORE}\b", re.IGNORECASE)
+ERROR_CLAIM_RE = re.compile(
+    rf"\b{_MORE}\b{_NEAR}(?P<a>error\w*)|\b(?P<b>error\w*){_NEAR}{_MORE}\b", re.IGNORECASE
+)
+# "no errors", "zero errors", "without errors" state the all-zero fact, not a comparison.
+_NEGATED_RE = re.compile(r"\b(?:no|zero|without)\W+$", re.IGNORECASE)
 
 
 class LLM(Protocol):
@@ -81,7 +85,15 @@ def unsupported_claims(text: str, metrics: Metrics) -> list[str]:
     error_rates = {f.value for f in metrics.figures if f.name == "error_rate"}
     if len(error_rates) != 1:
         return []
-    return [m.group(0) for m in ERROR_CLAIM_RE.finditer(text)]
+    claims, pos = [], 0
+    while m := ERROR_CLAIM_RE.search(text, pos):
+        word = "a" if m.group("a") else "b"
+        if _NEGATED_RE.search(text[: m.start(word)]):
+            pos = m.end(word)  # "no errors" is fine; look again past that word
+        else:
+            claims.append(m.group(0))
+            pos = m.end()
+    return claims
 
 
 def _redact(offender: str) -> str:

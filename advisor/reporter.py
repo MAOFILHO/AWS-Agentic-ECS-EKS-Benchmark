@@ -25,6 +25,8 @@ _MORE = r"(?:higher|lower|worse|more)"
 ERROR_CLAIM_RE = re.compile(
     rf"\b{_MORE}\b{_NEAR}(?P<a>error\w*)|\b(?P<b>error\w*){_NEAR}{_MORE}\b", re.IGNORECASE
 )
+# A "Verdict" heading with text under it; the title's "A Verdict" does not count.
+_VERDICT_RE = re.compile(r"^#{1,6}[ \t]*Verdict[ \t]*\n+(?!#)\S", re.IGNORECASE | re.MULTILINE)
 # "no errors", "zero errors", "without errors" state the all-zero fact, not a comparison.
 _NEGATED_RE = re.compile(r"\b(?:no|zero|without)\W+$", re.IGNORECASE)
 
@@ -68,8 +70,12 @@ def build_prompt(metrics: Metrics) -> str:
             + "\n".join(f"- {c.item}: {c.usd} USD" for c in metrics.shared_costs)
         )
     return (
-        "Write a short Markdown report on ECS vs EKS for hosting an AI agent fleet: a verdict, "
-        "a comparison table, the trade-offs, and a recommendation.\n"
+        "Write a short Markdown report on ECS vs EKS for hosting an AI agent fleet.\n"
+        "Use these four sections, in this order, each with an H2 heading: "
+        "## Verdict (one short paragraph, before the table), ## Comparison table, "
+        "## Trade-offs, ## Recommendation.\n"
+        "Comparison table: one column per cell, one row per metric, with the unit in the row label "
+        "(for example \"P95 latency (ms)\", \"Idle cost (USD/h)\"); no unit in any column header.\n"
         "Use only the figures in metrics.json below, as given or rounded. Do not compute new "
         "figures: no percentage difference, ratio, sum or average that is not already there.\n"
         "Write no other numbers: no dates, years, counts or versions. Number list items 1 to 4 "
@@ -78,6 +84,10 @@ def build_prompt(metrics: Metrics) -> str:
         + "".join(f"{rule}\n" for rule in rules)
         + f"metrics.json:\n{metrics.model_dump_json(indent=2)}\n"
     )
+
+
+def has_verdict(text: str) -> bool:
+    return bool(_VERDICT_RE.search(text))
 
 
 def unsupported_claims(text: str, metrics: Metrics) -> list[str]:
@@ -111,7 +121,8 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
             draft = llm.complete(prompt)
             offenders = check(draft, metrics)
             claims = unsupported_claims(draft, metrics)
-            if not offenders and not claims:
+            missing = not has_verdict(draft)
+            if not offenders and not claims and not missing:
                 paths.report.write_text(draft)
                 return {"status": "reported"}
             problems = []
@@ -121,13 +132,15 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
                 problems.append(
                     f"Every error rate is the same, so these claims are false: {'; '.join(claims)}."
                 )
+            if missing:
+                problems.append("The report has no Verdict section: start with a ## Verdict paragraph.")
             prompt = (
                 f"{build_prompt(metrics)}\nYour last draft:\n{draft}\n"
                 f"{' '.join(problems)} Rewrite the report without them."
             )
         error = (
             f"reporter: numbers not in metrics.json or unsupported claims after {MAX_TRIES} tries: "
-            + ", ".join([*map(_redact, offenders), *claims])
+            + ", ".join([*map(_redact, offenders), *claims, *(["no Verdict section"] if missing else [])])
         )
         return {"status": "report_failed", "errors": [*state.errors, error]}
 

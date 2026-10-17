@@ -49,8 +49,11 @@ benchmark:
 	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make benchmark RUN_ID=<id>"; exit 1; }
 	uv run --locked python -m advisor run --run-id "$(RUN_ID)" $(ARGS)
 
+# Write results/RUN_ID/report.md from results/RUN_ID/metrics.json: the reporter only, no AWS deploy.
+# Bedrock is still called: needs AWS_PROFILE and a region (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...).
 report:
-	@echo "not implemented yet"; exit 1
+	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make report RUN_ID=<id>"; exit 1; }
+	uv run --locked python -m scripts.make_report --run-id "$(RUN_ID)" $(ARGS)
 
 # Draw results/RUN_ID/chart.svg from results/RUN_ID/metrics.json. ARGS="--out <path>" writes it elsewhere.
 chart:

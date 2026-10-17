@@ -1,0 +1,3 @@
+uv run --locked python -m scripts.make_report --run-id "sample3" --region us-east-1
+results/sample3/report.md
+rc=0

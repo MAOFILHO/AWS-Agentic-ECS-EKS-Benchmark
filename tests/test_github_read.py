@@ -34,7 +34,7 @@ def fake_gh(tmp_path):
     def run(*gh_args):
         result = subprocess.run(
             [sys.executable, str(HELPER), "--kind", "comments", "--", *gh_args],
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True, env=env, check=False,
         )
         count = len(calls.read_text().splitlines()) if calls.exists() else 0
         return result, count, tmp_path / "github-halt.json"
@@ -42,13 +42,21 @@ def fake_gh(tmp_path):
     return run
 
 
-@pytest.mark.parametrize("flag", [["--jq", ".[]"], ["--jq=.[]"], ["-q", ".[]"], ["--template", "{{.}}"], ["-t", "{{.}}"]])
+@pytest.mark.parametrize("flag", [["--jq", ".[]"], ["--jq=.[]"], ["-q", ".[]"], ["--template", "{{.}}"], ["-t", "{{.}}"],
+                                  ["-q.[]"], ["-t{{.}}"]])
 def test_slurp_with_jq_exits_64_without_halting(fake_gh, flag):
     result, calls, halt_file = fake_gh(*COMMENTS, *flag)
     assert result.returncode == 64
     assert calls == 0
     assert not halt_file.exists()
     assert "| jq" in result.stderr
+
+
+def test_attached_slurp_with_jq_exits_64_without_halting(fake_gh):
+    result, calls, halt_file = fake_gh("api", "repos/{owner}/{repo}/issues/1/comments", "--paginate", "--slurp=true", "--jq", ".[]")
+    assert result.returncode == 64
+    assert calls == 0
+    assert not halt_file.exists()
 
 
 def test_real_gh_failure_on_valid_form_still_halts(fake_gh):

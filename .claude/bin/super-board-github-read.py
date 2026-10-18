@@ -271,8 +271,8 @@ def read(args, kind='json', meta=None, recovering=False):
     if not read_only(args):
         raise ValueError('retry helper accepts read-only GitHub commands only')
     # gh rejects --slurp with --jq/--template on every try; that is the caller's read, not an outage (#129).
-    if '--slurp' in args and any(a in ('--jq', '-q', '--template', '-t') or a.startswith(('--jq=', '--template='))
-                                 for a in args):
+    slurps = any(a == '--slurp' or a == '--slurp=true' for a in args)
+    if slurps and any(a.startswith(('--jq', '--template', '-q', '-t')) for a in args):
         raise ValueError("gh rejects --slurp with --jq or --template; this call failed, the run continues. "
                          "Drop --jq and pipe the slurped pages to jq: "
                          "--kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp | jq '[.[][] | .body]'")

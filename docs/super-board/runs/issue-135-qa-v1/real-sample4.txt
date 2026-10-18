@@ -1,0 +1,1 @@
+['ECS with EC2 instances offers a middle ground but generally lags in performance compared to Fargate and is more costly than EKS with EC2 instances']

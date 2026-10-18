@@ -32,7 +32,23 @@
     {"name": "deploy_time_s", "value": 1188.430724, "unit": "s", "source": "eks-ec2/deploy.json", "cell": "eks-ec2", "profile": null},
     {"name": "config_lines", "value": 534.0, "unit": "lines", "source": "eks-ec2/config.json", "cell": "eks-ec2", "profile": null},
     {"name": "idle_usd_per_hour", "value": 0.1641, "unit": "usd/h", "source": "eks-ec2/cost.json", "cell": "eks-ec2", "profile": null},
-    {"name": "usd_per_1k_requests", "value": 0.0018461549613195847, "unit": "usd", "source": "eks-ec2/cost.json + eks-ec2/k6-steady.json + eks-ec2/k6-step.json + eks-ec2/k6-spike.json + eks-ec2/k6-scale-from-min.json", "cell": "eks-ec2", "profile": null}
+    {"name": "usd_per_1k_requests", "value": 0.0018461549613195847, "unit": "usd", "source": "eks-ec2/cost.json + eks-ec2/k6-steady.json + eks-ec2/k6-step.json + eks-ec2/k6-spike.json + eks-ec2/k6-scale-from-min.json", "cell": "eks-ec2", "profile": null},
+    {"name": "p95_ms", "value": 9.44946719999998, "unit": "ms", "source": "ecs-ec2/k6-steady.json", "cell": "ecs-ec2", "profile": "steady"},
+    {"name": "p99_ms", "value": 422.2529079000014, "unit": "ms", "source": "ecs-ec2/k6-steady.json", "cell": "ecs-ec2", "profile": "steady"},
+    {"name": "error_rate", "value": 0.0, "unit": "ratio", "source": "ecs-ec2/k6-steady.json", "cell": "ecs-ec2", "profile": "steady"},
+    {"name": "p95_ms", "value": 8.7834879, "unit": "ms", "source": "ecs-ec2/k6-step.json", "cell": "ecs-ec2", "profile": "step"},
+    {"name": "p99_ms", "value": 27.33772419999987, "unit": "ms", "source": "ecs-ec2/k6-step.json", "cell": "ecs-ec2", "profile": "step"},
+    {"name": "error_rate", "value": 0.0, "unit": "ratio", "source": "ecs-ec2/k6-step.json", "cell": "ecs-ec2", "profile": "step"},
+    {"name": "p95_ms", "value": 7.9106944000000015, "unit": "ms", "source": "ecs-ec2/k6-spike.json", "cell": "ecs-ec2", "profile": "spike"},
+    {"name": "p99_ms", "value": 30.231805520000115, "unit": "ms", "source": "ecs-ec2/k6-spike.json", "cell": "ecs-ec2", "profile": "spike"},
+    {"name": "error_rate", "value": 0.0, "unit": "ratio", "source": "ecs-ec2/k6-spike.json", "cell": "ecs-ec2", "profile": "spike"},
+    {"name": "p95_ms", "value": 8.587652299999995, "unit": "ms", "source": "ecs-ec2/k6-scale-from-min.json", "cell": "ecs-ec2", "profile": "scale-from-min"},
+    {"name": "p99_ms", "value": 32.24158355, "unit": "ms", "source": "ecs-ec2/k6-scale-from-min.json", "cell": "ecs-ec2", "profile": "scale-from-min"},
+    {"name": "error_rate", "value": 0.0, "unit": "ratio", "source": "ecs-ec2/k6-scale-from-min.json", "cell": "ecs-ec2", "profile": "scale-from-min"},
+    {"name": "deploy_time_s", "value": 441.594171, "unit": "s", "source": "ecs-ec2/deploy.json", "cell": "ecs-ec2", "profile": null},
+    {"name": "config_lines", "value": 436.0, "unit": "lines", "source": "ecs-ec2/config.json", "cell": "ecs-ec2", "profile": null},
+    {"name": "idle_usd_per_hour", "value": 0.06409999999999999, "unit": "usd/h", "source": "ecs-ec2/cost.json", "cell": "ecs-ec2", "profile": null},
+    {"name": "usd_per_1k_requests", "value": 0.0010777470313920216, "unit": "usd", "source": "ecs-ec2/cost.json + ecs-ec2/k6-steady.json + ecs-ec2/k6-step.json + ecs-ec2/k6-spike.json + ecs-ec2/k6-scale-from-min.json", "cell": "ecs-ec2", "profile": null}
   ],
   "shared_costs": [
     {"item": "shared nat gateway", "usd": 0.0977799994875, "source": "shared-cost.json"}

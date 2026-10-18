@@ -1,0 +1,26 @@
+ecs-fargate p95_ms steady 4.1164
+ecs-fargate p99_ms steady 8.6188
+ecs-fargate deploy_time_s None 433.4456
+ecs-fargate idle_usd_per_hour None 0.0348
+ecs-fargate usd_per_1k_requests None 0.0009
+eks-ec2 p95_ms steady 11.0704
+eks-ec2 p99_ms steady 100.1621
+eks-ec2 deploy_time_s None 1188.4307
+eks-ec2 idle_usd_per_hour None 0.1641
+eks-ec2 usd_per_1k_requests None 0.0018
+ecs-ec2 p95_ms steady 9.4495
+ecs-ec2 p99_ms steady 422.2529
+ecs-ec2 deploy_time_s None 441.5942
+ecs-ec2 idle_usd_per_hour None 0.0641
+ecs-ec2 usd_per_1k_requests None 0.0011
+'ECS EC2 is not more costly than EKS EC2.' -> ['ECS EC2 is not more costly than EKS EC2']
+'EKS EC2 deploys faster than ECS EC2.' -> []
+'ECS EC2 deploys faster than EKS EC2.' -> []
+'ECS EC2 is cheaper than EKS EC2, but EKS EC2 is faster than ECS Fargate.' -> []
+'ECS-EC2 is pricier than EKS-EC2.' -> ['ECS-EC2 is pricier than EKS-EC2']
+'At USD 0.0641/h, ECS EC2 is more expensive than EKS EC2.' -> ['At USD 0.0641/h, ECS EC2 is more expensive than EKS EC2']
+'EKS EC2 is less expensive than ECS EC2.' -> ['EKS EC2 is less expensive than ECS EC2']
+'ECS Fargate is cheaper per 1k requests than ECS EC2.' -> []
+'| ecs-ec2 | cheaper than eks-ec2 |' -> []
+'ECS EC2 is slower than ECS EC2.' -> []
+'ECS Fargate is faster than EKS Fargate.' -> []

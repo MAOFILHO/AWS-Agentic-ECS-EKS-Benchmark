@@ -63,7 +63,7 @@ def test_draft_without_verdict_is_retried(tmp_path):
     assert paths.report.read_text() == WITH_VERDICT
 
 
-# Cut from results/sample4/metrics.json: ecs-fargate and eks-ec2, all 4 profiles.
+# Cut from results/sample4/metrics.json: ecs-fargate, ecs-ec2 and eks-ec2, all 4 profiles.
 SAMPLE4 = Path(__file__).resolve().parent / "fixtures" / "reporter" / "sample4-metrics.json"
 PROFILES = ["scale-from-min", "spike", "steady", "step"]
 

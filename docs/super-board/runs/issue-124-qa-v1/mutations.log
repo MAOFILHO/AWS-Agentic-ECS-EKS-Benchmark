@@ -1,0 +1,8 @@
+## mutation 1: peak_rps 50 -> 60 in runs/default.json
+2 failed, 4 passed in 0.04s
+## mutation 2: '600 s' -> '900 s' in METHOD steady row
+2 failed, 4 passed in 0.04s
+## mutation 3: stray figure '7 replicas' added to METHOD
+1 failed, 5 passed in 0.04s
+## mutation 4: drop Known limits heading
+1 failed, 5 passed in 0.04s

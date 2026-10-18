@@ -1,0 +1,13 @@
+tests/test_method.py::test_method_covers_each_topic_in_its_own_block PASSED [  8%]
+tests/test_method.py::test_capacity_line_matches_the_plan_config PASSED  [ 16%]
+tests/test_method.py::test_profile_rows_match_the_k6_scripts_and_plan_config PASSED [ 25%]
+tests/test_method.py::test_every_number_in_method_matches_the_config_or_loadtests PASSED [ 33%]
+tests/test_method.py::test_readme_links_the_method PASSED                [ 41%]
+tests/test_method.py::test_method_holds_no_account_id_email_or_alb_host PASSED [ 50%]
+tests/test_readme.py::test_sample_run_is_tracked PASSED                  [ 58%]
+tests/test_readme.py::test_every_readme_number_comes_from_the_sample_run PASSED [ 66%]
+tests/test_readme.py::test_readme_shows_chart_table_verdict_cost_and_limits PASSED [ 75%]
+tests/test_readme.py::test_published_chart_matches_the_published_metrics PASSED [ 83%]
+tests/test_readme.py::test_published_files_hold_no_alb_host_or_email PASSED [ 91%]
+tests/test_readme.py::test_tables_put_units_on_row_labels_only PASSED    [100%]
+============================== 12 passed in 0.06s ==============================

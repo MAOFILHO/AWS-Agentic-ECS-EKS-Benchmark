@@ -1,0 +1,30 @@
+## tracked files at 62c3b19: 12-digit ids, emails, ALB hosts
+.claude/skills/super-board/references/lint.md:215:   [ ] Test user login: testuser@example.com (issue #23)
+.claude/skills/super-board/references/second-account.md:23:A Gmail address like `you+bot@gmail.com` lands in your usual inbox.
+.claude/skills/visual/references/schema.md:30:      "auth": "session", "request": { "email": "a@b.co" }, "response": { "id": "usr_123" } }
+docs/super-board/runs/issue-112-qa-v1/secret-scan.txt:1:227:+@pytest.mark.parametrize("value", ["NaN", '"fast"'])
+docs/super-board/runs/issue-122-qa-v1/secret-scan.txt:3:tests/test_deploy_eks.py:14:ALB = "k8s-default-workload-0a1b2c3d4e-987654321.us-east-1.elb.amazonaws.com"
+docs/super-board/runs/issue-122-qa-v1/secret-scan.txt:4:tests/test_deployer.py:44:        return f"stack done for {ACCOUNT}\nALB: http://k8s-workload-abc.{REGION}.elb.amazonaws.com\n"
+docs/super-board/runs/issue-122-qa-v1/secret-scan.txt:5:tests/test_deployer.py:46:        return f"run-alb-1.{REGION}.elb.amazonaws.com\n"
+docs/super-board/runs/issue-122-qa-v1/secret-scan.txt:6:tests/test_deployer.py:94:                   "alb_dns_name": f"run-alb-1.{REGION}.elb.amazonaws.com"}
+docs/super-board/runs/issue-122-qa-v1/secret-scan.txt:7:tests/test_deployer.py:96:    assert eks["alb_dns_name"] == f"k8s-workload-abc.{REGION}.elb.amazonaws.com"
+docs/super-board/runs/issue-22-qa-v1/REPORT.md:11:| No email address in repo | pass | none outside `.claude/skills`; three vendored doc placeholders predate this card (`a@b.co`, `testuser@example.com`, `you+bot@gmail.com`) |
+tests/test_collector.py:75:            item("HorizontalPodAutoscaler", "SuccessfulRescale", "2026-10-14T21:56:01Z", "New size: 2; cpu above target a@b.com"),
+tests/test_deploy_eks.py:14:ALB = "k8s-default-workload-0a1b2c3d4e-987654321.us-east-1.elb.amazonaws.com"
+tests/test_deploy_stack.py:55:            "Parameters": [{"ParameterKey": "BudgetEmail", "ParameterValue": "a@b.co"}],
+tests/test_deploy_stack.py:71:        {"BudgetEmail": "a@b.co"},
+tests/test_deploy_stack.py:137:    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+tests/test_deploy_stack.py:179:    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+tests/test_deploy_stack.py:206:    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+tests/test_deploy_stack.py:211:    assert sent == {"BudgetEmail": "a@b.co"}
+tests/test_deploy_stack.py:217:    monkeypatch.setenv("BUDGET_EMAIL", "a@b.co")
+tests/test_deploy_stack.py:222:    assert sent == {"BudgetEmail": "a@b.co", "ExistingOidcProviderArn": arn}
+tests/test_deploy_stack.py:270:            "Parameters": [{"ParameterKey": "BudgetEmail", "ParameterValue": "a@b.co"}],
+tests/test_deployer.py:44:        return f"stack done for {ACCOUNT}\nALB: http://k8s-workload-abc.{REGION}.elb.amazonaws.com\n"
+tests/test_deployer.py:46:        return f"run-alb-1.{REGION}.elb.amazonaws.com\n"
+tests/test_deployer.py:94:                   "alb_dns_name": f"run-alb-1.{REGION}.elb.amazonaws.com"}
+tests/test_deployer.py:96:    assert eks["alb_dns_name"] == f"k8s-workload-abc.{REGION}.elb.amazonaws.com"
+tests/test_push_image.py:66:    git("-c user.email=a@b.co -c user.name=t commit -q --allow-empty -m x")
+grep exit 0
+## PR diff origin/main..HEAD only
+grep exit 1 (1 = no match)

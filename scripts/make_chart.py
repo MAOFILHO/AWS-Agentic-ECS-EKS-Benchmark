@@ -4,6 +4,8 @@ Usage:
     python -m scripts.make_chart --run-id <id> [--out PATH]
 
 One group per metric, one bar per cell, each group on its own scale. A missing figure shows "n/a" and no bar.
+With no metrics.json but an aggregate.json (scripts/aggregate_runs.py), each bar is the median with a min to max
+whisker.
 """
 
 import argparse
@@ -12,7 +14,13 @@ from pathlib import Path
 from typing import get_args
 from xml.sax.saxutils import escape
 
-from advisor.schemas import Metrics, MetricsError, read_metrics
+from advisor.schemas import (
+    Aggregate,
+    Metrics,
+    MetricsError,
+    read_aggregate,
+    read_metrics,
+)
 from advisor.state import CellName
 
 GROUPS = [
@@ -35,7 +43,21 @@ def pick(metrics: Metrics) -> dict[tuple[str, str], float]:
 
 
 def render(metrics: Metrics) -> str:
-    values = pick(metrics)
+    return draw(f"Benchmark {metrics.run_id}", pick(metrics), {})
+
+
+def render_aggregate(agg: Aggregate) -> str:
+    """Median bars with a min to max whisker. With several profiles, the steady one (or a profile-less one) wins."""
+    values: dict[tuple[str, str], float] = {}
+    spread: dict[tuple[str, str], tuple[float, float]] = {}
+    for fig in sorted(agg.figures, key=lambda f: f.profile not in (None, "steady")):
+        if (fig.cell, fig.name) not in values:
+            values[(fig.cell, fig.name)] = fig.median
+            spread[(fig.cell, fig.name)] = (fig.min, fig.max)
+    return draw(f"Benchmark median of {', '.join(agg.runs)}", values, spread)
+
+
+def draw(title: str, values: dict[tuple[str, str], float], spread: dict[tuple[str, str], tuple[float, float]]) -> str:
     cells = [c for c in get_args(CellName) if any(cell == c for cell, _ in values)]
     groups = GROUPS + ([IDLE] if any(name == IDLE[0] for _, name in values) else [])
     group_w = max(len(cells) * (BAR_W + GAP) + 3 * GAP, 150)
@@ -47,11 +69,11 @@ def render(metrics: Metrics) -> str:
          f'viewBox="0 0 {width} {height}" font-family="sans-serif" font-size="12">'),
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         (f'<text x="{LEFT}" y="24" font-size="16" font-weight="bold" fill="#1a1a1a">'
-         f"Benchmark {escape(metrics.run_id)}</text>"),
+         f"{escape(title)}</text>"),
     ]
     for g, (name, label) in enumerate(groups):
         x0 = LEFT + g * group_w
-        top = max((values.get((c, name), 0.0) for c in cells), default=0.0)
+        top = max((spread.get((c, name), (0.0, values.get((c, name), 0.0)))[1] for c in cells), default=0.0)
         out.append(f'<text x="{x0 + group_w / 2}" y="{base + 20}" text-anchor="middle" fill="#1a1a1a">'
                    f"{escape(label)}</text>")
         out.append(f'<line x1="{x0 + GAP}" y1="{base}" x2="{x0 + group_w - GAP}" y2="{base}" stroke="#999999"/>')
@@ -67,6 +89,10 @@ def render(metrics: Metrics) -> str:
                        f'width="{BAR_W}" height="{h:.1f}" fill="{COLOURS[cell]}"/>')
             out.append(f'<text x="{mid}" y="{base - h - 4:.1f}" text-anchor="middle" fill="#1a1a1a">'
                        f"{value:.6g}</text>")
+            if (cell, name) in spread and top > 0:
+                lo, hi = (base - v / top * PLOT_H for v in spread[(cell, name)])
+                out.append(f'<line data-whisker="1" data-cell="{cell}" data-metric="{name}" x1="{mid}" y1="{lo:.1f}" '
+                           f'x2="{mid}" y2="{hi:.1f}" stroke="#1a1a1a"/>')
     for i, cell in enumerate(cells):
         x = LEFT + i * 130
         out.append(f'<rect x="{x}" y="{height - 26}" width="12" height="12" fill="{COLOURS[cell]}"/>')
@@ -81,13 +107,17 @@ def main(argv=None, results: Path = Path("results")) -> int:
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
     source = results / args.run_id / "metrics.json"
+    aggregate = results / args.run_id / "aggregate.json"
     try:
-        metrics = read_metrics(source)
+        if not source.exists() and aggregate.exists():
+            svg = render_aggregate(read_aggregate(aggregate))
+        else:
+            svg = render(read_metrics(source))
     except (MetricsError, OSError) as err:
         print(f"error: {err}", file=sys.stderr)
         return 1
     out = args.out or results / args.run_id / "chart.svg"
-    out.write_text(render(metrics))
+    out.write_text(svg)
     print(out)
     return 0
 

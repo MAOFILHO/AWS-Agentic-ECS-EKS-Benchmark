@@ -1,0 +1,3 @@
+uv run --locked python -m scripts.aggregate_runs --runs "qa2-a,qa2-b,qa2-c" --out "results/qa2-agg/aggregate.json"
+results/qa2-agg/aggregate.json
+exit=0

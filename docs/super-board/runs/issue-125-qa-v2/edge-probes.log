@@ -1,0 +1,11 @@
+error: run ids repeated (run-a); each run counts once
+runs=qa2-a,qa2-a,qa2-a exit=1 file=no
+error: run ids repeated (run-a); each run counts once
+runs=qa2-a,qa2-b,qa2-a exit=1 file=no
+error: 1 validation error for Aggregate
+runs
+  List should have at least 1 item after validation, not 0 [type=too_short, input_value=[], input_type=list]
+    For further information visit https://errors.pydantic.dev/2.13/v/too_short
+runs=, exit=1 file=no
+error: [Errno 2] No such file or directory: 'results/nope/metrics.json'
+runs=qa2-a,nope exit=1 file=no

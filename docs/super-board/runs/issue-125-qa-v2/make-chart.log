@@ -1,0 +1,3 @@
+uv run --locked python -m scripts.make_chart --run-id "qa2-agg" 
+results/qa2-agg/chart.svg
+exit=0

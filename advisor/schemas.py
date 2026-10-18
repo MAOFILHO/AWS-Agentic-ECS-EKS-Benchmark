@@ -68,6 +68,39 @@ def read_metrics(path: Path) -> Metrics:
         raise MetricsError(f"{path.name}: {err}") from err
 
 
+class AggregateFigure(BaseModel):
+    """One (name, cell, profile) across repeat runs: how many runs had it, and the spread."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    name: MetricName
+    unit: str
+    cell: CellName
+    profile: Profile | None = None
+    n: int = Field(ge=1)
+    min: float
+    median: float
+    max: float
+    runs: list[str] = Field(min_length=1)
+
+
+class Aggregate(BaseModel):
+    """Shape of results/<name>/aggregate.json, written by scripts/aggregate_runs.py."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    runs: list[str] = Field(min_length=1)
+    figures: list[AggregateFigure] = []
+
+
+def read_aggregate(path: Path) -> Aggregate:
+    """Parse aggregate.json. A bad file raises MetricsError, never a default."""
+    try:
+        return Aggregate.model_validate_json(path.read_text())
+    except ValidationError as err:
+        raise MetricsError(f"{path.name}: {err}") from err
+
+
 class LoadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 

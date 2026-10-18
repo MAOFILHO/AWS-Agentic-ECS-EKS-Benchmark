@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="310" viewBox="0 0 760 310" font-family="sans-serif" font-size="12">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="20" y="24" font-size="16" font-weight="bold" fill="#1a1a1a">Benchmark median of run-a, run-b, run-c</text>
+<text x="110.0" y="260" text-anchor="middle" fill="#1a1a1a">p95 latency (ms)</text>
+<line x1="28" y1="240" x2="192" y2="240" stroke="#999999"/>
+<rect data-cell="ecs-fargate" data-metric="p95_ms" x="36" y="145.2" width="44" height="94.8" fill="#1f6fb2"/>
+<text x="58.0" y="141.2" text-anchor="middle" fill="#1a1a1a">4.31674</text>
+<line data-whisker="1" data-cell="ecs-fargate" data-metric="p95_ms" x1="58.0" y1="154.4" x2="58.0" y2="128.0" stroke="#1a1a1a"/>
+<rect data-cell="ecs-ec2" data-metric="p95_ms" x="88" y="98.8" width="44" height="141.2" fill="#7fb3e0"/>
+<text x="110.0" y="94.8" text-anchor="middle" fill="#1a1a1a">6.43401</text>
+<line data-whisker="1" data-cell="ecs-ec2" data-metric="p95_ms" x1="110.0" y1="108.3" x2="110.0" y2="88.5" stroke="#1a1a1a"/>
+<rect data-cell="eks-ec2" data-metric="p95_ms" x="140" y="68.9" width="44" height="171.1" fill="#f0a868"/>
+<text x="162.0" y="64.9" text-anchor="middle" fill="#1a1a1a">7.79588</text>
+<line data-whisker="1" data-cell="eks-ec2" data-metric="p95_ms" x1="162.0" y1="84.1" x2="162.0" y2="60.0" stroke="#1a1a1a"/>
+<text x="290.0" y="260" text-anchor="middle" fill="#1a1a1a">scale out (s)</text>
+<line x1="208" y1="240" x2="372" y2="240" stroke="#999999"/>
+<text x="238.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="290.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="342.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="470.0" y="260" text-anchor="middle" fill="#1a1a1a">cold start (s)</text>
+<line x1="388" y1="240" x2="552" y2="240" stroke="#999999"/>
+<text x="418.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="470.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="522.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="650.0" y="260" text-anchor="middle" fill="#1a1a1a">deploy time (s)</text>
+<line x1="568" y1="240" x2="732" y2="240" stroke="#999999"/>
+<text x="598.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="650.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<text x="702.0" y="234" text-anchor="middle" fill="#555555">n/a</text>
+<rect x="20" y="284" width="12" height="12" fill="#1f6fb2"/>
+<text x="38" y="294" fill="#1a1a1a">ecs-fargate</text>
+<rect x="150" y="284" width="12" height="12" fill="#7fb3e0"/>
+<text x="168" y="294" fill="#1a1a1a">ecs-ec2</text>
+<rect x="280" y="284" width="12" height="12" fill="#f0a868"/>
+<text x="298" y="294" fill="#1a1a1a">eks-ec2</text>
+</svg>

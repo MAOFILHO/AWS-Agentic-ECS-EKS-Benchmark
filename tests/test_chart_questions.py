@@ -83,3 +83,52 @@ def test_published_files_leak_no_account_id_or_email():
         # Same pattern as the repo guard in tests/test_bootstrap_oidc.py.
         assert not re.search(r"(?<![0-9A-Za-z])[0-9]{12}(?![0-9A-Za-z])", text), path.name
         assert "@" not in text, path.name
+
+
+def texts(svg: Path, attr: str) -> list[ET.Element]:
+    return [t for t in ET.parse(svg).iter(f"{SVG}text") if t.get(attr)]
+
+
+def sig_digits(label: str) -> int:
+    return len(label.replace("-", "").replace(".", "").lstrip("0").rstrip("0"))
+
+
+def test_value_labels_have_at_most_three_significant_digits(tmp_path):
+    run_dir = run_aggregate(tmp_path)
+    labels = [t.text for name in CHARTS for t in texts(run_dir / name, "data-label")]
+    assert labels and all(sig_digits(t) <= 3 for t in labels), labels
+    assert "5410" in labels and "0.0348" in labels
+
+
+def test_value_label_sits_above_its_whisker_top(tmp_path):
+    run_dir = run_aggregate(tmp_path)
+    for name in CHARTS:
+        tree = ET.parse(run_dir / name)
+        tops = {(w.get("data-cell"), w.get("data-metric")): float(w.get("y2"))
+                for w in tree.iter(f"{SVG}line") if w.get("data-whisker")}
+        labels = [t for t in tree.iter(f"{SVG}text") if t.get("data-label")]
+        assert labels, name
+        for t in labels:
+            assert float(t.get("y")) < tops[(t.get("data-cell"), t.get("data-metric"))], (name, t.text)
+
+
+def test_log_chart_has_a_tick_label_for_each_decade(tmp_path):
+    svg = run_aggregate(tmp_path) / "chart-burst-latency.svg"
+    ticks = {t.text for t in texts(svg, "data-tick")}
+    assert {"1", "10", "100", "1000", "10000"} <= ticks
+
+
+def test_linear_charts_have_tick_labels_and_gridlines(tmp_path):
+    run_dir = run_aggregate(tmp_path)
+    for name in CHARTS:
+        if name == "chart-burst-latency.svg":
+            continue
+        assert len(texts(run_dir / name, "data-tick")) >= 2, name
+        assert [ln for ln in ET.parse(run_dir / name).iter(f"{SVG}line") if ln.get("data-grid")], name
+
+
+def test_burst_latency_chart_has_p50_p95_p99_for_each_cell(tmp_path):
+    svg = run_aggregate(tmp_path) / "chart-burst-latency.svg"
+    for metric in ("p50_ms", "p95_ms", "p99_ms"):
+        assert {b.get("data-cell") for b in bars(svg, metric)} == CELLS, metric
+

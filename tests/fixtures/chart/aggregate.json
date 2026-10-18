@@ -3,6 +3,8 @@
   "figures": [
     {"name": "p50_ms", "unit": "ms", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 3.8, "median": 4.0, "max": 4.3, "runs": ["r1", "r2", "r3"]},
     {"name": "p95_ms", "unit": "ms", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 4.8, "median": 4.9, "max": 5.6, "runs": ["r1", "r2", "r3"]},
+    {"name": "p99_ms", "unit": "ms", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 10.0, "median": 12.0, "max": 16.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "p99_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "spike", "n": 3, "min": 7100.0, "median": 7170.0, "max": 8250.0, "runs": ["r1", "r2", "r3"]},
     {"name": "p50_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "spike", "n": 3, "min": 5400.0, "median": 5410.0, "max": 6200.0, "runs": ["r1", "r2", "r3"]},
     {"name": "p95_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "spike", "n": 3, "min": 5400.0, "median": 6100.0, "max": 7000.0, "runs": ["r1", "r2", "r3"]},
     {"name": "p95_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "scale-from-min", "n": 3, "min": 5.9, "median": 6.5, "max": 11.1, "runs": ["r1", "r2", "r3"]},

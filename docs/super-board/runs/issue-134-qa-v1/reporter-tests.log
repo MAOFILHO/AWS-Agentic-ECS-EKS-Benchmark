@@ -1,0 +1,11 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-134-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collected 15 items
+
+tests/test_reporter_layout.py .........                                  [ 60%]
+tests/test_reporter.py ......                                            [100%]
+
+============================== 15 passed in 0.71s ==============================

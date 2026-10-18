@@ -117,3 +117,12 @@ def test_prompt_figures_are_rounded_to_four_significant_digits():
     assert '"value": 1188.0' in prompt and "1188.430724" not in prompt
     assert '"value": 0.0008543' in prompt
     assert check("Deploy 1188 s, 11.07 ms, cost 0.0008543 USD", sample4()) == []
+
+
+def test_profile_heading_matches_whole_names_in_any_case():
+    metrics = sample4()
+    text = "## Verdict\nx\n#### STEP\n### Spike profile\n### steady-state\n### Scale-from-minimum\n"
+    # "steady-state" and "scale-from-minimum" are other words, not the profile names.
+    assert missing_profiles(text, metrics) == ["scale-from-min", "steady"]
+    # A profile in a plain text line, not a heading, does not count.
+    assert missing_profiles("steady\nstep\n### spike\n### scale-from-min\n", metrics) == ["steady", "step"]

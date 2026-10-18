@@ -1,0 +1,6 @@
+run 1 numcheck offenders: [] missing profiles: []
+  headings: ['## Verdict', '## Comparison Table', '### scale-from-min', '### spike', '### steady', '### step', '### Per cell', '## Shared Costs', '## Trade-offs', '## Recommendation']
+  ecs-ec2 header rows: 2  deploy rows: ['| deploy time (s)              | 433.4      | 441.6    | 441.6    |']
+run 2 numcheck offenders: [] missing profiles: []
+  headings: ['## Verdict', '## Comparison table', '### scale-from-min', '### spike', '### steady', '### step', '### Per cell', '## Trade-offs', '## Recommendation']
+  ecs-ec2 header rows: 2  deploy rows: ['| Deploy time (s)       | 433.4        |          | 441.6   |']

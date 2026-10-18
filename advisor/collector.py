@@ -37,9 +37,13 @@ def config_files(cell: str) -> list[str]:
             f"{HELM}/values-{cell.removeprefix('eks-')}.yaml"]
 
 
-def config(cell: str) -> dict:
+def config(cell: str, plan: PlanConfig | None = None) -> dict:
+    """An EC2 cell also records the instance type the deployer gave it (the plan's)."""
     lines = sum(len((d.ROOT / f).read_text().splitlines()) for f in config_files(cell))
-    return {"config_lines": lines, "moving_parts": len(ECS_PARTS if cell.startswith("ecs-") else EKS_PARTS)}
+    out = {"config_lines": lines, "moving_parts": len(ECS_PARTS if cell.startswith("ecs-") else EKS_PARTS)}
+    if cell.endswith("-ec2") and plan:
+        out["instance_type"] = plan.instance_type
+    return out
 
 
 def metric(id: str, namespace: str, name: str, dims: dict, stat: str, **extra) -> dict:
@@ -148,7 +152,7 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
 
         def collect_cell(cell: str) -> None:
             out, rid = raw / cell, d.cell_run_id(state.run_id, cell)
-            section(cell, "config.json", lambda: rf.write(out / "config.json", config(cell), rf.Config))
+            section(cell, "config.json", lambda: rf.write(out / "config.json", config(cell, plan), rf.Config))
             if cell not in state.load_windows:
                 gaps.append(f"{cell}: no load window, so no CloudWatch, ALB or event files")
                 return

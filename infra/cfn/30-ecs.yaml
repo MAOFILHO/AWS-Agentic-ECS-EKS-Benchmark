@@ -51,8 +51,8 @@ Parameters:
     Description: FARGATE for the ecs-fargate cell, EC2 for the ecs-ec2 cell.
   InstanceType:
     Type: String
-    Default: t3.small
-    Description: EC2 container instance type (ComputeType=EC2 only). x86_64, to match the amd64 image.
+    Default: t3.medium
+    Description: EC2 container instance type (ComputeType=EC2 only). x86_64, to match the amd64 image. Same default as 40-eks.
 
 Conditions:
   IsEc2: !Equals [!Ref ComputeType, EC2]

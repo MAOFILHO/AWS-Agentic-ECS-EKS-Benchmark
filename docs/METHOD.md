@@ -28,9 +28,9 @@ One capacity block in the plan config applies to every cell:
   chart (`resources`, `replicas`, `hpa.cpuTarget`).
 - ECS scales with target tracking on average service CPU; EKS scales with a HorizontalPodAutoscaler
   on the same target.
-- Replicas are equal; hosts are not. The ECS EC2 cell runs on `t3.small` container instances (the
-  `30-ecs` template default) and the EKS EC2 node group on `t3.medium` (the `40-eks` default).
-  Fargate cells have no host to size.
+- Hosts are equal too. Both EC2 cells run on the plan config's `t3.medium`: the deployer passes
+  it to the ECS container instances and the EKS node group, and each cell's `config.json` records
+  it. Fargate cells have no host to size.
 
 ### Workload
 
@@ -84,8 +84,7 @@ filled in. The reporter may only state numbers found in `metrics.json`, and a te
   ALB LCU hours and CloudWatch ingest.
 - Shared, on their own line and never spread across cells: the one NAT gateway (hours and data),
   the VPC endpoints, and the k6 harness.
-- EC2 hours are priced at the plan config's `t3.medium` for both EC2 cells, so the ECS EC2 cell,
-  which runs on `t3.small`, is priced above what it really ran on.
+- EC2 hours are priced at the plan config's `t3.medium`, the instance type both EC2 cells run on.
 - The planner prints an estimate and waits for a yes before any spend.
 
 **Blind spot.** The cost figures price the load window only. They leave out the time spent

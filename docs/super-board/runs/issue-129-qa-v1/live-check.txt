@@ -1,0 +1,12 @@
+## red check: helper reverted to origin/main
+5 failed, 2 passed in 1.52s
+
+## real gh gh version 2.102.0 (2026-09-30)
+the `--slurp` option is not supported with `--jq` or `--template`
+
+## helper, same read
+[github-read] gh rejects --slurp with --jq or --template; this call failed, the run continues. Drop --jq and pipe the slurped pages to jq: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp | jq '[.[][] | .body]'
+exit=64
+
+## worked example from the guidance
+["[builder] [report] ✅ built · PR #130 @ 0ccc6a7\nNext: qa\n"]

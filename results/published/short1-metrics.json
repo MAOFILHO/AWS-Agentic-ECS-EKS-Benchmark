@@ -11,7 +11,7 @@
     },
     {
       "name": "p95_ms",
-      "value": 4.8319694,
+      "value": 4.831969,
       "unit": "ms",
       "source": "ecs-fargate/k6-spike.json",
       "cell": "ecs-fargate",
@@ -19,7 +19,7 @@
     },
     {
       "name": "p99_ms",
-      "value": 10.363333320000033,
+      "value": 10.363333,
       "unit": "ms",
       "source": "ecs-fargate/k6-spike.json",
       "cell": "ecs-fargate",
@@ -43,7 +43,7 @@
     },
     {
       "name": "p95_ms",
-      "value": 4.830548899999999,
+      "value": 4.830549,
       "unit": "ms",
       "source": "ecs-fargate/k6-scale-from-min.json",
       "cell": "ecs-fargate",
@@ -51,7 +51,7 @@
     },
     {
       "name": "p99_ms",
-      "value": 9.300815240000006,
+      "value": 9.300815,
       "unit": "ms",
       "source": "ecs-fargate/k6-scale-from-min.json",
       "cell": "ecs-fargate",
@@ -107,7 +107,7 @@
     },
     {
       "name": "idle_usd_per_hour",
-      "value": 0.0348425,
+      "value": 0.034842,
       "unit": "usd/h",
       "source": "ecs-fargate/cost.json",
       "cell": "ecs-fargate",
@@ -115,7 +115,7 @@
     },
     {
       "name": "usd_per_1k_requests",
-      "value": 0.0008949733622059781,
+      "value": 0.000895,
       "unit": "usd",
       "source": "ecs-fargate/cost.json + ecs-fargate/k6-spike.json + ecs-fargate/k6-scale-from-min.json",
       "cell": "ecs-fargate",
@@ -131,7 +131,7 @@
     },
     {
       "name": "p95_ms",
-      "value": 6076.6569765,
+      "value": 6076.656977,
       "unit": "ms",
       "source": "ecs-ec2/k6-spike.json",
       "cell": "ecs-ec2",
@@ -139,7 +139,7 @@
     },
     {
       "name": "p99_ms",
-      "value": 7173.827480099999,
+      "value": 7173.82748,
       "unit": "ms",
       "source": "ecs-ec2/k6-spike.json",
       "cell": "ecs-ec2",
@@ -163,7 +163,7 @@
     },
     {
       "name": "p95_ms",
-      "value": 6.5487902999999985,
+      "value": 6.54879,
       "unit": "ms",
       "source": "ecs-ec2/k6-scale-from-min.json",
       "cell": "ecs-ec2",
@@ -171,7 +171,7 @@
     },
     {
       "name": "p99_ms",
-      "value": 9.982277920000001,
+      "value": 9.982278,
       "unit": "ms",
       "source": "ecs-ec2/k6-scale-from-min.json",
       "cell": "ecs-ec2",
@@ -243,7 +243,7 @@
     },
     {
       "name": "idle_usd_per_hour",
-      "value": 0.06409999999999999,
+      "value": 0.0641,
       "unit": "usd/h",
       "source": "ecs-ec2/cost.json",
       "cell": "ecs-ec2",
@@ -251,7 +251,7 @@
     },
     {
       "name": "usd_per_1k_requests",
-      "value": 0.001094304222264869,
+      "value": 0.001094,
       "unit": "usd",
       "source": "ecs-ec2/cost.json + ecs-ec2/k6-spike.json + ecs-ec2/k6-scale-from-min.json",
       "cell": "ecs-ec2",
@@ -267,7 +267,7 @@
     },
     {
       "name": "p95_ms",
-      "value": 3862.1558291999977,
+      "value": 3862.155829,
       "unit": "ms",
       "source": "eks-ec2/k6-spike.json",
       "cell": "eks-ec2",
@@ -275,7 +275,7 @@
     },
     {
       "name": "p99_ms",
-      "value": 6051.286955119998,
+      "value": 6051.286955,
       "unit": "ms",
       "source": "eks-ec2/k6-spike.json",
       "cell": "eks-ec2",
@@ -299,7 +299,7 @@
     },
     {
       "name": "p95_ms",
-      "value": 8.226694399999998,
+      "value": 8.226694,
       "unit": "ms",
       "source": "eks-ec2/k6-scale-from-min.json",
       "cell": "eks-ec2",
@@ -307,7 +307,7 @@
     },
     {
       "name": "p99_ms",
-      "value": 16.089137160000035,
+      "value": 16.089137,
       "unit": "ms",
       "source": "eks-ec2/k6-scale-from-min.json",
       "cell": "eks-ec2",
@@ -371,7 +371,7 @@
     },
     {
       "name": "usd_per_1k_requests",
-      "value": 0.0015365732718448087,
+      "value": 0.001537,
       "unit": "usd",
       "source": "eks-ec2/cost.json + eks-ec2/k6-spike.json + eks-ec2/k6-scale-from-min.json",
       "cell": "eks-ec2",
@@ -381,7 +381,7 @@
   "shared_costs": [
     {
       "item": "shared nat gateway",
-      "usd": 0.04892997625,
+      "usd": 0.04893,
       "source": "shared-cost.json"
     },
     {
@@ -391,17 +391,17 @@
     },
     {
       "item": "shared vpc endpoints",
-      "usd": 0.05436664027777778,
+      "usd": 0.054367,
       "source": "shared-cost.json"
     },
     {
       "item": "shared harness vcpu",
-      "usd": 0.044015231968888895,
+      "usd": 0.044015,
       "source": "shared-cost.json"
     },
     {
       "item": "shared harness memory",
-      "usd": 0.00966638864138889,
+      "usd": 0.009666,
       "source": "shared-cost.json"
     }
   ],

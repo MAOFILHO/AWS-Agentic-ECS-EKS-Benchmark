@@ -80,5 +80,6 @@ def test_published_holds_aggregate_four_charts_and_three_metrics():
 def test_published_files_leak_no_account_id_or_email():
     for path in PUBLISHED.iterdir():
         text = path.read_text()
-        assert not re.search(r"(?<![\d.])\d{12}(?!\d)", text), path.name
+        # Same pattern as the repo guard in tests/test_bootstrap_oidc.py.
+        assert not re.search(r"(?<![0-9A-Za-z])[0-9]{12}(?![0-9A-Za-z])", text), path.name
         assert "@" not in text, path.name

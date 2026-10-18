@@ -43,7 +43,8 @@ teardown:
 # Plan one run, print its estimate and matrix, then ask y/N before any spend. Needs RUN_ID and a region
 # (AWS_REGION, AWS_DEFAULT_REGION or ARGS=--region ...). A yes deploys every cell and always tears it down;
 # that needs AWS_PROFILE, IMAGE_URI and K6_IMAGE_URI (repo:tag in ECR; make push-k6 prints the k6 one).
-# ARGS="--cells ecs-fargate,eks-ec2 --profile steady --auto-approve-under 3.00" narrows it.
+# ARGS="--cells ecs-fargate,eks-ec2 --profile spike,scale-from-min --auto-approve-under 3.00" narrows it.
+# --cells and --profile each take a comma-separated list; leaving --profile out runs all 4.
 # Resume a run: uv run --locked python -m advisor resume <run-id>.
 benchmark:
 	@test -n "$(RUN_ID)" || { echo "error: RUN_ID is not set. Run: make benchmark RUN_ID=<id>"; exit 1; }

@@ -47,7 +47,7 @@ def parse_args(argv):
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="plan a run, show its estimate, ask before any spend")
     run.add_argument("--cells", default=",".join(DEFAULT_CELLS), help="comma-separated cells")
-    run.add_argument("--profile", choices=PROFILES, help="one load profile (default: all)")
+    run.add_argument("--profile", help=f"comma-separated load profiles of {', '.join(PROFILES)} (default: all)")
     run.add_argument("--region")
     run.add_argument("--auto-approve-under", type=float, metavar="USD")
     run.add_argument("--run-id", default=time.strftime("run-%Y%m%d-%H%M%S"))
@@ -59,6 +59,14 @@ def parse_args(argv):
         unknown = set(args.cells) - set(get_args(CellName))
         if unknown or not args.cells:
             parser.error(f"--cells: unknown {sorted(unknown)}; choose from {get_args(CellName)}")
+        if args.profile is not None:
+            args.profile = [p.strip() for p in args.profile.split(",") if p.strip()]
+            unknown = [p for p in args.profile if p not in PROFILES]
+            repeated = sorted({p for p in args.profile if args.profile.count(p) > 1})
+            if unknown or not args.profile:
+                parser.error(f"--profile: unknown {unknown}; choose from {list(PROFILES)}")
+            if repeated:
+                parser.error(f"--profile: repeated {repeated}; name each profile once")
     return args
 
 
@@ -192,7 +200,7 @@ def run_command(argv, pricing, ask, root) -> int:
             return finish(graph, cfg, ask, nodes["teardown"])
 
     region = resolve_region(args.region)
-    profiles = [args.profile] if args.profile else list(PROFILES)
+    profiles = args.profile or list(PROFILES)
     state = RunState(
         run_id=args.run_id,
         cells=[CellSpec(name=n, profile=p) for n in args.cells for p in profiles],

@@ -1,0 +1,25 @@
+== full suite, outbound network blocked, AWS_PROFILE unset
+.....                                                                    [100%]
+505 passed, 4 skipped in 6.22s
+== verify commands
+All checks passed!
+505 passed, 4 skipped in 6.06s
+== AC tests
+tests/test_instance_type.py::test_ecs_and_eks_templates_default_to_the_same_instance_type PASSED [  1%]
+tests/test_instance_type.py::test_template_default_is_the_run_config_instance_type PASSED [  2%]
+tests/test_deployer.py::test_both_ec2_cells_deploy_the_run_config_instance_type PASSED [ 15%]
+tests/test_deployer.py::test_fargate_cells_get_no_instance_type PASSED   [ 16%]
+tests/test_deployer.py::test_unset_instance_type_fails_an_ec2_cell_before_any_command PASSED [ 17%]
+tests/test_deployer.py::test_cli_hands_the_plan_instance_type_to_the_deployer PASSED [ 19%]
+tests/test_deploy_eks.py::test_fargate_cell_skips_node_group_and_uses_fargate_values PASSED [ 25%]
+tests/test_deploy_eks.py::test_failed_helm_error_masks_the_account_id PASSED [ 34%]
+tests/test_deploy_eks.py::test_ec2_cell_passes_the_instance_type_to_the_eks_stack PASSED [ 39%]
+tests/test_deploy_eks.py::test_fargate_cell_ignores_the_instance_type PASSED [ 41%]
+tests/test_deploy_eks.py::test_main_reads_the_instance_type_from_the_env PASSED [ 42%]
+tests/test_collector.py::test_ec2_cell_config_records_the_instance_type PASSED [ 47%]
+tests/test_collector.py::test_a_failed_section_is_a_gap_and_the_others_still_run PASSED [ 51%]
+tests/test_ecs_template.py::test_parameter_defaults PASSED               [ 67%]
+============================== 78 passed in 1.96s ==============================
+head: ca03988
+== blocker sanity
+RuntimeError: network blocked in QA: ('52.119.198.216', 443)

@@ -2,7 +2,7 @@
 
 The reporter cannot compute new figures, such as a percentage difference. A derived figure must
 already be in metrics.json: add the field to the analyst first. Every draft goes through
-`numcheck.check` and `unsupported_claims`; offenders go back to the LLM, at most 3 tries in all. After the third failed
+`numcheck.check`, `unsupported_claims` and `contradicted_rankings`; offenders go back to the LLM, at most 3 tries in all. After the third failed
 try the step fails, metrics.json stays, and no report is written.
 """
 
@@ -29,6 +29,26 @@ ERROR_CLAIM_RE = re.compile(
 _VERDICT_RE = re.compile(r"^#{1,6}[ \t]*Verdict[ \t]*\n+(?!#)\S", re.IGNORECASE | re.MULTILINE)
 # "no errors", "zero errors", "without errors" state the all-zero fact, not a comparison.
 _NEGATED_RE = re.compile(r"\b(?:no|zero|without)\W+$", re.IGNORECASE)
+# Ranking claims: "X is more costly than Y", "X has lower latency than Y" (issue #135).
+RANKED = {
+    "cost": ("idle_usd_per_hour", "usd_per_1k_requests"),
+    "latency": ("p50_ms", "p95_ms", "p99_ms"),
+}
+# Comparative word -> (kind, +1 when the first cell's figure is higher).
+_COMPARATIVES = {
+    r"more (?:costly|expensive)|costlier|pricier|costs? more|higher (?:idle )?costs?": ("cost", 1),
+    r"cheaper|less (?:costly|expensive)|costs? less|lower (?:idle )?costs?": ("cost", -1),
+    r"slower|(?:higher|more) latency": ("latency", 1),
+    r"faster|quicker|(?:lower|less) latency": ("latency", -1),
+}
+_RANK_RE = re.compile(
+    r"\b(?:" + "|".join(f"(?P<c{i}>{p})" for i, p in enumerate(_COMPARATIVES)) + r")\b"
+    r"(?P<rest>.*?)\b(?:than|compared (?:to|with))\b",
+    re.IGNORECASE,
+)
+# "ECS EC2", "ECS with EC2", "EKS on Fargate", "ecs-ec2".
+_CELL_RE = re.compile(r"\b(ECS|EKS)(?:-|\s+(?:with\s+|on\s+|using\s+)?)(EC2|Fargate)\b", re.IGNORECASE)
+_SENTENCE_RE = re.compile(r"[^.!?\n]+(?:[.!?](?!\s|$)[^.!?\n]*)*")
 
 
 class LLM(Protocol):
@@ -82,6 +102,12 @@ def build_prompt(metrics: Metrics) -> str:
     error_rates = [f.value for f in metrics.figures if f.name == "error_rate"]
     if error_rates and not any(error_rates):
         rules.append('Every error rate is zero: write "no errors in any cell" and compare no error rates.')
+    facts = rank_facts(metrics)
+    if facts:
+        rules.append(
+            "Ranking facts, the only cost or latency rankings you may state:\n"
+            + "\n".join(f"- {fact}" for fact in facts)
+        )
     if metrics.shared_costs:
         rules.append(
             "Shared costs, not part of any cell: list each on its own line under a shared cost heading.\n"
@@ -135,6 +161,55 @@ def unsupported_claims(text: str, metrics: Metrics) -> list[str]:
     return claims
 
 
+def _ranked_groups(metrics: Metrics) -> dict[tuple[str, str | None], dict[str, float]]:
+    """(metric, profile) -> {cell: value} for the cost and latency metrics."""
+    names = {n for kind in RANKED.values() for n in kind}
+    groups: dict[tuple[str, str | None], dict[str, float]] = {}
+    for f in metrics.figures:
+        if f.name in names:
+            groups.setdefault((f.name, f.profile), {})[f.cell] = f.value
+    return groups
+
+
+def rank_facts(metrics: Metrics) -> list[str]:
+    """Cells from lowest to highest, per cost or latency metric and profile, where two or more cells ran."""
+    facts = []
+    for (name, profile), cells in sorted(_ranked_groups(metrics).items(), key=lambda kv: (kv[0][0], kv[0][1] or "")):
+        if len(cells) > 1:
+            label = f"{name} ({profile})" if profile else name
+            facts.append(f"{label}: lowest to highest: {', '.join(sorted(cells, key=cells.get))}")
+    return facts
+
+
+def contradicted_rankings(text: str, metrics: Metrics) -> list[str]:
+    """Sentences ranking two cells on cost or latency that no figure in metrics.json supports.
+
+    A sentence counts only when a cell is named before the comparative word and another after
+    "than"; anything less clear is left alone. A claim passes when any figure of that kind, in any
+    profile, ranks the two cells that way.
+    """
+    groups = _ranked_groups(metrics)
+    claims = []
+    for sentence in _SENTENCE_RE.findall(text):
+        m = _RANK_RE.search(sentence)
+        if not m:
+            continue
+        before = _CELL_RE.findall(sentence[: m.start()])
+        after = _CELL_RE.findall(sentence[m.end():])
+        if not before or not after:
+            continue
+        (a, b) = ("-".join(before[-1]).lower(), "-".join(after[0]).lower())
+        kind, sign = next(v for i, v in enumerate(_COMPARATIVES.values()) if m.group(f"c{i}"))
+        pairs = [
+            (cells[a], cells[b])
+            for (name, _), cells in groups.items()
+            if name in RANKED[kind] and a in cells and b in cells
+        ]
+        if a != b and pairs and not any(sign * (x - y) > 0 for x, y in pairs):
+            claims.append(sentence.strip())
+    return claims
+
+
 def _redact(offender: str) -> str:
     if EMAIL_RE.fullmatch(offender) or ACCOUNT_ID_RE.search(offender):
         return "<redacted>"
@@ -150,9 +225,10 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
             draft = llm.complete(prompt)
             offenders = check(draft, metrics)
             claims = unsupported_claims(draft, metrics)
+            rankings = contradicted_rankings(draft, metrics)
             missing = not has_verdict(draft)
             no_section = missing_profiles(draft, metrics)
-            if not offenders and not claims and not missing and not no_section:
+            if not offenders and not claims and not rankings and not missing and not no_section:
                 paths.report.write_text(draft)
                 return {"status": "reported"}
             problems = []
@@ -161,6 +237,11 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
             if claims:
                 problems.append(
                     f"Every error rate is the same, so these claims are false: {'; '.join(claims)}."
+                )
+            if rankings:
+                problems.append(
+                    f"These rankings contradict metrics.json: {'; '.join(rankings)}. "
+                    "State only rankings from the ranking facts."
                 )
             if missing:
                 problems.append("The report has no Verdict section: start with a ## Verdict paragraph.")
@@ -177,6 +258,7 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
             + ", ".join([
                 *map(_redact, offenders),
                 *claims,
+                *rankings,
                 *(["no Verdict section"] if missing else []),
                 *(f"no {p} section" for p in no_section),
             ])

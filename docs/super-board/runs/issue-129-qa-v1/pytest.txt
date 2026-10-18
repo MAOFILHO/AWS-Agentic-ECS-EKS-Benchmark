@@ -1,0 +1,13 @@
+
+tests/test_github_read.py::test_slurp_with_jq_exits_64_without_halting[flag0] PASSED [ 14%]
+tests/test_github_read.py::test_slurp_with_jq_exits_64_without_halting[flag1] PASSED [ 28%]
+tests/test_github_read.py::test_slurp_with_jq_exits_64_without_halting[flag2] PASSED [ 42%]
+tests/test_github_read.py::test_slurp_with_jq_exits_64_without_halting[flag3] PASSED [ 57%]
+tests/test_github_read.py::test_slurp_with_jq_exits_64_without_halting[flag4] PASSED [ 71%]
+tests/test_github_read.py::test_real_gh_failure_on_valid_form_still_halts PASSED [ 85%]
+tests/test_github_read.py::test_read_guidance_shows_how_to_filter_slurped_pages PASSED [100%]
+
+============================== 7 passed in 0.52s ===============================
+
+## full suite
+502 passed, 4 skipped in 6.39s

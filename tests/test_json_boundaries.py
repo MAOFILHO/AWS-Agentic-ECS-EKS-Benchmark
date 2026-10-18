@@ -108,7 +108,7 @@ def test_run_config_rejects_unknown_keys_and_nan():
     good = (Path(__file__).resolve().parent.parent / "runs" / "default.json").read_text()
     assert RunConfig.model_validate_json(good).load.peak_rps > 0
     with pytest.raises(ValueError):
-        RunConfig.model_validate_json(good.replace('"peak_rps": 50', '"peak_rps": 50, "extra": 1'))
+        RunConfig.model_validate_json(good.replace('"peak_rps":', '"extra": 1, "peak_rps":'))
     with pytest.raises(ValueError):
         RunConfig.model_validate_json(good.replace('"duration_s": 600', '"duration_s": NaN'))
 

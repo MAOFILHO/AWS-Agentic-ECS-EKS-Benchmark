@@ -6,5 +6,8 @@
     "cell": {"replicas": 1, "nodes": 1, "lcus": 1, "log_gb": 0.1},
     "shared": {"nat_gb": 1, "endpoints": 5, "harness_vcpu": 1, "harness_memory_mib": 2048, "harness_tasks": 1}
   },
-  "load": {"peak_rps": 50}
+  "load": {
+    "peak_rps": 80,
+    "why": "sample4 at 50 RPS: ecs-fargate CPU peaked at 50% (target 60), so it never scaled out. CPU grows about 1% per RPS on 0.25 vCPU, so 80 RPS should reach about 80%, over the target and under the 256m EKS limit."
+  }
 }

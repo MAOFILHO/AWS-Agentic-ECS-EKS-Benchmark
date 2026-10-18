@@ -11,6 +11,8 @@ UNITS = {"p50_ms": "ms", "p95_ms": "ms", "p99_ms": "ms", "error_rate": "ratio"}
 UNITS |= {"scale_out_s": "s", "cold_start_s": "s", "deploy_time_s": "s"}
 UNITS |= {"usd_per_1k_requests": "usd", "idle_usd_per_hour": "usd/h"}
 UNITS |= {"config_lines": "lines", "moving_parts": "count"}
+# The profiles that jump to the peak, so a scale-out is expected. Each gets its own scale figures.
+SCALE_PROFILES = ("spike", "scale-from-min")
 
 
 class _Run:
@@ -40,9 +42,9 @@ class _Run:
         self.figures.append(Figure(name=name, value=value, unit=unit, source=source, cell=cell, profile=profile))
 
 
-def _to_healthy(events, kind: str) -> float | None:
-    """Seconds from the first `kind` event to the first `healthy` event after it."""
-    starts = [e.timestamp for e in events if e.kind == kind]
+def _to_healthy(events, kind: str, window: rf.Window) -> float | None:
+    """Seconds from the first `kind` event inside the window to the first `healthy` event after it."""
+    starts = [e.timestamp for e in events if e.kind == kind and window.start <= e.timestamp < window.end]
     if not starts:
         return None
     ends = [e.timestamp for e in events if e.kind == "healthy" and e.timestamp >= min(starts)]
@@ -69,10 +71,19 @@ def _cell(run: _Run, cell: str, profiles: list[str], threshold: float) -> bool:
         run.add("error_rate", rate, cell, [name], profile, f"{name} has zero requests")
 
     events = run.read(cell, "events.json", list[rf.Event])
-    if events is not None:
+    scaling = [p for p in profiles if p in SCALE_PROFILES]
+    windows = run.read(cell, "windows.json", dict[str, rf.Window]) if scaling else None
+    for profile in scaling if events is not None and windows is not None else []:
+        window = windows.get(profile)
+        if window is None:
+            run.gaps.append(f"{cell}/{profile} scale_out_s, cold_start_s: windows.json has no {profile} window")
+            continue
+        if not [e for e in events if e.kind != "healthy" and window.start <= e.timestamp < window.end]:
+            run.gaps.append(f"{cell}/{profile} scale_out_s, cold_start_s: no scale-out happened in its load window")
+            continue
         for metric, kind in (("scale_out_s", "alarm"), ("cold_start_s", "scheduled")):
-            got = _to_healthy(events, kind)
-            run.add(metric, got, cell, ["events.json"], why=f"no {kind} then healthy")
+            got = _to_healthy(events, kind, window)
+            run.add(metric, got, cell, ["events.json", "windows.json"], profile, f"no {kind} then healthy in its load window")
 
     deploy = run.read(cell, "deploy.json", rf.Deploy)
     if deploy is not None:

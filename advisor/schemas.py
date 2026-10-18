@@ -105,6 +105,7 @@ class LoadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     peak_rps: int = Field(gt=0)
+    why: str = ""  # the reason for this peak, read by people only
 
 
 class RunConfig(BaseModel):

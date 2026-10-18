@@ -9,7 +9,7 @@ from test_load_runner import ACCOUNT, HARNESS, SENSITIVE, Client, aws_of
 from advisor import deployer as d
 from advisor import rawformats as rf
 from advisor.analyst import analyse
-from advisor.collector import make_collector
+from advisor.collector import make_collector, make_eks_snapshot
 from advisor.cost import CellUsage, SharedUsage
 from advisor.planner import PlanConfig
 from advisor.state import Capacity, CellSpec, RunState
@@ -18,7 +18,7 @@ ALB = "alb.example.com"
 ARN = f"arn:aws:elasticloadbalancing:us-east-2:{ACCOUNT}"
 WINDOWS = {"ecs-fargate": ["2026-10-14T20:05:00+00:00", "2026-10-14T20:15:00+00:00"],
            "eks-ec2": ["2026-10-14T21:50:00+00:00", "2026-10-14T22:00:00+00:00"]}
-READERS = {"alb.json": rf.Alb, "events.json": list[rf.Event], "deploy.json": rf.Deploy, "config.json": rf.Config,
+READERS = {"windows.json": dict[str, rf.Window], "alb.json": rf.Alb, "events.json": list[rf.Event], "deploy.json": rf.Deploy, "config.json": rf.Config,
            "cost.json": rf.Cost, "shared-cost.json": list[rf.SharedCostLine]}
 PRICES = {"eks_cluster_hour": 0.10, "fargate_vcpu_hour": 0.04, "fargate_gb_hour": 0.004, "ec2_instance_hour": 0.0416,
           "alb_hour": 0.0225, "alb_lcu_hour": 0.008, "cw_ingest_gb": 0.5, "nat_hour": 0.045, "nat_gb": 0.045,
@@ -80,7 +80,7 @@ def kubectl(argv, env):
 
 
 def state(**changes):
-    cells = [CellSpec(name=c, profile="steady") for c in ("ecs-fargate", "eks-ec2")]
+    cells = [CellSpec(name=c, profile="spike") for c in ("ecs-fargate", "eks-ec2")]
     return RunState(run_id="col-01", cells=cells, region="us-east-2", **{"load_windows": WINDOWS, "prices": PRICES, **changes},
                     capacity=Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4))
 
@@ -90,6 +90,9 @@ def collect(tmp_path, aws=None, run=kubectl, sleeps=None, **changes):
         rf.write(tmp_path / "results" / "col-01" / "raw" / cell / "deploy.json", {
             "stack_create_start": "2026-10-14T19:50:00+00:00", "stack_create_end": "2026-10-14T19:53:30+00:00",
             "alb_dns_name": ALB}, rf.DeployStarted)
+        start, end = WINDOWS[cell]
+        rf.write(tmp_path / "results" / "col-01" / "raw" / cell / "windows.json",
+                 {"spike": {"start": start, "end": end}}, dict[str, rf.Window])
     aws = aws or clients()
     out = make_collector(aws_of(**aws), "sso", tmp_path, run=run,
                          sleep=[].append if sleeps is None else sleeps.append, plan=PLAN)(state(**changes))
@@ -109,7 +112,7 @@ def test_every_raw_file_passes_its_reader(tmp_path):
 def test_analyst_yields_the_scale_out_time_for_both_fixtures(tmp_path):
     _, raw, _ = collect(tmp_path)
     metrics = analyse("col-01", raw, state().cells)
-    got = {(f.cell, f.name): f.value for f in metrics.figures}
+    got = {(f.cell, f.name): f.value for f in metrics.figures if f.profile in (None, "spike")}
     assert got[("ecs-fargate", "scale_out_s")] == 69.0  # alarm 20:10:00, steady state 20:11:09
     assert got[("eks-ec2", "scale_out_s")] == 22.0  # HPA 21:56:01, pod Ready 21:56:23
     assert got[("ecs-fargate", "cold_start_s")] == 38.0
@@ -247,7 +250,7 @@ def test_analyst_makes_cost_figures_from_the_collected_files(tmp_path):
     _, raw, _ = collect(tmp_path)
     for cell in ("ecs-fargate", "eks-ec2"):
         k6 = {"metrics": {"http_reqs": {"count": 1000}, "http_req_failed": {"passes": 0, "fails": 1000}}}
-        (raw / cell / "k6-steady.json").write_text(json.dumps(k6))
+        (raw / cell / "k6-spike.json").write_text(json.dumps(k6))
     metrics = analyse("col-01", raw, state().cells)
     got = {(f.cell, f.name): f.value for f in metrics.figures}
     for cell in ("ecs-fargate", "eks-ec2"):
@@ -264,3 +267,19 @@ def test_shared_costs_are_their_own_file_and_never_in_a_cell(tmp_path):
     assert {line["item"] for line in shared} >= {"shared vpc endpoints", "shared harness vcpu"}
     ecs_cell_only = (2 * (0.25 * 0.04 + 0.5 * 0.004) + 0.0225 + 0.008) / 6 + 0.05
     assert cost_of(raw, "ecs-fargate")["load_usd"] == pytest.approx(ecs_cell_only)
+
+
+def test_the_eks_snapshot_writes_events_before_they_expire_and_the_collector_keeps_it(tmp_path):
+    calls = []
+    run = lambda argv, env: calls.append(argv[0]) or kubectl(argv, env)
+    snapshot = make_eks_snapshot(aws_of(**clients()), "sso", tmp_path, run=run)
+    snapshot(state(), "ecs-fargate", at(20, 5))  # an ECS cell keeps its events in AWS: nothing to snapshot
+    assert calls == []
+    snapshot(state(), "eks-ec2", at(21, 50))
+    raw = tmp_path / "results" / "col-01" / "raw" / "eks-ec2"
+    taken = rf.read(raw / "events.json", list[rf.Event])
+    assert [e.kind for e in taken] == ["alarm", "scheduled", "healthy"]
+    calls.clear()
+    out, _, _ = collect(tmp_path, run=run)
+    assert calls == [] and out["gaps"] == []  # no second kubectl read over the snapshot
+    assert rf.read(raw / "events.json", list[rf.Event]) == taken

@@ -58,7 +58,10 @@ def log_messages(logs, group: str, stream: str) -> list[str]:
 
 
 def make_load_runner(aws: Aws, root: Path, duration_s: float, peak_rps: int, sleep=time.sleep,
-                     clock=time.monotonic, now: Callable[[], datetime] = lambda: datetime.now(UTC)):
+                     clock=time.monotonic, now: Callable[[], datetime] = lambda: datetime.now(UTC),
+                     after_cell: Callable[[RunState, str, datetime], None] = lambda state, cell, start: None):
+    """`after_cell(state, cell, load start)` runs once a cell's profiles are done; an error in it is a gap."""
+
     def run_profile(state: RunState, cell: str, profile: str, raw: Path) -> None:
         region, rid = state.region, d.cell_run_id(state.run_id, cell)
         harness = stack_outputs(aws("cloudformation", region), f"{rid}-harness")
@@ -100,6 +103,7 @@ def make_load_runner(aws: Aws, root: Path, duration_s: float, peak_rps: int, sle
     def load_runner(state: RunState) -> dict:
         raw, gaps, windows = create_run_dirs(state.run_id, root).raw, [], {}
         for cell in d.cells_of(state):
+            profiles: dict[str, dict] = {}
             for profile in [c.profile for c in state.cells if c.name == cell]:
                 start = now()
                 try:
@@ -107,7 +111,15 @@ def make_load_runner(aws: Aws, root: Path, duration_s: float, peak_rps: int, sle
                 except Exception as err:  # noqa: BLE001 - one failed cell is a gap, the other cells still run
                     gaps.append(rf.scrub(f"{cell}/{profile} load: {type(err).__name__}: {err}"))
                     print(gaps[-1], flush=True)
-                windows[cell] = [windows.get(cell, [start.isoformat()])[0], now().isoformat()]
+                end = now()
+                windows[cell] = [windows.get(cell, [start.isoformat()])[0], end.isoformat()]
+                profiles[profile] = {"start": start.isoformat(), "end": end.isoformat()}
+                rf.write(raw / cell / "windows.json", profiles, dict[str, rf.Window])
+            try:
+                after_cell(state, cell, datetime.fromisoformat(windows[cell][0]))
+            except Exception as err:  # noqa: BLE001 - the hook only reads; its failure is a gap
+                gaps.append(rf.scrub(f"{cell} after load: {type(err).__name__}: {err}"))
+                print(gaps[-1], flush=True)
         return {"status": "loaded", "gaps": [*state.gaps, *gaps], "load_windows": windows}
 
     return load_runner

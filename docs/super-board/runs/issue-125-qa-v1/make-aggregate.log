@@ -1,0 +1,9 @@
+results/qa125-agg/aggregate.json
+exit=0
+valid 6 ['qa125-run-a', 'qa125-run-b', 'qa125-run-c']
+p95_ms ecs-fargate steady 3 3.9 4.316744 5.1
+error_rate ecs-fargate steady 3 0.0 0.0 0.0
+p95_ms eks-ec2 steady 3 7.1 7.795883 8.2
+error_rate eks-ec2 steady 3 0.0 0.0 0.0
+p95_ms ecs-ec2 steady 3 6.0 6.434008 6.9
+error_rate ecs-ec2 steady 3 0.0 0.0 0.0

@@ -104,6 +104,13 @@ def test_single_run_metrics_chart_is_unchanged(tmp_path):
     assert svg == make_chart.render(metrics)
 
 
+def test_single_run_chart_matches_main_byte_for_byte(tmp_path):
+    # run-a-chart-main.svg was drawn by scripts/make_chart.py on main 451a2c4, before aggregate support.
+    seed(tmp_path, ["run-a"])
+    assert make_chart.main(["--run-id", "run-a"], results=tmp_path) == 0
+    assert (tmp_path / "run-a" / "chart.svg").read_bytes() == (FIXTURES / "run-a-chart-main.svg").read_bytes()
+
+
 def test_make_aggregate_writes_valid_json_and_chart_renders(tmp_path):
     seed(tmp_path / "results")
     shutil.copy(ROOT / "Makefile", tmp_path / "Makefile")

@@ -24,6 +24,10 @@ from advisor.schemas import (
 
 
 def aggregate(runs: list[Metrics]) -> Aggregate:
+    ids = [r.run_id for r in runs]
+    repeated = sorted({rid for rid in ids if ids.count(rid) > 1})
+    if repeated:
+        raise MetricsError(f"run ids repeated ({', '.join(repeated)}); each run counts once")
     for attr in ("cell", "profile"):
         sets = {r.run_id: {getattr(f, attr) for f in r.figures} for r in runs}
         if len({frozenset(s) for s in sets.values()}) > 1:
@@ -36,6 +40,9 @@ def aggregate(runs: list[Metrics]) -> Aggregate:
     figures = []
     for (name, cell, profile), rows in groups.items():
         values = [v for _, v, _ in rows]
+        units = {u for _, _, u in rows}
+        if len(units) > 1:
+            raise MetricsError(f"{name} {cell} {profile} has different unit across runs ({sorted(units)})")
         figures.append(AggregateFigure(
             name=name, unit=rows[0][2], cell=cell, profile=profile, n=len(rows),
             min=min(values), median=statistics.median(values), max=max(values),

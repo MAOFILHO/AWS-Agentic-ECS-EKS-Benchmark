@@ -72,6 +72,27 @@ def test_missing_run_exits_with_error(tmp_path, capsys):
     assert "error:" in capsys.readouterr().err
 
 
+def test_repeated_run_id_is_rejected(tmp_path, capsys):
+    seed(tmp_path, ["run-a"])
+    code, out = aggregate(tmp_path, ["run-a", "run-a", "run-a"])
+    assert code != 0 and not out.exists()
+    err = capsys.readouterr().err
+    assert "error:" in err and "run-a" in err
+
+
+def test_unit_that_differs_between_runs_is_rejected(tmp_path, capsys):
+    seed(tmp_path)
+    path = tmp_path / "run-b" / "metrics.json"
+    data = json.loads(path.read_text())
+    fig = next(f for f in data["figures"] if f["name"] == "p95_ms")
+    fig["unit"] = "s"
+    path.write_text(json.dumps(data))
+    code, out = aggregate(tmp_path)
+    assert code != 0 and not out.exists()
+    err = capsys.readouterr().err
+    assert "error:" in err and "unit" in err
+
+
 def test_bad_aggregate_json_raises(tmp_path):
     bad = tmp_path / "aggregate.json"
     bad.write_text('{"runs": ["run-a"], "figures": [{"name": "p95_ms", "min": "fast"}]}')

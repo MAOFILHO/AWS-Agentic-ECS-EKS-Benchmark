@@ -1,0 +1,714 @@
+{
+  "runs": [
+    "short1",
+    "short2",
+    "short3"
+  ],
+  "figures": [
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "spike",
+      "n": 3,
+      "min": 3.759845,
+      "median": 4.077531,
+      "max": 4.325449,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "spike",
+      "n": 3,
+      "min": 4.8319694,
+      "median": 4.835586,
+      "max": 5.6276065,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "spike",
+      "n": 3,
+      "min": 10.363333320000033,
+      "median": 12.232909060000004,
+      "max": 16.075988640000087,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "ecs-fargate",
+      "profile": "spike",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 4.091434,
+      "median": 4.769319,
+      "max": 5.22321,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 4.830548899999999,
+      "median": 6.133465299999998,
+      "max": 6.5505256999999935,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 9.300815240000006,
+      "median": 20.00217812000001,
+      "max": 45.31459908000177,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "scale_out_s",
+      "unit": "s",
+      "cell": "ecs-fargate",
+      "profile": "spike",
+      "n": 3,
+      "min": 72.768,
+      "median": 75.867,
+      "max": 84.659,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "cold_start_s",
+      "unit": "s",
+      "cell": "ecs-fargate",
+      "profile": "spike",
+      "n": 3,
+      "min": 66.024,
+      "median": 66.85,
+      "max": 74.31,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "deploy_time_s",
+      "unit": "s",
+      "cell": "ecs-fargate",
+      "profile": null,
+      "n": 3,
+      "min": 400.795825,
+      "median": 426.442562,
+      "max": 438.801709,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "config_lines",
+      "unit": "lines",
+      "cell": "ecs-fargate",
+      "profile": null,
+      "n": 3,
+      "min": 436.0,
+      "median": 436.0,
+      "max": 436.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "moving_parts",
+      "unit": "count",
+      "cell": "ecs-fargate",
+      "profile": null,
+      "n": 3,
+      "min": 4.0,
+      "median": 4.0,
+      "max": 4.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "unit": "usd/h",
+      "cell": "ecs-fargate",
+      "profile": null,
+      "n": 3,
+      "min": 0.0348425,
+      "median": 0.0348425,
+      "max": 0.0348425,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "unit": "usd",
+      "cell": "ecs-fargate",
+      "profile": null,
+      "n": 3,
+      "min": 0.0008941767508443222,
+      "median": 0.0008942613839412873,
+      "max": 0.0008949733622059781,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 5405.667976,
+      "median": 5412.185181,
+      "max": 6209.576632,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 6076.6569765,
+      "median": 6166.6310878,
+      "max": 7586.1648846,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 7167.57819512,
+      "median": 7173.827480099999,
+      "max": 8252.352041179998,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "ecs-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 5.033499,
+      "median": 5.478594,
+      "max": 5.766901,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 5.9471671,
+      "median": 6.5487902999999985,
+      "max": 11.142011399999998,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 9.982277920000001,
+      "median": 10.993312640000026,
+      "max": 26.68298332000017,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "scale_out_s",
+      "unit": "s",
+      "cell": "ecs-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 72.45,
+      "median": 72.812,
+      "max": 76.546,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "cold_start_s",
+      "unit": "s",
+      "cell": "ecs-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 65.52,
+      "median": 66.04,
+      "max": 66.21,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "scale_out_s",
+      "unit": "s",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 148.348,
+      "median": 186.023,
+      "max": 232.658,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "cold_start_s",
+      "unit": "s",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 144.3,
+      "median": 183.025,
+      "max": 222.484,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "deploy_time_s",
+      "unit": "s",
+      "cell": "ecs-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 459.736098,
+      "median": 466.852038,
+      "max": 505.132989,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "config_lines",
+      "unit": "lines",
+      "cell": "ecs-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 436.0,
+      "median": 436.0,
+      "max": 436.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "moving_parts",
+      "unit": "count",
+      "cell": "ecs-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 4.0,
+      "median": 4.0,
+      "max": 4.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "unit": "usd/h",
+      "cell": "ecs-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 0.06409999999999999,
+      "median": 0.06409999999999999,
+      "max": 0.06409999999999999,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "unit": "usd",
+      "cell": "ecs-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 0.0010930217331309349,
+      "median": 0.001094304222264869,
+      "max": 0.0011641316972841658,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 5.737405,
+      "median": 5.78718,
+      "max": 5.882886,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 3862.1558291999977,
+      "median": 4675.048985100001,
+      "max": 5310.671004999998,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 6019.63783592,
+      "median": 6051.286955119998,
+      "max": 6056.085381010001,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "eks-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.015669009270146847,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 5.334955,
+      "median": 5.350873,
+      "max": 5.754018,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 8.226694399999998,
+      "median": 8.2796995,
+      "max": 9.092091899999996,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 13.039261720000004,
+      "median": 15.554325300000023,
+      "max": 16.089137160000035,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "scale_out_s",
+      "unit": "s",
+      "cell": "eks-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 21.0,
+      "median": 21.0,
+      "max": 23.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "cold_start_s",
+      "unit": "s",
+      "cell": "eks-ec2",
+      "profile": "spike",
+      "n": 3,
+      "min": 20.0,
+      "median": 21.0,
+      "max": 23.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "deploy_time_s",
+      "unit": "s",
+      "cell": "eks-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 1041.309024,
+      "median": 1125.289183,
+      "max": 1170.731995,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "config_lines",
+      "unit": "lines",
+      "cell": "eks-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 534.0,
+      "median": 534.0,
+      "max": 534.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "moving_parts",
+      "unit": "count",
+      "cell": "eks-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 4.0,
+      "median": 4.0,
+      "max": 4.0,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "unit": "usd/h",
+      "cell": "eks-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 0.1641,
+      "median": 0.1641,
+      "max": 0.1641,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "unit": "usd",
+      "cell": "eks-ec2",
+      "profile": null,
+      "n": 3,
+      "min": 0.0015365732718448087,
+      "median": 0.0015382627549441212,
+      "max": 0.0015601443235525943,
+      "runs": [
+        "short1",
+        "short2",
+        "short3"
+      ]
+    }
+  ]
+}

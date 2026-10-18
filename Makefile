@@ -62,7 +62,8 @@ chart:
 	uv run --locked python -m scripts.make_chart --run-id "$(RUN_ID)" $(ARGS)
 
 # Write results/OUT/aggregate.json from results/<id>/metrics.json of each run in RUNS: n, min, median, max per
-# figure. No AWS call. Then make chart RUN_ID=OUT draws the median with a min to max whisker.
+# figure. No AWS call. Then make chart RUN_ID=OUT draws the median with a min to max whisker, plus one
+# chart-<question>.svg per question (burst scaling, burst latency, cost, deploy).
 aggregate:
 	@test -n "$(RUNS)" || { echo "error: RUNS is not set. Run: make aggregate RUNS=a,b,c OUT=<name>"; exit 1; }
 	@test -n "$(OUT)" || { echo "error: OUT is not set. Run: make aggregate RUNS=a,b,c OUT=<name>"; exit 1; }

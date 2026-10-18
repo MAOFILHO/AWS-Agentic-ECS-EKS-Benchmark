@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="310" viewBox="0 0 430 310" font-family="sans-serif" font-size="12">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="20" y="24" font-size="16" font-weight="bold" fill="#1a1a1a">How fast does it scale out under a burst?</text>
+<text x="110.0" y="260" text-anchor="middle" fill="#1a1a1a">scale out (s)</text>
+<line x1="28" y1="240" x2="192" y2="240" stroke="#999999"/>
+<rect data-cell="ecs-fargate" data-metric="scale_out_s" x="36" y="78.7" width="44" height="161.3" fill="#1f6fb2"/>
+<text x="58.0" y="74.7" text-anchor="middle" fill="#1a1a1a">75.867</text>
+<line data-whisker="1" data-cell="ecs-fargate" data-metric="scale_out_s" x1="58.0" y1="85.3" x2="58.0" y2="60.0" stroke="#1a1a1a"/>
+<rect data-cell="ecs-ec2" data-metric="scale_out_s" x="88" y="85.2" width="44" height="154.8" fill="#7fb3e0"/>
+<text x="110.0" y="81.2" text-anchor="middle" fill="#1a1a1a">72.812</text>
+<line data-whisker="1" data-cell="ecs-ec2" data-metric="scale_out_s" x1="110.0" y1="86.0" x2="110.0" y2="77.2" stroke="#1a1a1a"/>
+<rect data-cell="eks-ec2" data-metric="scale_out_s" x="140" y="195.4" width="44" height="44.6" fill="#f0a868"/>
+<text x="162.0" y="191.4" text-anchor="middle" fill="#1a1a1a">21</text>
+<line data-whisker="1" data-cell="eks-ec2" data-metric="scale_out_s" x1="162.0" y1="195.4" x2="162.0" y2="191.1" stroke="#1a1a1a"/>
+<text x="290.0" y="260" text-anchor="middle" fill="#1a1a1a">cold start (s)</text>
+<line x1="208" y1="240" x2="372" y2="240" stroke="#999999"/>
+<rect data-cell="ecs-fargate" data-metric="cold_start_s" x="216" y="78.1" width="44" height="161.9" fill="#1f6fb2"/>
+<text x="238.0" y="74.1" text-anchor="middle" fill="#1a1a1a">66.85</text>
+<line data-whisker="1" data-cell="ecs-fargate" data-metric="cold_start_s" x1="238.0" y1="80.1" x2="238.0" y2="60.0" stroke="#1a1a1a"/>
+<rect data-cell="ecs-ec2" data-metric="cold_start_s" x="268" y="80.0" width="44" height="160.0" fill="#7fb3e0"/>
+<text x="290.0" y="76.0" text-anchor="middle" fill="#1a1a1a">66.04</text>
+<line data-whisker="1" data-cell="ecs-ec2" data-metric="cold_start_s" x1="290.0" y1="81.3" x2="290.0" y2="79.6" stroke="#1a1a1a"/>
+<rect data-cell="eks-ec2" data-metric="cold_start_s" x="320" y="189.1" width="44" height="50.9" fill="#f0a868"/>
+<text x="342.0" y="185.1" text-anchor="middle" fill="#1a1a1a">21</text>
+<line data-whisker="1" data-cell="eks-ec2" data-metric="cold_start_s" x1="342.0" y1="191.6" x2="342.0" y2="184.3" stroke="#1a1a1a"/>
+<rect x="20" y="284" width="12" height="12" fill="#1f6fb2"/>
+<text x="38" y="294" fill="#1a1a1a">ecs-fargate</text>
+<rect x="150" y="284" width="12" height="12" fill="#7fb3e0"/>
+<text x="168" y="294" fill="#1a1a1a">ecs-ec2</text>
+<rect x="280" y="284" width="12" height="12" fill="#f0a868"/>
+<text x="298" y="294" fill="#1a1a1a">eks-ec2</text>
+</svg>

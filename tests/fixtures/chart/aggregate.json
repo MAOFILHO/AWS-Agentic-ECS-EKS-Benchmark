@@ -1,0 +1,20 @@
+{
+  "runs": ["r1", "r2", "r3"],
+  "figures": [
+    {"name": "p50_ms", "unit": "ms", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 3.8, "median": 4.0, "max": 4.3, "runs": ["r1", "r2", "r3"]},
+    {"name": "p95_ms", "unit": "ms", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 4.8, "median": 4.9, "max": 5.6, "runs": ["r1", "r2", "r3"]},
+    {"name": "p50_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "spike", "n": 3, "min": 5400.0, "median": 5410.0, "max": 6200.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "p95_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "spike", "n": 3, "min": 5400.0, "median": 6100.0, "max": 7000.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "p95_ms", "unit": "ms", "cell": "ecs-ec2", "profile": "scale-from-min", "n": 3, "min": 5.9, "median": 6.5, "max": 11.1, "runs": ["r1", "r2", "r3"]},
+    {"name": "scale_out_s", "unit": "s", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 72.0, "median": 75.0, "max": 84.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "cold_start_s", "unit": "s", "cell": "ecs-fargate", "profile": "spike", "n": 3, "min": 66.0, "median": 67.0, "max": 74.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "scale_out_s", "unit": "s", "cell": "ecs-ec2", "profile": "spike", "n": 3, "min": 72.0, "median": 73.0, "max": 77.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "scale_out_s", "unit": "s", "cell": "ecs-ec2", "profile": "scale-from-min", "n": 3, "min": 148.0, "median": 186.0, "max": 232.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "deploy_time_s", "unit": "s", "cell": "ecs-fargate", "n": 3, "min": 400.0, "median": 426.0, "max": 438.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "deploy_time_s", "unit": "s", "cell": "ecs-ec2", "n": 3, "min": 459.0, "median": 466.0, "max": 505.0, "runs": ["r1", "r2", "r3"]},
+    {"name": "idle_usd_per_hour", "unit": "USD/h", "cell": "ecs-fargate", "n": 3, "min": 0.0348, "median": 0.0348, "max": 0.0348, "runs": ["r1", "r2", "r3"]},
+    {"name": "idle_usd_per_hour", "unit": "USD/h", "cell": "ecs-ec2", "n": 3, "min": 0.0641, "median": 0.0641, "max": 0.0641, "runs": ["r1", "r2", "r3"]},
+    {"name": "usd_per_1k_requests", "unit": "USD", "cell": "ecs-fargate", "n": 3, "min": 0.00089, "median": 0.00089, "max": 0.0009, "runs": ["r1", "r2", "r3"]},
+    {"name": "usd_per_1k_requests", "unit": "USD", "cell": "ecs-ec2", "n": 3, "min": 0.00109, "median": 0.00109, "max": 0.00116, "runs": ["r1", "r2", "r3"]}
+  ]
+}

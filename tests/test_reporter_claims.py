@@ -3,7 +3,14 @@
 import shutil
 from pathlib import Path
 
-from advisor.reporter import build_prompt, make_reporter, unsupported_claims
+from advisor.reporter import (
+    FALLBACK_VERDICT,
+    build_prompt,
+    make_reporter,
+    render_report,
+    unsupported_claims,
+    verdict_of,
+)
 from advisor.schemas import Figure, Metrics, read_metrics
 from advisor.state import Capacity, CellSpec, RunState
 from scripts import make_report
@@ -79,10 +86,10 @@ def test_reporter_retries_a_comparative_error_claim_then_writes_the_clean_draft(
     assert make_reporter(llm, tmp_path)(state) == {"status": "reported"}
     assert len(llm.prompts) == 2
     assert "higher error rates" in llm.prompts[1]
-    assert (run / "report.md").read_text() == NO_ERRORS
+    assert f"## Verdict\n{verdict_of(NO_ERRORS)}\n" in (run / "report.md").read_text()
 
 
-def test_reporter_fails_after_three_comparative_error_claims(tmp_path):
+def test_reporter_falls_back_after_three_comparative_error_claims(tmp_path):
     run = tmp_path / "results" / "sample3"
     run.mkdir(parents=True)
     shutil.copy(SAMPLE3, run / "metrics.json")
@@ -93,9 +100,10 @@ def test_reporter_fails_after_three_comparative_error_claims(tmp_path):
         region="us-east-1",
     )
     update = make_reporter(StubLLM([HIGHER_ERRORS] * 3), tmp_path)(state)
-    assert update["status"] == "report_failed"
+    assert update["status"] == "reported"
     assert "higher error" in update["errors"][-1]
-    assert not (run / "report.md").exists()
+    assert "higher error" not in (run / "report.md").read_text()
+    assert FALLBACK_VERDICT in (run / "report.md").read_text()
 
 
 def test_steady_only_prompt_forbids_scaling_and_cold_start_claims():
@@ -119,13 +127,13 @@ def test_prompt_with_a_scaling_profile_drops_the_steady_only_rule():
     assert "no errors in any cell" not in prompt
 
 
-def test_prompt_calls_out_each_shared_cost_line():
+def test_report_lists_each_shared_cost_line():
     metrics = sample3()
     assert metrics.shared_costs  # the analyst already reads raw/shared-cost.json into metrics.json
-    prompt = build_prompt(metrics)
-    assert "shared cost" in prompt.lower()
+    report = render_report(metrics, "ECS wins.")
+    assert "## Shared costs" in report
     for line in metrics.shared_costs:
-        assert f"- {line.item}: {line.usd} USD" in prompt
+        assert f"| {line.item} | " in report
 
 
 def test_make_report_writes_report_md_from_saved_metrics_without_aws(tmp_path, monkeypatch):
@@ -138,7 +146,7 @@ def test_make_report_writes_report_md_from_saved_metrics_without_aws(tmp_path, m
     shutil.copy(SAMPLE3, run / "metrics.json")
     llm = StubLLM([NO_ERRORS])
     assert make_report.main(["--run-id", "sample3"], root=tmp_path, llm=llm) == 0
-    assert (run / "report.md").read_text() == NO_ERRORS
+    assert f"## Verdict\n{verdict_of(NO_ERRORS)}\n" in (run / "report.md").read_text()
 
 
 def test_make_report_calls_only_bedrock_in_the_given_region(tmp_path, monkeypatch):
@@ -160,11 +168,10 @@ def test_make_report_calls_only_bedrock_in_the_given_region(tmp_path, monkeypatc
     assert clients == [("bedrock-runtime", "us-east-1")]
 
 
-def test_make_report_exits_1_without_metrics_or_after_three_bad_drafts(tmp_path, capsys):
+def test_make_report_exits_1_without_metrics_and_0_after_three_bad_drafts(tmp_path):
     assert make_report.main(["--run-id", "nope"], root=tmp_path, llm=StubLLM([])) == 1
     run = tmp_path / "results" / "sample3"
     run.mkdir(parents=True)
     shutil.copy(SAMPLE3, run / "metrics.json")
-    assert make_report.main(["--run-id", "sample3"], root=tmp_path, llm=StubLLM([HIGHER_ERRORS] * 3)) == 1
-    assert not (run / "report.md").exists()
-    assert "higher error" in capsys.readouterr().err
+    assert make_report.main(["--run-id", "sample3"], root=tmp_path, llm=StubLLM([HIGHER_ERRORS] * 3)) == 0
+    assert FALLBACK_VERDICT in (run / "report.md").read_text()

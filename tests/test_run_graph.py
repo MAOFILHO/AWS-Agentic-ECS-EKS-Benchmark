@@ -7,13 +7,14 @@ import pytest
 
 from advisor import cli, deployer
 from advisor.graph import build_graph
+from advisor.reporter import FALLBACK_VERDICT
 from advisor.schemas import RunConfig
 from advisor.state import Capacity, RunState
 from tests.test_analyst import REAL, REAL_CELLS
 
 CONFIG = RunConfig.model_validate_json(cli.RUN_CONFIG.read_text()).model_dump()
 ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
-REPORT = "## Verdict\nECS is simpler to run.\n\n### spike\n\n### steady\n"  # one section per profile (#134)
+REPORT = "ECS is simpler to run."  # the LLM writes only the Verdict (#141)
 
 
 class Bedrock:
@@ -82,16 +83,13 @@ def test_run_past_the_collector_writes_metrics_and_report(env, tmp_path, monkeyp
     result = run_graph(tmp_path)
     results = tmp_path / "results" / "graph-01"
     assert '"figures"' in (results / "metrics.json").read_text()
-    assert (results / "report.md").read_text() == REPORT
+    assert f"## Verdict\n{REPORT}\n" in (results / "report.md").read_text()
     assert fake.regions == ["eu-west-1"]  # the run's region
     assert result["status"] == "done" and env  # teardown ran
 
 
-@pytest.mark.parametrize("error", [RuntimeError(f"AccessDeniedException for arn:aws:iam::{ACCOUNT}:role/x"), None])
-def test_failed_reporter_still_ends_in_teardown(env, tmp_path, monkeypatch, error):
-    fake = Bedrock(error)
-    if error is None:  # a draft with a number not in metrics.json, three times
-        fake.converse = lambda **kwargs: {"output": {"message": {"content": [{"text": "p95 is 9999 ms"}]}}}
+def test_failed_reporter_still_ends_in_teardown(env, tmp_path, monkeypatch):
+    fake = Bedrock(RuntimeError(f"AccessDeniedException for arn:aws:iam::{ACCOUNT}:role/x"))
     bedrock(monkeypatch, fake)
     result = run_graph(tmp_path)
     assert result["status"] == "report_failed"
@@ -99,6 +97,17 @@ def test_failed_reporter_still_ends_in_teardown(env, tmp_path, monkeypatch, erro
     assert not (tmp_path / "results" / "graph-01" / "report.md").exists()
     assert result["errors"][-1].startswith("reporter:")
     assert ACCOUNT not in result["errors"][-1]
+
+
+def test_three_bad_verdicts_end_done_with_the_fallback_report(env, tmp_path, monkeypatch):
+    fake = Bedrock()
+    fake.converse = lambda **kwargs: {"output": {"message": {"content": [{"text": "p95 is 9999 ms"}]}}}
+    bedrock(monkeypatch, fake)
+    result = run_graph(tmp_path)
+    assert result["status"] == "done"
+    assert "9999" in result["errors"][-1]
+    report = (tmp_path / "results" / "graph-01" / "report.md").read_text()
+    assert FALLBACK_VERDICT in report and "9999" not in report
 
 
 def test_resume_builds_the_same_nodes_as_run(env, tmp_path, monkeypatch):

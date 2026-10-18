@@ -2,7 +2,12 @@
 
 from pathlib import Path
 
-from advisor.reporter import build_prompt, contradicted_rankings, make_reporter
+from advisor.reporter import (
+    FALLBACK_VERDICT,
+    build_prompt,
+    contradicted_rankings,
+    make_reporter,
+)
 from advisor.schemas import Metrics
 from advisor.state import Capacity, CellSpec, RunState
 from advisor.store import create_run_dirs
@@ -78,7 +83,7 @@ def test_prompt_lists_the_ranking_facts():
     assert "p95_ms (steady): lowest to highest: ecs-fargate, ecs-ec2, eks-ec2" in prompt
 
 
-def test_reporter_retries_a_contradicted_ranking_then_fails_after_three(tmp_path):
+def test_reporter_retries_a_contradicted_ranking_then_falls_back_after_three(tmp_path):
     paths = create_run_dirs("sample4", tmp_path)
     paths.metrics.write_text(SAMPLE4.read_text())
     state = RunState(
@@ -87,13 +92,12 @@ def test_reporter_retries_a_contradicted_ranking_then_fails_after_three(tmp_path
         capacity=Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4),
         region="us-east-1",
     )
-    llm = StubLLM([report(WRONG_COST), report(RIGHT_COST)])
+    llm = StubLLM([WRONG_COST, RIGHT_COST])
     assert make_reporter(llm, tmp_path)(state) == {"status": "reported"}
     assert f"These rankings contradict metrics.json: {WRONG_COST}" in llm.prompts[1]
-    assert paths.report.read_text() == report(RIGHT_COST)
+    assert f"## Verdict\n{RIGHT_COST}\n" in paths.report.read_text()
 
-    paths.report.unlink()
-    update = make_reporter(StubLLM([report(WRONG_COST)] * 3), tmp_path)(state)
-    assert update["status"] == "report_failed"
+    update = make_reporter(StubLLM([WRONG_COST] * 3), tmp_path)(state)
+    assert update["status"] == "reported"
     assert WRONG_COST in update["errors"][-1]
-    assert not paths.report.exists()
+    assert WRONG_COST not in paths.report.read_text() and FALLBACK_VERDICT in paths.report.read_text()

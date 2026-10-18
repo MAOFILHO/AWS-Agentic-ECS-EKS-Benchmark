@@ -50,10 +50,10 @@ runner passes the plan config's peak and duration:
 
 | Profile | Shape | Answers |
 |---|---|---|
-| `steady` | 50 RPS for 600 s | baseline latency and error rate |
-| `step` | 13, 25, 38 and 50 RPS, each held 150 s | latency per load band |
-| `spike` | 5 RPS for 150 s, then 50 RPS within 1 s, held 450 s | scale out and errors under a burst |
-| `scale-from-min` | 0 RPS for 150 s, then 50 RPS within 1 s, held 450 s | cold start from minimum replicas |
+| `steady` | 80 RPS for 600 s | baseline latency and error rate |
+| `step` | 20, 40, 60 and 80 RPS, each held 150 s | latency per load band |
+| `spike` | 8 RPS for 150 s, then 80 RPS within 1 s, held 450 s | scale out and errors under a burst |
+| `scale-from-min` | 0 RPS for 150 s, then 80 RPS within 1 s, held 450 s | cold start from minimum replicas |
 
 The step rates are 25, 50, 75 and 100 percent of the peak; the spike starts at 10 percent of it.
 Run by hand with no environment set, the scripts default to 50 RPS for 60 s.

@@ -18,7 +18,7 @@ from langgraph.types import Command
 
 from advisor import rawformats as rf
 from advisor.analyst import analyst_node
-from advisor.collector import make_collector
+from advisor.collector import make_collector, make_eks_snapshot
 from advisor.deployer import make_deployer
 from advisor.gate import make_gate
 from advisor.graph import build_graph
@@ -95,7 +95,8 @@ def deploy_nodes(root: Path, config: dict) -> dict:
     return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root,
                                              k6_image_uri=os.environ.get("K6_IMAGE_URI"),
                                              instance_type=config["plan"]["instance_type"]),
-            "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
+            "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"],
+                                            after_cell=make_eks_snapshot(aws, profile, root)),
             "collector": make_collector(aws, profile, root, plan=PlanConfig(**config["plan"])),
             "analyst": partial(analyst_node, root=root,
                                harness_cpu_threshold=config.get("harness_cpu_threshold", 70.0)),

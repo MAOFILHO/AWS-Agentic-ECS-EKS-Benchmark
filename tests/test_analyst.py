@@ -1,3 +1,4 @@
+import json
 import re
 import shutil
 from pathlib import Path
@@ -34,10 +35,8 @@ EXPECTED = [
     ("error_rate", "ecs-fargate", "spike", 40 / 2000),
     ("p50_ms", "eks-ec2", "steady", 38.0),
     ("error_rate", "eks-ec2", "steady", 0.0),
-    ("scale_out_s", "ecs-fargate", None, 69.0),  # alarm 20:10:00, healthy 20:11:09
-    ("scale_out_s", "eks-ec2", None, 22.0),  # alarm 21:56:01, healthy 21:56:23
-    ("cold_start_s", "ecs-fargate", None, 38.0),  # scheduled 20:10:31
-    ("cold_start_s", "eks-ec2", None, 3.0),  # scheduled 21:56:20
+    ("scale_out_s", "ecs-fargate", "spike", 69.0),  # alarm 20:10:00, healthy 20:11:09
+    ("cold_start_s", "ecs-fargate", "spike", 38.0),  # scheduled 20:10:31
     ("deploy_time_s", "ecs-fargate", None, 252.0),  # 19:50:00 to 19:54:12
     ("deploy_time_s", "eks-ec2", None, 1110.0),  # 21:20:00 to 21:38:30
     ("usd_per_1k_requests", "ecs-fargate", None, 0.0125 / (2994 + 1960) * 1000),
@@ -61,7 +60,7 @@ def test_real_run_has_no_gaps_and_is_not_harness_bound():
     assert (metrics.gaps, metrics.harness_bound) == ([], False)
 
 
-MISSING = ["events.json", "deploy.json", "config.json", "cost.json", "k6-spike.json"]
+MISSING = ["events.json", "windows.json", "deploy.json", "config.json", "cost.json", "k6-spike.json"]
 
 
 @pytest.mark.parametrize("missing", [*MISSING, "cloudwatch-harness-cpu.json"])
@@ -147,3 +146,48 @@ def test_non_finite_cost_is_a_gap_and_metrics_json_reloads(tmp_path, bad):
     analyst_node(RunState(run_id="real-01", cells=REAL_CELLS, capacity=capacity, region="r"), root=tmp_path)
     written = Metrics.model_validate_json((raw.parent / "metrics.json").read_text())
     assert "eks-ec2/cost.json" in "\n".join(written.gaps)
+
+
+EKS_EVENTS = """[
+  {"timestamp": "2026-10-14T21:56:01Z", "kind": "alarm", "message": "HPA cpu above target"},
+  {"timestamp": "2026-10-14T21:56:20Z", "kind": "scheduled", "message": "pod scheduled"},
+  {"timestamp": "2026-10-14T21:56:23Z", "kind": "healthy", "message": "pod Ready"},
+  {"timestamp": "2026-10-14T22:04:10Z", "kind": "scheduled", "message": "pod scheduled"},
+  {"timestamp": "2026-10-14T22:04:40Z", "kind": "healthy", "message": "pod Ready"}
+]"""
+EKS_WINDOWS = """{"spike": {"start": "2026-10-14T21:50:00Z", "end": "2026-10-14T22:00:00Z"},
+  "scale-from-min": {"start": "2026-10-14T22:00:00Z", "end": "2026-10-14T22:10:00Z"}}"""
+EKS_CELLS = [CellSpec(name="eks-ec2", profile=p) for p in ("steady", "spike", "scale-from-min")]
+
+
+def eks_run(tmp_path: Path, events: str) -> Metrics:
+    raw = real_copy(tmp_path)
+    (raw / "eks-ec2" / "events.json").write_text(events)
+    (raw / "eks-ec2" / "windows.json").write_text(EKS_WINDOWS)
+    return analyse("real-01", raw, EKS_CELLS)
+
+
+def test_fake_eks_events_give_scale_figures_per_profile(tmp_path):
+    metrics = eks_run(tmp_path, EKS_EVENTS)
+    got = {(f.name, f.profile): f.value for f in metrics.figures if f.cell == "eks-ec2" and f.unit == "s"
+           and f.name != "deploy_time_s"}
+    assert got == {("scale_out_s", "spike"): 22.0, ("cold_start_s", "spike"): 3.0,  # HPA 21:56:01, Ready 21:56:23
+                   ("cold_start_s", "scale-from-min"): 30.0}  # scheduled 22:04:10, Ready 22:04:40
+    assert "eks-ec2/scale-from-min scale_out_s: no alarm then healthy in its load window" in metrics.gaps
+
+
+def test_a_cell_with_zero_scaling_events_says_no_scale_out_happened(tmp_path):
+    metrics = eks_run(tmp_path, "[]")
+    assert not [f for f in metrics.figures if f.name in ("scale_out_s", "cold_start_s")]
+    for profile in ("spike", "scale-from-min"):
+        assert f"eks-ec2/{profile} scale_out_s, cold_start_s: no scale-out happened in its load window" in metrics.gaps
+
+
+def test_metrics_json_on_disk_gives_scale_figures_a_profile(tmp_path):
+    raw = tmp_path / "results" / "real-01" / "raw"
+    shutil.copytree(REAL, raw)
+    capacity = Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4)
+    analyst_node(RunState(run_id="real-01", cells=REAL_CELLS, capacity=capacity, region="us-east-1"), root=tmp_path)
+    figures = json.loads((raw.parent / "metrics.json").read_text())["figures"]
+    scale = {(f["name"], f["cell"], f["profile"]) for f in figures if f["name"] in ("scale_out_s", "cold_start_s")}
+    assert scale == {("scale_out_s", "ecs-fargate", "spike"), ("cold_start_s", "ecs-fargate", "spike")}

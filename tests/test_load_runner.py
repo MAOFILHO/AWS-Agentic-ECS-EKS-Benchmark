@@ -65,14 +65,14 @@ def state(cells=("ecs-fargate",), profiles=("steady",)):
                     capacity=Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4), region="us-east-2")
 
 
-def node(tmp_path, ecs, logs, cfn, clock=lambda: 0):
+def node(tmp_path, ecs, logs, cfn, clock=lambda: 0, **kwargs):
     for cell in ("ecs-fargate", "eks-ec2"):
         rf.write(tmp_path / "results" / "load-01" / "raw" / cell / "deploy.json", {
             "stack_create_start": "2026-10-14T19:50:00+00:00", "stack_create_end": "2026-10-14T19:53:30+00:00",
             "alb_dns_name": "alb.example.com"}, rf.DeployStarted)
     aws = aws_of(ecs=ecs, logs=logs, cloudformation=cfn)
     return make_load_runner(aws, tmp_path, 600, 50, sleep=lambda s: None, clock=clock,
-                            now=lambda: datetime(2026, 10, 14, 20, 0, tzinfo=UTC))
+                            now=lambda: datetime(2026, 10, 14, 20, 0, tzinfo=UTC), **kwargs)
 
 
 def raw(tmp_path, cell="ecs-fargate"):
@@ -151,3 +151,29 @@ def test_raw_file_and_printed_gaps_hold_no_account_id_or_email(tmp_path, capsys)
     ecs.responses["run_task"] = {"tasks": [], "failures": [{"arn": TASK, "reason": f"denied for {EMAIL}"}]}
     out = node(tmp_path, ecs, logs, cfn)(state())
     assert out["gaps"] and not SENSITIVE.search(out["gaps"][0] + capsys.readouterr().out)
+
+
+def test_each_profile_window_goes_to_windows_json(tmp_path):
+    ecs, logs, cfn = harness()
+    ticks = iter(range(0, 60, 5))
+    now = lambda: datetime(2026, 10, 14, 20, next(ticks), tzinfo=UTC)
+    node(tmp_path, ecs, logs, cfn)  # writes deploy.json
+    make_load_runner(aws_of(ecs=ecs, logs=logs, cloudformation=cfn), tmp_path, 600, 50, sleep=lambda s: None,
+                     clock=lambda: 0, now=now)(state(profiles=("spike", "scale-from-min")))
+    windows = rf.read(raw(tmp_path) / "windows.json", dict[str, rf.Window])
+    assert {p: (w.start.minute, w.end.minute) for p, w in windows.items()} == {"spike": (0, 5), "scale-from-min": (10, 15)}
+
+
+def test_after_cell_runs_once_per_cell_and_its_error_is_a_gap(tmp_path):
+    ecs, logs, cfn = harness()
+    seen = []
+
+    def after(state, cell, start):
+        seen.append((cell, start.hour))
+        if cell == "eks-ec2":
+            raise RuntimeError(f"kubectl denied for {EMAIL}")
+
+    out = node(tmp_path, ecs, logs, cfn, after_cell=after)(state(("ecs-fargate", "eks-ec2"), ("steady", "spike")))
+    assert seen == [("ecs-fargate", 20), ("eks-ec2", 20)]
+    assert len(out["gaps"]) == 1 and out["gaps"][0].startswith("eks-ec2 after load: RuntimeError")
+    assert not SENSITIVE.search(out["gaps"][0])

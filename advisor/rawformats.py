@@ -14,6 +14,8 @@ including a NaN or Infinity number. The analyst turns a missing or bad file into
   `{"timestamp": ISO 8601, "kind": "alarm" | "scheduled" | "healthy", "message": str}`.
   `alarm` = autoscaling alarm or HPA decision, `scheduled` = task or pod placed,
   `healthy` = replica passed its health check (`/readyz` 200 or ALB target healthy).
+- `windows.json`: the load runner's `{profile: {"start", "end"}}`, ISO 8601: when each k6 profile ran. The
+  analyst counts a scaling event toward the profile whose window holds it.
 - `deploy.json`: `{"stack_create_start", "stack_create_end", "target_healthy"}`, ISO 8601, and
   `alb_dns_name`. The deployer writes all but `target_healthy` (DeployStarted), which the collector adds.
 - `config.json`: `{"config_lines": int, "moving_parts": int}`, plus `instance_type` for an EC2 cell.
@@ -87,6 +89,11 @@ class Event(Strict):
     timestamp: AwareDatetime
     kind: Literal["alarm", "scheduled", "healthy"]
     message: str
+
+
+class Window(Strict):
+    start: AwareDatetime
+    end: AwareDatetime
 
 
 class DeployStarted(Strict):

@@ -120,6 +120,25 @@ def eks_events(run: d.Runner, env: dict, cluster: str, region: str, start: datet
     return found
 
 
+def make_eks_snapshot(aws: Aws, profile: str | None, root: Path, run: d.Runner | None = None):
+    """The load runner's after_cell hook: write an EKS cell's events.json as soon as its load ends.
+
+    Kubernetes keeps events for one hour, and the collector runs only after every cell's load, so by then the HPA
+    and pod events of the first EKS profiles are gone. The collector keeps this file and does not read them again.
+    """
+    env = {"AWS_PROFILE": profile} if profile else {}
+
+    def snapshot(state: RunState, cell: str, start: datetime) -> None:
+        if cell.startswith("ecs-"):
+            return
+        stack = stack_outputs(aws("cloudformation", state.region), f"{d.cell_run_id(state.run_id, cell)}-{cell}")
+        found = eks_events(run or d.subprocess_runner, env, stack["ClusterName"], state.region, start)
+        out = create_run_dirs(state.run_id, root).raw / cell / "events.json"
+        rf.write(out, sorted(found, key=lambda e: e["timestamp"]), list[rf.Event])
+
+    return snapshot
+
+
 def priced(part: cost.Breakdown) -> float:
     """A breakdown's total; any missing price raises, so the file is left out and the section is a gap."""
     if part.gaps:
@@ -214,6 +233,8 @@ def make_collector(aws: Aws, profile: str | None, root: Path, run: d.Runner | No
                 rf.write(out / "deploy.json", {**deploy.model_dump(mode="json"), "target_healthy": healthy}, rf.Deploy)
 
             def events():
+                if not ecs and (out / "events.json").is_file():
+                    return  # make_eks_snapshot wrote it right after this cell's load
                 if ecs:
                     found = ecs_events(aws, region, cell_stack["ClusterName"], cell_stack["ServiceName"], start)
                 else:

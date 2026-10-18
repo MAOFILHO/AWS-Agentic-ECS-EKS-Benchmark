@@ -1,0 +1,4 @@
+ok .claude/worktrees/issue-143-qa/results/published/aggregate.json
+ok .claude/worktrees/issue-143-qa/results/published/short1-metrics.json
+ok .claude/worktrees/issue-143-qa/results/published/short2-metrics.json
+ok .claude/worktrees/issue-143-qa/results/published/short3-metrics.json

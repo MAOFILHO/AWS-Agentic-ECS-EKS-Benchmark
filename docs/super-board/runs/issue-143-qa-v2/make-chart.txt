@@ -1,0 +1,19 @@
+uv run --locked python -m scripts.make_chart --run-id "sample" 
+results/sample/chart.svg
+sample chart byte-equal: yes
+uv run --locked python -m scripts.make_chart --run-id "qa-agg" 
+results/qa-agg/chart.svg
+results/qa-agg/chart-burst-scaling.svg
+results/qa-agg/chart-burst-latency.svg
+results/qa-agg/chart-cost.svg
+results/qa-agg/chart-deploy.svg
+chart-burst-scaling.svg matches published
+chart-burst-latency.svg matches published
+chart-cost.svg matches published
+chart-deploy.svg matches published
+aggregate.json
+chart-burst-latency.svg
+chart-burst-scaling.svg
+chart-cost.svg
+chart-deploy.svg
+chart.svg

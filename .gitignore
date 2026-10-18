@@ -8,10 +8,11 @@
 .DS_Store
 .claude/settings.json.bak-*
 
-# Benchmark output: only the published sample run is tracked
+# Benchmark output: only the sample run and the published 3-run results are tracked
 results/*
 !results/.gitkeep
 !results/sample/
+!results/published/
 
 # Local env files (the example stays tracked) and virtualenv
 .env

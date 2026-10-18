@@ -1,0 +1,413 @@
+{
+  "run_id": "short3",
+  "figures": [
+    {
+      "name": "p50_ms",
+      "value": 3.759845,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p95_ms",
+      "value": 4.835586,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p99_ms",
+      "value": 12.232909,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p50_ms",
+      "value": 4.769319,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p95_ms",
+      "value": 6.133465,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p99_ms",
+      "value": 20.002178,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "scale_out_s",
+      "value": 84.659,
+      "unit": "s",
+      "source": "ecs-fargate/events.json + ecs-fargate/windows.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "cold_start_s",
+      "value": 74.31,
+      "unit": "s",
+      "source": "ecs-fargate/events.json + ecs-fargate/windows.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "deploy_time_s",
+      "value": 438.801709,
+      "unit": "s",
+      "source": "ecs-fargate/deploy.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "config_lines",
+      "value": 436.0,
+      "unit": "lines",
+      "source": "ecs-fargate/config.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "moving_parts",
+      "value": 4.0,
+      "unit": "count",
+      "source": "ecs-fargate/config.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "value": 0.034842,
+      "unit": "usd/h",
+      "source": "ecs-fargate/cost.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "value": 0.000894,
+      "unit": "usd",
+      "source": "ecs-fargate/cost.json + ecs-fargate/k6-spike.json + ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "p50_ms",
+      "value": 5412.185181,
+      "unit": "ms",
+      "source": "ecs-ec2/k6-spike.json",
+      "cell": "ecs-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "p95_ms",
+      "value": 6166.631088,
+      "unit": "ms",
+      "source": "ecs-ec2/k6-spike.json",
+      "cell": "ecs-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "p99_ms",
+      "value": 7167.578195,
+      "unit": "ms",
+      "source": "ecs-ec2/k6-spike.json",
+      "cell": "ecs-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "ecs-ec2/k6-spike.json",
+      "cell": "ecs-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "p50_ms",
+      "value": 5.033499,
+      "unit": "ms",
+      "source": "ecs-ec2/k6-scale-from-min.json",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p95_ms",
+      "value": 5.947167,
+      "unit": "ms",
+      "source": "ecs-ec2/k6-scale-from-min.json",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p99_ms",
+      "value": 10.993313,
+      "unit": "ms",
+      "source": "ecs-ec2/k6-scale-from-min.json",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "ecs-ec2/k6-scale-from-min.json",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "scale_out_s",
+      "value": 72.45,
+      "unit": "s",
+      "source": "ecs-ec2/events.json + ecs-ec2/windows.json",
+      "cell": "ecs-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "cold_start_s",
+      "value": 66.21,
+      "unit": "s",
+      "source": "ecs-ec2/events.json + ecs-ec2/windows.json",
+      "cell": "ecs-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "scale_out_s",
+      "value": 232.658,
+      "unit": "s",
+      "source": "ecs-ec2/events.json + ecs-ec2/windows.json",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "cold_start_s",
+      "value": 222.484,
+      "unit": "s",
+      "source": "ecs-ec2/events.json + ecs-ec2/windows.json",
+      "cell": "ecs-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "deploy_time_s",
+      "value": 505.132989,
+      "unit": "s",
+      "source": "ecs-ec2/deploy.json",
+      "cell": "ecs-ec2",
+      "profile": null
+    },
+    {
+      "name": "config_lines",
+      "value": 436.0,
+      "unit": "lines",
+      "source": "ecs-ec2/config.json",
+      "cell": "ecs-ec2",
+      "profile": null
+    },
+    {
+      "name": "moving_parts",
+      "value": 4.0,
+      "unit": "count",
+      "source": "ecs-ec2/config.json",
+      "cell": "ecs-ec2",
+      "profile": null
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "value": 0.0641,
+      "unit": "usd/h",
+      "source": "ecs-ec2/cost.json",
+      "cell": "ecs-ec2",
+      "profile": null
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "value": 0.001093,
+      "unit": "usd",
+      "source": "ecs-ec2/cost.json + ecs-ec2/k6-spike.json + ecs-ec2/k6-scale-from-min.json",
+      "cell": "ecs-ec2",
+      "profile": null
+    },
+    {
+      "name": "p50_ms",
+      "value": 5.737405,
+      "unit": "ms",
+      "source": "eks-ec2/k6-spike.json",
+      "cell": "eks-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "p95_ms",
+      "value": 5310.671005,
+      "unit": "ms",
+      "source": "eks-ec2/k6-spike.json",
+      "cell": "eks-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "p99_ms",
+      "value": 6019.637836,
+      "unit": "ms",
+      "source": "eks-ec2/k6-spike.json",
+      "cell": "eks-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.015669,
+      "unit": "ratio",
+      "source": "eks-ec2/k6-spike.json",
+      "cell": "eks-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "p50_ms",
+      "value": 5.334955,
+      "unit": "ms",
+      "source": "eks-ec2/k6-scale-from-min.json",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p95_ms",
+      "value": 8.279699,
+      "unit": "ms",
+      "source": "eks-ec2/k6-scale-from-min.json",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p99_ms",
+      "value": 13.039262,
+      "unit": "ms",
+      "source": "eks-ec2/k6-scale-from-min.json",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "eks-ec2/k6-scale-from-min.json",
+      "cell": "eks-ec2",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "scale_out_s",
+      "value": 21.0,
+      "unit": "s",
+      "source": "eks-ec2/events.json + eks-ec2/windows.json",
+      "cell": "eks-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "cold_start_s",
+      "value": 21.0,
+      "unit": "s",
+      "source": "eks-ec2/events.json + eks-ec2/windows.json",
+      "cell": "eks-ec2",
+      "profile": "spike"
+    },
+    {
+      "name": "deploy_time_s",
+      "value": 1170.731995,
+      "unit": "s",
+      "source": "eks-ec2/deploy.json",
+      "cell": "eks-ec2",
+      "profile": null
+    },
+    {
+      "name": "config_lines",
+      "value": 534.0,
+      "unit": "lines",
+      "source": "eks-ec2/config.json",
+      "cell": "eks-ec2",
+      "profile": null
+    },
+    {
+      "name": "moving_parts",
+      "value": 4.0,
+      "unit": "count",
+      "source": "eks-ec2/config.json",
+      "cell": "eks-ec2",
+      "profile": null
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "value": 0.1641,
+      "unit": "usd/h",
+      "source": "eks-ec2/cost.json",
+      "cell": "eks-ec2",
+      "profile": null
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "value": 0.00156,
+      "unit": "usd",
+      "source": "eks-ec2/cost.json + eks-ec2/k6-spike.json + eks-ec2/k6-scale-from-min.json",
+      "cell": "eks-ec2",
+      "profile": null
+    }
+  ],
+  "shared_costs": [
+    {
+      "item": "shared nat gateway",
+      "usd": 0.048964,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared nat data",
+      "usd": 0.045,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared vpc endpoints",
+      "usd": 0.054405,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared harness vcpu",
+      "usd": 0.044046,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared harness memory",
+      "usd": 0.009673,
+      "source": "shared-cost.json"
+    }
+  ],
+  "gaps": [
+    "ecs-fargate/scale-from-min scale_out_s, cold_start_s: no scale-out happened in its load window",
+    "eks-ec2/scale-from-min scale_out_s, cold_start_s: no scale-out happened in its load window"
+  ],
+  "harness_bound": false
+}

@@ -1,14 +1,17 @@
-"""Reporter node: an LLM writes results/<run-id>/report.md from metrics.json only (ADR 0004).
+"""Reporter node: writes results/<run-id>/report.md from metrics.json only (ADR 0004, issue #141).
 
-The reporter cannot compute new figures, such as a percentage difference. A derived figure must
-already be in metrics.json: add the field to the analyst first. Every draft goes through
-`numcheck.check`, `unsupported_claims` and `contradicted_rankings`; offenders go back to the LLM, at most 3 tries in all. After the third failed
-try the step fails, metrics.json stays, and no report is written.
+Code writes every table from metrics.json: a figure that exists always shows, a missing one shows
+`n/a` with its gap as a note. The LLM writes only the Verdict paragraph. It cannot compute new
+figures, such as a percentage difference: a derived figure must already be in metrics.json. Every
+Verdict draft goes through `numcheck.check`, `unsupported_claims` and `contradicted_rankings`;
+offenders go back to the LLM, at most 3 tries in all. After the third failed try the report is
+still written, with the tables and FALLBACK_VERDICT.
 """
 
 import os
 import re
 from collections.abc import Callable, Mapping
+from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
@@ -19,14 +22,30 @@ from advisor.store import create_run_dirs
 
 DEFAULT_BEDROCK_MODEL_ID = "amazon.nova-micro-v1:0"
 MAX_TRIES = 3
+FALLBACK_VERDICT = "No checked verdict could be written for this run: read the tables below."
+# Table rows: metric -> row label, unit in the label (issue #122).
+PROFILE_ROWS = {
+    "p50_ms": "P50 latency (ms)",
+    "p95_ms": "P95 latency (ms)",
+    "p99_ms": "P99 latency (ms)",
+    "error_rate": "Error rate",
+    "scale_out_s": "Scale-out (s)",
+    "cold_start_s": "Cold start (s)",
+}
+CELL_ROWS = {
+    "deploy_time_s": "Deploy time (s)",
+    "config_lines": "Config lines",
+    "moving_parts": "Moving parts",
+    "idle_usd_per_hour": "Idle cost (USD/h)",
+    "usd_per_1k_requests": "Cost per 1k requests (USD)",
+}
 # "higher error rate", "error rate is worse": a comparison word within five words of "error", same clause.
 _NEAR = r"(?:[^\w.!?;:\n]+\w+){0,5}?[^\w.!?;:\n]+"
 _MORE = r"(?:higher|lower|worse|more)"
 ERROR_CLAIM_RE = re.compile(
     rf"\b{_MORE}\b{_NEAR}(?P<a>error\w*)|\b(?P<b>error\w*){_NEAR}{_MORE}\b", re.IGNORECASE
 )
-# A "Verdict" heading with text under it; the title's "A Verdict" does not count.
-_VERDICT_RE = re.compile(r"^#{1,6}[ \t]*Verdict[ \t]*\n+(?!#)\S", re.IGNORECASE | re.MULTILINE)
+_VERDICT_HEADING_RE = re.compile(r"\A#{1,6}[ \t]*Verdict[ \t]*\n", re.IGNORECASE)
 # "no errors", "zero errors", "without errors" state the all-zero fact, not a comparison.
 _NEGATED_RE = re.compile(r"\b(?:no|zero|without)\W+$", re.IGNORECASE)
 # Ranking claims: "X is more costly than Y", "X has lower latency than Y" (issue #135).
@@ -74,8 +93,19 @@ class BedrockLLM:
         return resp["output"]["message"]["content"][0]["text"]
 
 
-def _profiles(metrics: Metrics) -> list[str]:
-    return sorted({f.profile for f in metrics.figures if f.profile})
+def _ordered(first: list[str], seen: list) -> list:
+    """`first` (matrix order), then the rest of `seen` in the order met; no repeats, no None."""
+    return [x for x in dict.fromkeys([*first, *seen]) if x is not None]
+
+
+def _profiles(metrics: Metrics, state: RunState | None = None) -> list[str]:
+    matrix = [c.profile for c in state.cells] if state else []
+    return _ordered(matrix, [f.profile for f in metrics.figures])
+
+
+def _cells(metrics: Metrics, state: RunState | None = None) -> list[str]:
+    matrix = [c.name for c in state.cells] if state else []
+    return _ordered(matrix, [f.cell for f in metrics.figures])
 
 
 def _rounded(metrics: Metrics) -> Metrics:
@@ -85,16 +115,8 @@ def _rounded(metrics: Metrics) -> Metrics:
 
 
 def build_prompt(metrics: Metrics) -> str:
-    profiles = _profiles(metrics)
+    profiles = sorted(_profiles(metrics))
     rules = [f"Profiles that ran: {', '.join(profiles) or 'none'}. Name no other profile."]
-    if profiles:
-        rules.append(
-            "Under ## Comparison table, write one table per profile, each under its own ### heading "
-            f"that is just the profile name: {', '.join(profiles)}. Each profile table has a column "
-            "for every cell and the p95 latency, p99 latency and error rate rows of that profile. "
-            "After them, one ### Per cell heading with one table, written once, for the rows with no "
-            "profile: deploy time (s), config lines, idle cost (USD/h), cost per thousand requests (USD)."
-        )
     if set(profiles) <= {"steady"}:
         rules.append(
             "The steady profile measures no scaling: make no claim about scaling, scale-out or cold start."
@@ -108,22 +130,12 @@ def build_prompt(metrics: Metrics) -> str:
             "Ranking facts, the only cost or latency rankings you may state:\n"
             + "\n".join(f"- {fact}" for fact in facts)
         )
-    if metrics.shared_costs:
-        rules.append(
-            "Shared costs, not part of any cell: list each on its own line under a shared cost heading.\n"
-            + "\n".join(f"- {c.item}: {c.usd} USD" for c in metrics.shared_costs)
-        )
     return (
-        "Write a short Markdown report on ECS vs EKS for hosting an AI agent fleet.\n"
-        "Use these four sections, in this order, each with an H2 heading: "
-        "## Verdict (one short paragraph, before the table), ## Comparison table, "
-        "## Trade-offs, ## Recommendation.\n"
-        "Comparison table: one column per cell, one row per metric, with the unit in the row label "
-        "(for example \"P95 latency (ms)\", \"Idle cost (USD/h)\"); no unit in any column header.\n"
+        "Write the Verdict of a report on ECS vs EKS for hosting an AI agent fleet: one short "
+        "paragraph of plain prose. No heading, no table, no list: the tables are written for you.\n"
         "Use only the figures in metrics.json below, as given or rounded. Do not compute new "
         "figures: no percentage difference, ratio, sum or average that is not already there.\n"
-        "Write no other numbers: no dates, years, counts or versions. Number list items 1 to 4 "
-        "only, at the start of a line.\n"
+        "Write no other numbers: no dates, years, counts or versions.\n"
         "Make no claim the figures do not show.\n"
         + "".join(f"{rule}\n" for rule in rules)
         + "Figure values below are rounded to 4 significant digits: copy them as written.\n"
@@ -131,18 +143,53 @@ def build_prompt(metrics: Metrics) -> str:
     )
 
 
-def has_verdict(text: str) -> bool:
-    return bool(_VERDICT_RE.search(text))
+def verdict_of(draft: str) -> str:
+    """The draft without a leading "## Verdict" heading, trimmed."""
+    return _VERDICT_HEADING_RE.sub("", draft.strip(), count=1).strip()
 
 
-def missing_profiles(text: str, metrics: Metrics) -> list[str]:
-    """Profiles with no heading of their own, when more than one profile ran."""
-    profiles = _profiles(metrics)
-    if len(profiles) < 2:
-        return []
-    flags = re.IGNORECASE | re.MULTILINE
-    heading = r"^#{2,6}[^\n]*(?<![\w-])%s(?![\w-])"
-    return [p for p in profiles if not re.search(heading % re.escape(p), text, flags)]
+def _shown(value: float) -> str:
+    """4 significant digits, whole numbers from 1000 up, never scientific notation."""
+    return f"{value:.0f}" if abs(value) >= 1000 else format(Decimal(f"{value:.4g}"), "f")
+
+
+def _gap_profile(gap: str, profiles: list[str]) -> str | None:
+    m = re.match(r"[\w-]+/([\w-]+)", gap)
+    return m.group(1) if m and m.group(1) in profiles else None
+
+
+def _table(rows: dict[str, str], cells: list[str], values: dict, notes: list[str]) -> str:
+    lines = [f"| Metric | {' | '.join(cells)} |", "|---|" + "---|" * len(cells)]
+    for name, label in rows.items():
+        shown = [_shown(values[name, c]) if (name, c) in values else "n/a" for c in cells]
+        lines.append(f"| {label} | {' | '.join(shown)} |")
+    if notes:
+        lines += ["", "Notes:", *(f"- {n}" for n in notes)]
+    return "\n".join(lines) + "\n"
+
+
+def render_report(metrics: Metrics, verdict: str, state: RunState | None = None) -> str:
+    """The whole report: the Verdict as given, every table from metrics.json, cells in matrix order."""
+    cells, profiles = _cells(metrics, state), _profiles(metrics, state)
+    values = {(f.name, f.cell, f.profile): f.value for f in metrics.figures}
+    out = [f"# ECS vs EKS: {metrics.run_id}\n", f"## Verdict\n{verdict}\n", "## Comparison table\n"]
+    for p in profiles:
+        notes = [
+            g for g in metrics.gaps
+            if _gap_profile(g, profiles) == p
+            or (_gap_profile(g, profiles) is None and any(n in g for n in PROFILE_ROWS))
+        ]
+        rows = {(n, c): v for (n, c, q), v in values.items() if q == p}
+        out.append(f"### {p}\n" + _table(PROFILE_ROWS, cells, rows, notes))
+    notes = [g for g in metrics.gaps if _gap_profile(g, profiles) is None and not any(n in g for n in PROFILE_ROWS)]
+    rows = {(n, c): v for (n, c, q), v in values.items() if q is None}
+    out.append("### Per cell\n" + _table(CELL_ROWS, cells, rows, notes))
+    if metrics.shared_costs:
+        out.append(
+            "## Shared costs\nNot part of any cell.\n\n| Item | USD |\n|---|---|\n"
+            + "".join(f"| {c.item} | {_shown(c.usd)} |\n" for c in metrics.shared_costs)
+        )
+    return "\n".join(out)
 
 
 def unsupported_claims(text: str, metrics: Metrics) -> list[str]:
@@ -222,14 +269,13 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
         metrics = read_metrics(paths.metrics)
         prompt = build_prompt(metrics)
         for _ in range(MAX_TRIES):
-            draft = llm.complete(prompt)
-            offenders = check(draft, metrics)
-            claims = unsupported_claims(draft, metrics)
-            rankings = contradicted_rankings(draft, metrics)
-            missing = not has_verdict(draft)
-            no_section = missing_profiles(draft, metrics)
-            if not offenders and not claims and not rankings and not missing and not no_section:
-                paths.report.write_text(draft)
+            verdict = verdict_of(llm.complete(prompt))
+            offenders = check(verdict, metrics)
+            claims = unsupported_claims(verdict, metrics)
+            rankings = contradicted_rankings(verdict, metrics)
+            shape = not verdict or bool(re.search(r"^\s*[#|]", verdict, re.MULTILINE))
+            if not offenders and not claims and not rankings and not shape:
+                paths.report.write_text(render_report(metrics, verdict, state))
                 return {"status": "reported"}
             problems = []
             if offenders:
@@ -243,26 +289,22 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
                     f"These rankings contradict metrics.json: {'; '.join(rankings)}. "
                     "State only rankings from the ranking facts."
                 )
-            if missing:
-                problems.append("The report has no Verdict section: start with a ## Verdict paragraph.")
-            if no_section:
-                problems.append(
-                    f"These profiles have no ### table section: {', '.join(no_section)}."
-                )
+            if shape:
+                problems.append("Write one paragraph of prose only: no heading, no table, not empty.")
             prompt = (
-                f"{build_prompt(metrics)}\nYour last draft:\n{draft}\n"
-                f"{' '.join(problems)} Rewrite the report without them."
+                f"{build_prompt(metrics)}\nYour last draft:\n{verdict}\n"
+                f"{' '.join(problems)} Rewrite the Verdict without them."
             )
+        paths.report.write_text(render_report(metrics, FALLBACK_VERDICT, state))
         error = (
-            f"reporter: numbers not in metrics.json or unsupported claims after {MAX_TRIES} tries: "
+            f"reporter: fallback Verdict after {MAX_TRIES} tries: "
             + ", ".join([
                 *map(_redact, offenders),
                 *claims,
                 *rankings,
-                *(["no Verdict section"] if missing else []),
-                *(f"no {p} section" for p in no_section),
+                *(["not one prose paragraph"] if shape else []),
             ])
         )
-        return {"status": "report_failed", "errors": [*state.errors, error]}
+        return {"status": "reported", "errors": [*state.errors, error]}
 
     return reporter

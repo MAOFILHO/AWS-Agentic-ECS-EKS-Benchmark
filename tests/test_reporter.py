@@ -1,5 +1,6 @@
 from advisor.reporter import (
     DEFAULT_BEDROCK_MODEL_ID,
+    FALLBACK_VERDICT,
     BedrockLLM,
     build_prompt,
     make_reporter,
@@ -8,8 +9,8 @@ from advisor.schemas import Figure, Metrics
 from advisor.state import Capacity, CellSpec, RunState
 from advisor.store import create_run_dirs
 
-GOOD = "## Verdict\nECS wins.\n\n| cell | p95 ms |\n|---|---|\n| ecs-fargate | 120 |\n"
-BAD = "## Verdict\nECS wins.\n\n| cell | p95 ms |\n|---|---|\n| ecs-fargate | 97 |\n"
+GOOD = "ECS Fargate has a p95 of 120 ms."
+BAD = "ECS Fargate has a p95 of 97 ms."
 
 
 class StubLLM:
@@ -54,7 +55,7 @@ def test_clean_draft_writes_report(tmp_path):
     llm = StubLLM([GOOD])
     update = make_reporter(llm, tmp_path)(make_state())
     assert update == {"status": "reported"}
-    assert paths.report.read_text() == GOOD
+    assert f"## Verdict\n{GOOD}\n" in paths.report.read_text()
     assert len(llm.prompts) == 1
 
 
@@ -65,27 +66,29 @@ def test_invented_number_triggers_a_retry_with_the_offenders(tmp_path):
     assert update == {"status": "reported"}
     assert len(llm.prompts) == 2
     assert "97" in llm.prompts[1]
-    assert paths.report.read_text() == GOOD
+    assert f"## Verdict\n{GOOD}\n" in paths.report.read_text()
 
 
-def test_third_failure_fails_the_step_and_writes_no_report(tmp_path):
+def test_third_failure_writes_the_report_with_the_fallback_verdict(tmp_path):
     paths = write_metrics(tmp_path)
     metrics_before = paths.metrics.read_text()
     llm = StubLLM([BAD, BAD, BAD, GOOD])
     update = make_reporter(llm, tmp_path)(make_state())
     assert len(llm.prompts) == 3
-    assert update["status"] == "report_failed"
+    assert update["status"] == "reported"
     assert "97" in update["errors"][-1]
-    assert not paths.report.exists()
+    assert f"## Verdict\n{FALLBACK_VERDICT}\n" in paths.report.read_text()
+    assert "97" not in paths.report.read_text()
     assert paths.metrics.read_text() == metrics_before
 
 
 def test_failure_error_redacts_account_id_and_email(tmp_path):
-    write_metrics(tmp_path)
+    paths = write_metrics(tmp_path)
     account, email = "1234" * 3, "someone" + "@" + "example.com"
     leak = f"Account {account}, owner {email}."
     update = make_reporter(StubLLM([leak] * 3), tmp_path)(make_state())
-    assert update["status"] == "report_failed"
+    assert update["status"] == "reported"
+    assert account not in paths.report.read_text() and email not in paths.report.read_text()
     assert account not in update["errors"][-1]
     assert email not in update["errors"][-1]
     assert "<redacted>" in update["errors"][-1]

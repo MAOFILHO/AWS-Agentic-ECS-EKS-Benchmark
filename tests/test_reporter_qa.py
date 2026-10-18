@@ -1,7 +1,7 @@
 import pytest
 
 from advisor.numcheck import check
-from advisor.reporter import make_reporter
+from advisor.reporter import FALLBACK_VERDICT, make_reporter
 from advisor.schemas import Figure, Metrics
 from advisor.state import Capacity, CellSpec, RunState
 from advisor.store import create_run_dirs
@@ -9,7 +9,7 @@ from advisor.store import create_run_dirs
 # Built at runtime so no committed file holds an id- or email-shaped string (AC4).
 ACCOUNT = "1234" * 3
 EMAIL = "someone" + "@" + "example.com"
-CLEAN = "## Verdict\nECS wins.\n\n| cell | p95 ms |\n|---|---|\n| ecs-fargate | 120 |\n"
+CLEAN = "ECS Fargate has a p95 of 120 ms. "
 
 
 def make_metrics() -> Metrics:
@@ -61,7 +61,8 @@ def test_a_leaking_draft_never_reaches_report_md(tmp_path, leak):
     paths = create_run_dirs("qa-83", tmp_path)
     paths.metrics.write_text(make_metrics().model_dump_json())
     update = make_reporter(StubLLM([CLEAN + leak] * 3), tmp_path)(make_state())
-    assert update["status"] == "report_failed"
-    assert not paths.report.exists()
+    assert update["status"] == "reported"
+    report = paths.report.read_text()
+    assert FALLBACK_VERDICT in report and ACCOUNT not in report and EMAIL not in report
     assert ACCOUNT not in update["errors"][-1]
     assert EMAIL not in update["errors"][-1]

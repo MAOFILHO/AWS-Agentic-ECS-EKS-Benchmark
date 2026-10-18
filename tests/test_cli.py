@@ -3,6 +3,7 @@ import re
 import pytest
 
 from advisor import cli, deployer
+from advisor.planner import PROFILES
 from tests.test_cost import StubPricing
 
 ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
@@ -117,3 +118,35 @@ def test_run_folder_files_have_no_account_id_or_email(tmp_path):
     for path in files:
         text = path.read_bytes().decode("latin-1")
         assert not FILE_ACCOUNT_ID.search(text) and not EMAIL.search(text), path
+
+
+def test_profile_takes_a_list_in_the_order_typed(tmp_path, capsys):
+    argv = ["run", "--cells", "ecs-fargate,eks-ec2", "--profile", "spike,scale-from-min", "--region", "us-east-1", "--run-id", "cli-10"]
+    assert main(argv, tmp_path) == 0
+    matrix = next(l for l in capsys.readouterr().out.splitlines() if l.startswith("matrix:"))
+    assert matrix == "matrix: ecs-fargate/spike, ecs-fargate/scale-from-min, eks-ec2/spike, eks-ec2/scale-from-min"
+
+
+def test_unknown_profile_lists_the_valid_names_and_makes_no_aws_call(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exit_:
+        main(["run", "--region", "us-east-1", "--profile", "spike,burst"], tmp_path)
+    assert exit_.value.code != 0
+    err = capsys.readouterr().err
+    assert "burst" in err and all(p in err for p in PROFILES)
+    assert not (tmp_path / "runs").exists()
+
+
+def test_repeated_profile_is_refused(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exit_:
+        main(["run", "--region", "us-east-1", "--profile", "spike,spike"], tmp_path)
+    assert exit_.value.code != 0
+    assert "spike" in capsys.readouterr().err
+    assert not (tmp_path / "runs").exists()
+
+
+def test_one_profile_and_no_flag_behave_as_before(tmp_path, capsys):
+    main(["run", "--cells", "ecs-fargate", "--profile", "steady", "--region", "us-east-1", "--run-id", "cli-11"], tmp_path)
+    assert "matrix: ecs-fargate/steady\n" in capsys.readouterr().out
+    main(["run", "--cells", "ecs-fargate", "--region", "us-east-1", "--run-id", "cli-12"], tmp_path)
+    matrix = next(l for l in capsys.readouterr().out.splitlines() if l.startswith("matrix:"))
+    assert matrix == "matrix: " + ", ".join(f"ecs-fargate/{p}" for p in PROFILES)

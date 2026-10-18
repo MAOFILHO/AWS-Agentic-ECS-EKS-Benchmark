@@ -1,0 +1,21 @@
+== M1: 30-ecs default back to t3.small
+FAILED tests/test_instance_type.py::test_ecs_and_eks_templates_default_to_the_same_instance_type
+FAILED tests/test_instance_type.py::test_template_default_is_the_run_config_instance_type
+2 failed in 0.03s
+== M2: deployer drops InstanceType env-param
+=========================== short test summary info ============================
+FAILED tests/test_deployer.py::test_both_ec2_cells_deploy_the_run_config_instance_type
+1 failed, 12 passed in 1.22s
+== M3: deployer gives eks-ec2 no INSTANCE_TYPE
+=========================== short test summary info ============================
+FAILED tests/test_deployer.py::test_both_ec2_cells_deploy_the_run_config_instance_type
+1 failed, 12 passed in 0.76s
+== M4: collector stops recording instance_type
+=========================== short test summary info ============================
+FAILED tests/test_collector.py::test_ec2_cell_config_records_the_instance_type
+1 failed, 17 passed in 0.71s
+== M5: deploy_eks drops InstanceType param
+=========================== short test summary info ============================
+FAILED tests/test_deploy_eks.py::test_ec2_cell_passes_the_instance_type_to_the_eks_stack
+1 failed, 17 passed in 0.28s
+?? docs/super-board/runs/issue-128-qa-v1/

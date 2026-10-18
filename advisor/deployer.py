@@ -95,7 +95,7 @@ def deploy_commands(cell: str, rid: str, region: str) -> list[list[str]]:
     ecs = [*stack, "--stack", f"{rid}-{cell}", "--template", "infra/cfn/30-ecs.yaml", "--env-param", "RunId=RUN_ID",
            "--env-param", "NetworkStackName=NETWORK_STACK", "--env-param", "ImageUri=IMAGE_URI"]
     if cell == "ecs-ec2":
-        ecs += ["--env-param", "ComputeType=COMPUTE_TYPE"]
+        ecs += ["--env-param", "ComputeType=COMPUTE_TYPE", "--env-param", "InstanceType=INSTANCE_TYPE"]
     return [network, harness, ecs,
             ["aws", "cloudformation", "describe-stacks", "--stack-name", f"{rid}-{cell}", "--region", region,
              "--query", "Stacks[0].Outputs[?OutputKey=='AlbDnsName'].OutputValue", "--output", "text"]]
@@ -103,8 +103,11 @@ def deploy_commands(cell: str, rid: str, region: str) -> list[list[str]]:
 
 def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: Runner | None = None,
                   now: Callable[[], datetime] = lambda: datetime.now(UTC),
-                  k6_image_uri: str | None = None) -> Callable[[RunState], dict]:
-    """Build the node. A failed command stops it with status "failed"; the graph then runs teardown."""
+                  k6_image_uri: str | None = None, instance_type: str | None = None) -> Callable[[RunState], dict]:
+    """Build the node. A failed command stops it with status "failed"; the graph then runs teardown.
+
+    `instance_type` is the run config's, so ecs-ec2 and eks-ec2 run on the host the cost model prices (SPEC section 4).
+    """
 
     def deployer(state: RunState) -> dict:
         runner = run or subprocess_runner
@@ -113,6 +116,8 @@ def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: R
             return {"status": "failed", "errors": [*state.errors, mask(f"deployer: {why}")]}
 
         inputs = (("AWS_PROFILE", profile), ("IMAGE_URI", image_uri), ("K6_IMAGE_URI", k6_image_uri))
+        if any(c.endswith("-ec2") for c in cells_of(state)):
+            inputs += (("instance_type", instance_type),)
         if missing := [name for name, value in inputs if not value]:
             hint = " (run make push-k6 and export the URI it prints)" if "K6_IMAGE_URI" in missing else ""
             return failed(f"not set: {', '.join(missing)}{hint}; nothing was deployed")
@@ -123,6 +128,8 @@ def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: R
                    "NETWORK_STACK": f"{rid}-network"}
             if cell == "ecs-ec2":
                 env["COMPUTE_TYPE"] = "EC2"
+            if cell.endswith("-ec2"):
+                env["INSTANCE_TYPE"] = instance_type
             start = now()
             for argv in deploy_commands(cell, rid, state.region):
                 code, out = run_logged(runner, root, state.run_id, argv, env)

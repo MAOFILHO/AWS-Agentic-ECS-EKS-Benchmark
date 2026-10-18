@@ -242,3 +242,33 @@ def test_yes_answers_every_change_set_prompt(monkeypatch):
     assert seen["one"] is deploy_eks.deploy_stack.deploy
     deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1", "--yes"])
     assert seen["one"].keywords["answer"]("Execute? ") == "y"
+
+
+def test_ec2_cell_passes_the_instance_type_to_the_eks_stack():
+    events = []
+    deploy(events, instance_type="t3.medium")
+    assert events[1][2]["InstanceType"] == "t3.medium"
+
+
+def test_fargate_cell_ignores_the_instance_type():
+    events = []
+    deploy(events, cell="eks-fargate", instance_type="t3.medium")
+    assert "InstanceType" not in events[1][2]
+
+
+def test_main_reads_the_instance_type_from_the_env(monkeypatch):
+    got = {}
+    for name, value in {"IMAGE_URI": IMAGE, "AWS_PROFILE": "sso", "AWS_REGION": "us-east-1", "INSTANCE_TYPE": "t3.medium"}.items():
+        monkeypatch.setenv(name, value)
+
+    class Session:
+        def __init__(self, **kw):
+            pass
+
+        def client(self, name):
+            return name
+
+    monkeypatch.setattr(deploy_eks.boto3, "Session", Session)
+    monkeypatch.setattr(deploy_eks, "deploy", lambda *a, **kw: got.update(kw))
+    deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1"])
+    assert got["instance_type"] == "t3.medium"

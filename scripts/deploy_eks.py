@@ -1,7 +1,7 @@
 """Deploy one EKS cell: network, cluster and controller role stacks, then the controller and the workload with Helm.
 
 Usage:
-    AWS_PROFILE=<sso-profile> AWS_REGION=<region> IMAGE_URI=<ecr-image-uri> \
+    AWS_PROFILE=<sso-profile> AWS_REGION=<region> IMAGE_URI=<ecr-image-uri> [INSTANCE_TYPE=<type>] \
     python -m scripts.deploy_eks --cell eks-ec2|eks-fargate --run-id <id> [--region <region>] [--yes]
 
 Stacks go through deploy_stack.py (change sets, y/N per stack; --yes skips the prompts). The kubeconfig is a temp file,
@@ -98,7 +98,7 @@ def wait_for_alb(run, kubeconfig, timeout, sleep=time.sleep, clock=time.monotoni
 
 
 def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
-           deploy_one=deploy_stack.deploy, run=subprocess.run, sleep=time.sleep):
+           deploy_one=deploy_stack.deploy, run=subprocess.run, sleep=time.sleep, instance_type=None):
     compute_type, values_file = CELLS[cell]
     repo, tag = split_image(image_uri)
     version = kubernetes_version(ssm)
@@ -106,9 +106,11 @@ def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
 
     network, eks_stack, lbc_stack = f"{run_id}-network", f"{run_id}-{cell}", f"{run_id}-eks-lbc-iam"
     deploy_one(cfn, network, (CFN / "10-network.yaml").read_text(), {"RunId": run_id})
-    deploy_one(cfn, eks_stack, (CFN / "40-eks.yaml").read_text(), {
-        "RunId": run_id, "NetworkStackName": network, "ComputeType": compute_type,
-        "KubernetesVersion": version})
+    params = {"RunId": run_id, "NetworkStackName": network, "ComputeType": compute_type,
+              "KubernetesVersion": version}
+    if compute_type == "EC2" and instance_type:  # unset: the 40-eks default
+        params["InstanceType"] = instance_type
+    deploy_one(cfn, eks_stack, (CFN / "40-eks.yaml").read_text(), params)
     deploy_one(cfn, lbc_stack, (CFN / "41-eks-lbc-iam.yaml").read_text(), {
         "RunId": run_id, "EksStackName": eks_stack, "Cell": cell})
 
@@ -160,7 +162,8 @@ def main(argv=None):
         if args.yes:
             deploy_one = functools.partial(deploy_stack.deploy, answer=lambda _prompt: "y")
         deploy(session.client("cloudformation"), session.client("ssm"), session.client("eks"),
-               args.run_id, args.cell, region, image_uri, deploy_one=deploy_one)
+               args.run_id, args.cell, region, image_uri, deploy_one=deploy_one,
+               instance_type=os.environ.get("INSTANCE_TYPE"))
     except (BotoCoreError, ClientError) as err:
         raise SystemExit(mask(f"error: {err}")) from None
 

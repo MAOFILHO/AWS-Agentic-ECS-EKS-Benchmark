@@ -93,7 +93,8 @@ def deploy_nodes(root: Path, config: dict) -> dict:
         return boto3.client(service, region_name=region)
 
     return {"deployer": make_deployer(profile, os.environ.get("IMAGE_URI"), root,
-                                             k6_image_uri=os.environ.get("K6_IMAGE_URI")),
+                                             k6_image_uri=os.environ.get("K6_IMAGE_URI"),
+                                             instance_type=config["plan"]["instance_type"]),
             "load_runner": make_load_runner(aws, root, config["plan"]["duration_s"], config["load"]["peak_rps"]),
             "collector": make_collector(aws, profile, root, plan=PlanConfig(**config["plan"])),
             "analyst": partial(analyst_node, root=root,

@@ -106,7 +106,7 @@ def test_parameter_defaults():
     assert params["LlmMode"]["Default"] == "mock"
     assert params["ComputeType"]["Default"] == "FARGATE"
     assert params["ComputeType"]["AllowedValues"] == ["FARGATE", "EC2"]
-    assert params["InstanceType"]["Default"] == "t3.small"
+    assert params["InstanceType"]["Default"] == "t3.medium"
 
 
 def test_fargate_resource_list_is_unchanged():

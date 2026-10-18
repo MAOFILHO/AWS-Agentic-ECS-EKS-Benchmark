@@ -123,6 +123,12 @@ def test_config_counts_the_cells_template_lines(tmp_path):
     assert json.loads((raw / "ecs-fargate" / "config.json").read_text()) == {"config_lines": lines, "moving_parts": 4}
 
 
+def test_ec2_cell_config_records_the_instance_type(tmp_path):
+    _, raw, _ = collect(tmp_path)
+    assert json.loads((raw / "eks-ec2" / "config.json").read_text())["instance_type"] == PLAN.instance_type
+    assert "instance_type" not in json.loads((raw / "ecs-fargate" / "config.json").read_text())
+
+
 def test_no_file_holds_an_account_id_or_an_email(tmp_path):
     _, raw, _ = collect(tmp_path)
     text = "".join(p.read_text() for p in raw.rglob("*.json"))

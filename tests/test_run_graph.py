@@ -13,7 +13,7 @@ from tests.test_analyst import REAL, REAL_CELLS
 
 CONFIG = RunConfig.model_validate_json(cli.RUN_CONFIG.read_text()).model_dump()
 ACCOUNT = "1234" * 3  # built at runtime: tracked files must hold no account id
-REPORT = "## Verdict\nECS is simpler to run.\n"
+REPORT = "## Verdict\nECS is simpler to run.\n\n### spike\n\n### steady\n"  # one section per profile (#134)
 
 
 class Bedrock:

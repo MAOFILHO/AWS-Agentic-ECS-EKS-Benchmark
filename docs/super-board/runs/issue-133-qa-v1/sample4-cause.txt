@@ -1,0 +1,4 @@
+ecs-fargate: events=0 kinds=[] service_cpu_peak=50.0% over 44 points load=2026-10-17T20:17:00-04:00..2026-10-17T20:59:00-04:00
+ecs-ec2: events=6 kinds=['alarm', 'alarm', 'scheduled', 'scheduled', 'healthy', 'alarm'] service_cpu_peak=86.9% over 43 points load=2026-10-17T21:43:00-04:00..2026-10-17T22:25:00-04:00
+eks-ec2: events=0 kinds=[] service_cpu_peak=no cloudwatch-cpu.json (collector reads AWS/ECS only) load=2026-10-17T21:00:00-04:00..2026-10-17T21:42:00-04:00
+cpu target 60% (runs/default.json capacity.cpu_target)

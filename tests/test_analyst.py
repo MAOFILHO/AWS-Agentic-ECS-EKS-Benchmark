@@ -1,3 +1,4 @@
+import json
 import re
 import shutil
 from pathlib import Path
@@ -180,3 +181,13 @@ def test_a_cell_with_zero_scaling_events_says_no_scale_out_happened(tmp_path):
     assert not [f for f in metrics.figures if f.name in ("scale_out_s", "cold_start_s")]
     for profile in ("spike", "scale-from-min"):
         assert f"eks-ec2/{profile} scale_out_s, cold_start_s: no scale-out happened in its load window" in metrics.gaps
+
+
+def test_metrics_json_on_disk_gives_scale_figures_a_profile(tmp_path):
+    raw = tmp_path / "results" / "real-01" / "raw"
+    shutil.copytree(REAL, raw)
+    capacity = Capacity(vcpu=0.25, memory_mib=512, min_replicas=1, max_replicas=4)
+    analyst_node(RunState(run_id="real-01", cells=REAL_CELLS, capacity=capacity, region="us-east-1"), root=tmp_path)
+    figures = json.loads((raw.parent / "metrics.json").read_text())["figures"]
+    scale = {(f["name"], f["cell"], f["profile"]) for f in figures if f["name"] in ("scale_out_s", "cold_start_s")}
+    assert scale == {("scale_out_s", "ecs-fargate", "spike"), ("cold_start_s", "ecs-fargate", "spike")}

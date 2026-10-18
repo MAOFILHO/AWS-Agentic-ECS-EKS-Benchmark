@@ -1,0 +1,6 @@
+3 cells x 4 profiles x 600 s, advisor.cost.estimate + shared_costs, us-east-1 list prices
+(eks 0.10/h, fargate vcpu 0.04048/h, gb 0.004445/h, t3.medium 0.0416/h, alb 0.0225/h, lcu 0.008/h,
+ cw ingest 0.50/GB, nat 0.045/h + 0.045/GB, vpce 0.01/h)
+default cell usage (1 replica, 1 node): USD 1.1251
+ceiling (4 replicas, 2 nodes):          USD 1.2053
+peak_rps is not an input of the planner estimate (advisor/planner.py:42).

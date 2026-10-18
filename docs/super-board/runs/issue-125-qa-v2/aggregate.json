@@ -1,0 +1,99 @@
+{
+  "runs": [
+    "run-a",
+    "run-b",
+    "run-c"
+  ],
+  "figures": [
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "ecs-fargate",
+      "profile": "steady",
+      "n": 3,
+      "min": 3.9,
+      "median": 4.316744,
+      "max": 5.1,
+      "runs": [
+        "run-a",
+        "run-b",
+        "run-c"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "ecs-fargate",
+      "profile": "steady",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "run-a",
+        "run-b",
+        "run-c"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "eks-ec2",
+      "profile": "steady",
+      "n": 3,
+      "min": 7.1,
+      "median": 7.795883,
+      "max": 8.2,
+      "runs": [
+        "run-a",
+        "run-b",
+        "run-c"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "eks-ec2",
+      "profile": "steady",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "run-a",
+        "run-b",
+        "run-c"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "ecs-ec2",
+      "profile": "steady",
+      "n": 3,
+      "min": 6.0,
+      "median": 6.434008,
+      "max": 6.9,
+      "runs": [
+        "run-a",
+        "run-b",
+        "run-c"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "ecs-ec2",
+      "profile": "steady",
+      "n": 3,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "run-a",
+        "run-b",
+        "run-c"
+      ]
+    }
+  ]
+}

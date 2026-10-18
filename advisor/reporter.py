@@ -54,9 +54,27 @@ class BedrockLLM:
         return resp["output"]["message"]["content"][0]["text"]
 
 
+def _profiles(metrics: Metrics) -> list[str]:
+    return sorted({f.profile for f in metrics.figures if f.profile})
+
+
+def _rounded(metrics: Metrics) -> Metrics:
+    """Figure values cut to 4 significant digits, so the LLM copies numbers instead of rounding them."""
+    figures = [f.model_copy(update={"value": float(f"{f.value:.4g}")}) for f in metrics.figures]
+    return metrics.model_copy(update={"figures": figures})
+
+
 def build_prompt(metrics: Metrics) -> str:
-    profiles = sorted({f.profile for f in metrics.figures if f.profile})
+    profiles = _profiles(metrics)
     rules = [f"Profiles that ran: {', '.join(profiles) or 'none'}. Name no other profile."]
+    if profiles:
+        rules.append(
+            "Under ## Comparison table, write one table per profile, each under its own ### heading "
+            f"that is just the profile name: {', '.join(profiles)}. Each profile table has a column "
+            "for every cell and the p95 latency, p99 latency and error rate rows of that profile. "
+            "After them, one ### Per cell heading with one table, written once, for the rows with no "
+            "profile: deploy time (s), config lines, idle cost (USD/h), cost per thousand requests (USD)."
+        )
     if set(profiles) <= {"steady"}:
         rules.append(
             "The steady profile measures no scaling: make no claim about scaling, scale-out or cold start."
@@ -82,12 +100,23 @@ def build_prompt(metrics: Metrics) -> str:
         "only, at the start of a line.\n"
         "Make no claim the figures do not show.\n"
         + "".join(f"{rule}\n" for rule in rules)
-        + f"metrics.json:\n{metrics.model_dump_json(indent=2)}\n"
+        + "Figure values below are rounded to 4 significant digits: copy them as written.\n"
+        + f"metrics.json:\n{_rounded(metrics).model_dump_json(indent=2)}\n"
     )
 
 
 def has_verdict(text: str) -> bool:
     return bool(_VERDICT_RE.search(text))
+
+
+def missing_profiles(text: str, metrics: Metrics) -> list[str]:
+    """Profiles with no heading of their own, when more than one profile ran."""
+    profiles = _profiles(metrics)
+    if len(profiles) < 2:
+        return []
+    flags = re.IGNORECASE | re.MULTILINE
+    heading = r"^#{2,6}[^\n]*(?<![\w-])%s(?![\w-])"
+    return [p for p in profiles if not re.search(heading % re.escape(p), text, flags)]
 
 
 def unsupported_claims(text: str, metrics: Metrics) -> list[str]:
@@ -122,7 +151,8 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
             offenders = check(draft, metrics)
             claims = unsupported_claims(draft, metrics)
             missing = not has_verdict(draft)
-            if not offenders and not claims and not missing:
+            no_section = missing_profiles(draft, metrics)
+            if not offenders and not claims and not missing and not no_section:
                 paths.report.write_text(draft)
                 return {"status": "reported"}
             problems = []
@@ -134,13 +164,22 @@ def make_reporter(llm: LLM, root: Path) -> Callable[[RunState], dict]:
                 )
             if missing:
                 problems.append("The report has no Verdict section: start with a ## Verdict paragraph.")
+            if no_section:
+                problems.append(
+                    f"These profiles have no ### table section: {', '.join(no_section)}."
+                )
             prompt = (
                 f"{build_prompt(metrics)}\nYour last draft:\n{draft}\n"
                 f"{' '.join(problems)} Rewrite the report without them."
             )
         error = (
             f"reporter: numbers not in metrics.json or unsupported claims after {MAX_TRIES} tries: "
-            + ", ".join([*map(_redact, offenders), *claims, *(["no Verdict section"] if missing else [])])
+            + ", ".join([
+                *map(_redact, offenders),
+                *claims,
+                *(["no Verdict section"] if missing else []),
+                *(f"no {p} section" for p in no_section),
+            ])
         )
         return {"status": "report_failed", "errors": [*state.errors, error]}
 

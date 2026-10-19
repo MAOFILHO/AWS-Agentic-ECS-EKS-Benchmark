@@ -1,0 +1,52 @@
+Head 4904ebb. Published short1-3 plus 3 synthetic runs holding only ecs-fargate and eks-fargate.
+Re-aggregating short1-3 gives results/published/aggregate.json byte-equal; make_readme_tables leaves README.md byte-equal; make_chart leaves results/published/chart-*.svg and results/sample/chart.svg byte-equal.
+
+p95_ms spike, n and runs per cell:
+ecs-fargate 6 ['short1', 'short2', 'short3', 'fg1', 'fg2', 'fg3']
+ecs-ec2 3 ['short1', 'short2', 'short3']
+eks-ec2 3 ['short1', 'short2', 'short3']
+eks-fargate 3 ['fg1', 'fg2', 'fg3']
+
+**Profile `spike`**
+
+| Metric | ecs-fargate | ecs-ec2 | eks-fargate | eks-ec2 |
+|---|---|---|---|---|
+| Runs | n=6 | n=3 | n=3 | n=3 |
+| p50 latency (ms) | 4.08 (3.76 to 4.33) | 5412 (5406 to 6210) | 6.12 (5.64 to 6.49) | 5.79 (5.74 to 5.88) |
+| p95 latency (ms) | 4.84 (4.83 to 5.63) | 6167 (6077 to 7586) | 7.25 (7.25 to 8.44) | 4675 (3862 to 5311) |
+| p99 latency (ms) | 12.2 (10.4 to 16.1) | 7174 (7168 to 8252) | 18.3 (15.5 to 24.1) | 6051 (6020 to 6056) |
+| Error rate | 0.00% | 0.00% | 0.00% | 0.00% (0.00% to 1.57%) |
+| Scale out (s) | 75.9 (72.8 to 84.7) | 72.8 (72.5 to 76.5) | 114 (109 to 127) | 21 (21 to 23) |
+| Cold start (s) | 66.8 (66.0 to 74.3) | 66.0 (65.5 to 66.2) | 100 (99.0 to 111) | 21 (20 to 23) |
+
+**Profile `scale-from-min`**
+
+| Metric | ecs-fargate | ecs-ec2 | eks-fargate | eks-ec2 |
+|---|---|---|---|---|
+| Runs | n=6 | n=3 | n=3 | n=3 |
+| p50 latency (ms) | 4.77 (4.09 to 5.22) | 5.48 (5.03 to 5.77) | 7.15 (6.14 to 7.83) | 5.35 (5.33 to 5.75) |
+| p95 latency (ms) | 6.13 (4.83 to 6.55) | 6.55 (5.95 to 11.1) | 9.20 (7.25 to 9.83) | 8.28 (8.23 to 9.09) |
+| p99 latency (ms) | 20.0 (9.30 to 45.3) | 11.0 (9.98 to 26.7) | 30.0 (14.0 to 68.0) | 15.6 (13.0 to 16.1) |
+| Error rate | 0.00% | 0.00% | 0.00% | 0.00% |
+| Scale out (s) | n/a | 186 (148 to 233) | n/a | n/a |
+| Cold start (s) | n/a | 183 (144 to 222) | n/a | n/a |
+
+**Per cell**
+
+| Metric | ecs-fargate | ecs-ec2 | eks-fargate | eks-ec2 |
+|---|---|---|---|---|
+| Runs | n=6 | n=3 | n=3 | n=3 |
+| Deploy time (s) | 426 (401 to 439) | 467 (460 to 505) | 640 (601 to 658) | 1125 (1041 to 1171) |
+| Config lines | 436 | 436 | 654 | 534 |
+| Moving parts | 2 | 5 | 3 | 8 |
+| Idle cost (USD/h) | 0.0348 | 0.0641 | 0.0523 | 0.1641 |
+| USD per thousand requests | 0.0009 | 0.0011 (0.0011 to 0.0012) | 0.0013 | 0.0015 (0.0015 to 0.0016) |
+
+Moving parts by cell, counted from its templates:
+
+- ecs-fargate: LoadBalancer, ScalableTarget
+- ecs-ec2: LoadBalancer, LaunchTemplate, AutoScalingGroup, CapacityProvider, ScalableTarget
+- eks-fargate: vpc-cni, kube-proxy, coredns, metrics-server, eks-pod-identity-agent, FargateProfile, LbcOidcProvider, aws-load-balancer-controller
+- eks-ec2: vpc-cni, kube-proxy, coredns, metrics-server, eks-pod-identity-agent, NodeGroup, LbcPodIdentity, aws-load-balancer-controller
+
+Limits: cells were measured in different run sets; ecs-fargate appears in all of them.

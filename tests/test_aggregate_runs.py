@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from advisor.schemas import MetricsError, read_aggregate
+from advisor.schemas import Aggregate, AggregateFigure, MetricsError, read_aggregate
 from scripts import aggregate_runs, make_chart
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,17 +42,20 @@ def test_three_runs_give_n_min_median_max_for_one_latency_figure(tmp_path):
     assert fig.unit == "ms" and fig.runs == RUNS
 
 
-def test_runs_with_different_cell_sets_are_rejected(tmp_path, capsys):
+def test_runs_with_different_cell_sets_aggregate_each_cell_over_its_own_runs(tmp_path):
+    # Issue #159: the eks-fargate runs hold other cells than the published runs.
     seed(tmp_path)
     path = tmp_path / "run-c" / "metrics.json"
     data = json.loads(path.read_text())
     data["figures"] = [f for f in data["figures"] if f["cell"] != "eks-ec2"]
     path.write_text(json.dumps(data))
     code, out = aggregate(tmp_path)
-    assert code != 0
-    assert not out.exists()
-    err = capsys.readouterr().err
-    assert "error:" in err and "cell" in err
+    assert code == 0
+    agg = read_aggregate(out)
+    assert agg.runs == RUNS
+    by_cell = {f.cell: f for f in agg.figures if (f.name, f.profile) == ("p95_ms", "steady")}
+    assert (by_cell["ecs-fargate"].n, by_cell["ecs-fargate"].runs) == (3, RUNS)
+    assert (by_cell["eks-ec2"].n, by_cell["eks-ec2"].runs) == (2, ["run-a", "run-b"])
 
 
 def test_runs_with_different_profile_sets_are_rejected(tmp_path, capsys):
@@ -168,3 +171,37 @@ def test_no_aws_sdk_loaded_on_the_aggregate_and_chart_path(tmp_path):
     assert result.stdout.strip().splitlines()[-1] == "[]"
     for script in ("aggregate_runs.py", "make_chart.py"):
         assert not re.search(r"boto|bedrock|aws", (ROOT / "scripts" / script).read_text(), re.IGNORECASE)
+
+
+def _fig(cell, run_ids, name="p95_ms", profile="spike"):
+    return AggregateFigure(name=name, unit="ms", cell=cell, profile=profile, n=len(run_ids),
+                           min=4.0, median=5.0, max=6.0, runs=run_ids)
+
+
+def test_readme_tables_print_n_per_cell():
+    from scripts.make_readme_tables import render
+
+    six = [f"r{i}" for i in range(1, 7)]
+    agg = Aggregate(runs=six, figures=[_fig("ecs-fargate", six), _fig("eks-fargate", six[3:])])
+    lines = render(agg).splitlines()
+    assert "| Metric | ecs-fargate | eks-fargate |" in lines
+    assert "| Runs | n=6 | n=3 |" in lines
+    assert "cells were measured in different run sets; ecs-fargate appears in all of them." in render(agg).lower()
+
+
+def test_readme_tables_with_one_cell_set_have_no_run_set_note():
+    from scripts.make_readme_tables import render
+
+    runs = ["r1", "r2", "r3"]
+    text = render(Aggregate(runs=runs, figures=[_fig("ecs-fargate", runs), _fig("eks-ec2", runs)]))
+    assert "| Runs | n=3 | n=3 |" in text.splitlines()
+    assert "different run sets" not in text
+
+
+def test_published_charts_still_render_the_same(tmp_path):
+    published = ROOT / "results" / "published"
+    (tmp_path / "published").mkdir()
+    shutil.copy(published / "aggregate.json", tmp_path / "published" / "aggregate.json")
+    assert make_chart.main(["--run-id", "published"], results=tmp_path) == 0
+    for svg in published.glob("chart-*.svg"):
+        assert (tmp_path / "published" / svg.name).read_bytes() == svg.read_bytes(), svg.name

@@ -4,6 +4,8 @@ Usage:
     python -m scripts.make_readme_tables [--aggregate results/published/aggregate.json] [--readme README.md]
 
 Each cell shows `median (min to max)`, or one value when every run agreed. A missing figure shows n/a.
+The Runs row gives n, how many runs each cell's numbers in that table rest on. When cells come from
+different run sets, a note under the tables names the cells found in every run.
 Under the table with moving parts, a list names each cell's parts (advisor.collector.moving_parts).
 The tables replace whatever sits between the START and END markers in the README.
 """
@@ -60,12 +62,20 @@ def render(agg: Aggregate) -> str:
     for profile, title in TABLES:
         rows = [(name, label) for name, label in ROWS if any(k[0] == profile and k[2] == name for k in figs)]
         out += [f"**{title}**", "", "| Metric | " + " | ".join(cells) + " |", "|---" * (len(cells) + 1) + "|"]
+        if rows:
+            runs = {c: {r for f in agg.figures if f.profile == profile and f.cell == c for r in f.runs} for c in cells}
+            out.append("| Runs | " + " | ".join(f"n={len(runs[c])}" for c in cells) + " |")
         for name, label in rows:
             out.append(f"| {label} | " + " | ".join(_cell(figs.get((profile, c, name))) for c in cells) + " |")
         out.append("")
         if any(name == "moving_parts" for name, _ in rows):
             out += ["Moving parts by cell, counted from its templates:", "",
                     *(f"- {c}: " + ", ".join(moving_parts(c)) for c in cells), ""]
+    everywhere = [c for c in cells if {r for f in agg.figures if f.cell == c for r in f.runs} == set(agg.runs)]
+    if len(everywhere) < len(cells):
+        shown = ", ".join(everywhere) or "no cell"
+        verb = "appears" if len(everywhere) < 2 else "appear"
+        out.append(f"Limits: cells were measured in different run sets; {shown} {verb} in all of them.")
     return "\n".join(out).rstrip("\n")
 
 

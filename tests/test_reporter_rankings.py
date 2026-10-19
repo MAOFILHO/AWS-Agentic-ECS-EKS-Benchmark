@@ -101,3 +101,50 @@ def test_reporter_retries_a_contradicted_ranking_then_falls_back_after_three(tmp
     assert update["status"] == "reported"
     assert WRONG_COST in update["errors"][-1]
     assert WRONG_COST not in paths.report.read_text() and FALLBACK_VERDICT in paths.report.read_text()
+
+
+# Cut from the short runs. Spike p50: ecs-fargate 4.08, eks-ec2 5.79, ecs-ec2 5406; p95 and p99 are lowest on ecs-fargate.
+SHORT1 = Path(__file__).resolve().parent / "fixtures" / "reporter" / "short1-metrics.json"
+SHORT2_VERDICT = "EKS on EC2 is the slowest in latency, especially in spike."
+
+
+def short1() -> Metrics:
+    return Metrics.model_validate_json(SHORT1.read_text())
+
+
+def test_short2_superlative_slowest_is_rejected():
+    # ecs-ec2 has p50 5406 ms against 5.79 ms on eks-ec2: eks-ec2 is not the slowest on every latency metric.
+    assert contradicted_rankings(SHORT2_VERDICT, short1()) == [SHORT2_VERDICT.rstrip(".")]
+    assert contradicted_rankings("EKS on EC2 is the slowest on p50 in spike.", short1()) != []
+
+
+def test_true_superlatives_pass():
+    metrics = short1()
+    assert contradicted_rankings("ECS Fargate is the fastest in latency.", metrics) == []
+    assert contradicted_rankings("ECS Fargate has the lowest p95 in spike.", metrics) == []
+    assert contradicted_rankings("ECS EC2 is the slowest on p50 in spike.", metrics) == []
+    assert contradicted_rankings("ECS Fargate is the cheapest.", sample4()) == []
+    assert contradicted_rankings("EKS with EC2 is the most expensive.", sample4()) == []
+    assert contradicted_rankings("ECS EC2 is the cheapest.", sample4()) != []
+
+
+def test_negated_true_sentence_passes_and_negated_false_one_fails():
+    metrics = sample4()
+    assert contradicted_rankings("ECS with EC2 is not more costly than EKS with EC2.", metrics) == []
+    assert contradicted_rankings("EKS with EC2 is never cheaper than ECS with EC2.", metrics) == []
+    assert contradicted_rankings("ECS with EC2 isn't more costly than EKS with EC2.", metrics) == []
+    assert contradicted_rankings("EKS with EC2 is not more costly than ECS with EC2.", metrics) != []
+    assert contradicted_rankings("EKS with EC2 is not the cheapest.", metrics) == []
+    assert contradicted_rankings("ECS Fargate is not the cheapest.", metrics) != []
+
+
+def test_every_comparison_in_a_sentence_is_checked():
+    metrics = sample4()
+    right = "EKS with EC2 is more costly than ECS with EC2"
+    # Second comparison false: ECS Fargate is the cheapest, so it is not more costly than ECS EC2.
+    assert contradicted_rankings(f"{right} and ECS Fargate is more costly than ECS with EC2.", metrics) != []
+    assert contradicted_rankings(f"{right}, and slower than ECS Fargate in latency.", metrics) == []
+    assert contradicted_rankings(f"{right}, and faster than ECS Fargate.", metrics) != []
+    assert contradicted_rankings(f"{right} and ECS with EC2 is more costly than ECS Fargate.", metrics) == []
+    # Same subject carried over: "EKS ... costlier than ECS EC2 and cheaper than ECS Fargate" is false.
+    assert contradicted_rankings(f"{right} and cheaper than ECS Fargate.", metrics) != []

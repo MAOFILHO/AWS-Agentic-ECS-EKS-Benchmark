@@ -1,0 +1,33 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-157-qa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/marco/K21/Temp/AWS-Agentic-ECS-EKS-Benchmark/.claude/worktrees/issue-157-qa
+configfile: pyproject.toml
+plugins: langsmith-0.14.4, anyio-4.15.1
+collecting ... collected 66 items / 43 deselected / 23 selected
+
+tests/test_deploy_eks.py::test_fargate_cell_skips_node_group_and_uses_fargate_values PASSED [  4%]
+tests/test_deploy_eks.py::test_fargate_waits_longer_and_gives_the_controller_vpc_id_and_its_irsa_role PASSED [  8%]
+tests/test_deploy_eks.py::test_fargate_cell_ignores_the_instance_type PASSED [ 13%]
+tests/test_deploy_eks.py::test_alb_timeout_writes_the_diagnostics_file_before_exiting PASSED [ 17%]
+tests/test_deploy_eks.py::test_diagnostics_mask_account_ids_and_role_arns PASSED [ 21%]
+tests/test_deploy_eks.py::test_a_failed_controller_install_also_writes_diagnostics PASSED [ 26%]
+tests/test_deploy_eks.py::test_unwritable_diagnostics_keep_the_original_error PASSED [ 30%]
+tests/test_deploy_eks.py::test_no_diagnostics_path_runs_no_diagnostics PASSED [ 34%]
+tests/test_deploy_eks.py::test_main_passes_the_diagnostics_path PASSED   [ 39%]
+tests/test_deploy_eks.py::test_a_missing_kubectl_still_writes_diagnostics_and_keeps_the_error PASSED [ 43%]
+tests/test_deploy_eks.py::test_the_diagnostics_file_masks_the_cluster_arn_account_too PASSED [ 47%]
+tests/test_deploy_eks.py::test_fargate_restarts_pending_coredns_and_waits_before_the_controller PASSED [ 52%]
+tests/test_deploy_eks.py::test_fargate_restarts_every_pending_add_on_and_none_when_all_run PASSED [ 56%]
+tests/test_deploy_eks.py::test_a_coredns_that_never_gets_ready_stops_the_deploy_and_writes_diagnostics PASSED [ 60%]
+tests/test_deploy_eks.py::test_ec2_never_touches_kube_system_add_ons PASSED [ 65%]
+tests/test_deploy_eks.py::test_diagnostics_list_the_ingress_class_and_the_previous_controller_log PASSED [ 69%]
+tests/test_eks_template.py::test_ec2_has_a_node_group_and_no_fargate_profile PASSED [ 73%]
+tests/test_eks_template.py::test_fargate_has_a_fargate_profile_and_no_node_group PASSED [ 78%]
+tests/test_eks_template.py::test_pod_execution_role_trusts_only_fargate_pods PASSED [ 82%]
+tests/test_eks_template.py::test_coredns_runs_on_fargate_only_in_fargate_mode PASSED [ 86%]
+tests/test_eks_template.py::test_lbc_role_on_fargate_trusts_only_the_controller_service_account_through_irsa PASSED [ 91%]
+tests/test_eks_template.py::test_fargate_add_ons_wait_for_the_fargate_profile_and_ec2_order_is_unchanged PASSED [ 95%]
+tests/test_eks_template.py::test_rendered_add_ons_need_the_profile_on_fargate_only PASSED [100%]
+
+====================== 23 passed, 43 deselected in 1.06s =======================

@@ -181,6 +181,8 @@ Resources:
         - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
 
   # On Fargate, CoreDNS must be told to run there or its pods stay Pending.
+  # The fargate-profile tag refs the profile, so on Fargate this add-on waits for it (issue #157);
+  # a plain DependsOn cannot name a resource EC2 does not create, and on EC2 the tag is dropped.
   CoreDnsAddon:
     Type: AWS::EKS::Addon
     Properties:
@@ -193,7 +195,9 @@ Resources:
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
         - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+        - !If [IsFargate, { Key: fargate-profile, Value: !GetAtt FargateProfile.Arn }, !Ref "AWS::NoValue"]
 
+  # Same Fargate-only wait for the profile as CoreDnsAddon (issue #157).
   MetricsServerAddon:
     Type: AWS::EKS::Addon
     Properties:
@@ -205,6 +209,7 @@ Resources:
         - { Key: ttl-hours, Value: !Ref TtlHours }
         - { Key: project, Value: agentic-platform-advisor }
         - { Key: cell, Value: !If [IsEc2, eks-ec2, eks-fargate] }
+        - !If [IsFargate, { Key: fargate-profile, Value: !GetAtt FargateProfile.Arn }, !Ref "AWS::NoValue"]
 
   PodIdentityAgentAddon:
     Type: AWS::EKS::Addon

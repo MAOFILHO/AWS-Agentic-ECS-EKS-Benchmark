@@ -1,0 +1,43 @@
+$ uv run --locked python -m scripts.recount_parts
+exit 0
+$ git status --porcelain results README.md
+$ uv run --locked python -m scripts.make_readme_tables
+exit 0
+$ git status --porcelain results README.md
+## independent count: resource types in templates (grep)
+infra/cfn/40-eks.yaml:76:    Condition: IsEc2
+infra/cfn/40-eks.yaml:101:    Condition: IsFargate
+infra/cfn/40-eks.yaml:160:    Type: AWS::EKS::Addon
+infra/cfn/40-eks.yaml:172:    Type: AWS::EKS::Addon
+infra/cfn/40-eks.yaml:185:    Type: AWS::EKS::Addon
+infra/cfn/40-eks.yaml:198:    Type: AWS::EKS::Addon
+infra/cfn/40-eks.yaml:210:    Type: AWS::EKS::Addon
+infra/cfn/40-eks.yaml:223:    Type: AWS::EKS::Nodegroup
+infra/cfn/40-eks.yaml:224:    Condition: IsEc2
+infra/cfn/40-eks.yaml:247:    Condition: IsFargate
+infra/cfn/30-ecs.yaml:209:    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+infra/cfn/30-ecs.yaml:282:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:295:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:331:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:336:    Type: AWS::EC2::LaunchTemplate
+infra/cfn/30-ecs.yaml:337:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:369:    Type: AWS::AutoScaling::AutoScalingGroup
+infra/cfn/30-ecs.yaml:370:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:386:    Type: AWS::ECS::CapacityProvider
+infra/cfn/30-ecs.yaml:387:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:403:    Condition: IsEc2
+infra/cfn/30-ecs.yaml:411:    Type: AWS::ApplicationAutoScaling::ScalableTarget
+infra/cfn/41-eks-lbc-iam.yaml:223:    Type: AWS::EKS::PodIdentityAssociation
+## moving_parts per cell
+ecs-fargate 2 ['LoadBalancer', 'ScalableTarget']
+ecs-ec2 5 ['LoadBalancer', 'LaunchTemplate', 'AutoScalingGroup', 'CapacityProvider', 'ScalableTarget']
+eks-ec2 8 ['vpc-cni', 'kube-proxy', 'coredns', 'metrics-server', 'eks-pod-identity-agent', 'NodeGroup', 'LbcPodIdentity', 'aws-load-balancer-controller']
+eks-fargate 7 ['vpc-cni', 'kube-proxy', 'coredns', 'metrics-server', 'eks-pod-identity-agent', 'LbcPodIdentity', 'aws-load-balancer-controller']
+## published moving_parts
+      "cell": "ecs-fargate",
+      "cell": "ecs-ec2",
+      "cell": "eks-ec2",
+aggregate [('ecs-fargate', 2.0, 2.0), ('ecs-ec2', 5.0, 5.0), ('eks-ec2', 8.0, 8.0)]
+short1 [('ecs-fargate', 2.0), ('ecs-ec2', 5.0), ('eks-ec2', 8.0)]
+short2 [('ecs-fargate', 2.0), ('ecs-ec2', 5.0), ('eks-ec2', 8.0)]
+short3 [('ecs-fargate', 2.0), ('ecs-ec2', 5.0), ('eks-ec2', 8.0)]

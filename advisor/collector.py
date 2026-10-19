@@ -10,6 +10,7 @@ usage and the plan-time prices in state.prices. A missing price or input leaves 
 """
 
 import json
+import re
 import tempfile
 import time
 from collections.abc import Callable
@@ -24,8 +25,13 @@ from advisor.planner import PlanConfig
 from advisor.state import RunState
 from advisor.store import create_run_dirs
 
-ECS_PARTS = ("cluster", "service", "ALB", "autoscaling policy")
-EKS_PARTS = ("cluster", "node group", "controller", "add-ons")
+# A moving part is a controller or add-on the cell needs beyond the workload itself (docs/METHOD.md).
+# It is counted from the cell's templates: each resource of these types whose Condition holds for the cell.
+PART_TYPES = {"AWS::ECS::CapacityProvider", "AWS::AutoScaling::AutoScalingGroup", "AWS::EC2::LaunchTemplate",
+              "AWS::ApplicationAutoScaling::ScalableTarget", "AWS::ElasticLoadBalancingV2::LoadBalancer",
+              "AWS::EKS::Addon", "AWS::EKS::Nodegroup", "AWS::EKS::PodIdentityAssociation"}
+CONDITIONS = {"IsEc2": "ec2", "IsFargate": "fargate"}  # template Condition -> the cell's compute
+HELM_CONTROLLERS = ("aws-load-balancer-controller",)  # scripts/deploy_eks.py installs it with Helm, not a template
 HELM = "infra/helm/workload"
 METRIC_TRIES, METRIC_WAIT_S = 3, 60  # Container Insights publishes 1 to 2 minutes after the task ends
 
@@ -37,10 +43,28 @@ def config_files(cell: str) -> list[str]:
             f"{HELM}/values-{cell.removeprefix('eks-')}.yaml"]
 
 
+def moving_parts(cell: str, root: Path = d.ROOT) -> list[str]:
+    """Part names in template order: an add-on by its AddonName, any other resource by its logical id."""
+    compute, parts = cell.split("-", 1)[1], []
+    for f in config_files(cell):
+        if not f.startswith("infra/cfn/"):
+            continue
+        res: dict[str, str] = {}
+        for line in [*(root / f).read_text().splitlines(), "  End:"]:
+            if m := re.fullmatch(r"  (\w+):", line):  # a new top-level key under a section ends the last resource
+                if res.get("Type") in PART_TYPES and CONDITIONS.get(res.get("Condition", ""), compute) == compute:
+                    parts.append(res.get("AddonName", res["id"]))
+                res = {"id": m[1]}
+            elif m := re.fullmatch(r"    (Type|Condition): (\S+)|      (AddonName): (\S+)", line):
+                res[m[1] or m[3]] = m[2] or m[4]
+    return parts + ([*HELM_CONTROLLERS] if cell.startswith("eks-") else [])
+
+
 def config(cell: str, plan: PlanConfig | None = None) -> dict:
     """An EC2 cell also records the instance type the deployer gave it (the plan's)."""
     lines = sum(len((d.ROOT / f).read_text().splitlines()) for f in config_files(cell))
-    out = {"config_lines": lines, "moving_parts": len(ECS_PARTS if cell.startswith("ecs-") else EKS_PARTS)}
+    parts = moving_parts(cell)
+    out = {"config_lines": lines, "moving_parts": len(parts), "moving_parts_list": parts}
     if cell.endswith("-ec2") and plan:
         out["instance_type"] = plan.instance_type
     return out

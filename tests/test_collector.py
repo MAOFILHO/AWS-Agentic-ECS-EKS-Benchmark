@@ -1,6 +1,7 @@
 """Collector node with stub boto3 clients and a fake kubectl runner: no AWS (issue #95)."""
 
 import json
+import shutil
 from datetime import UTC, datetime
 
 import pytest
@@ -9,7 +10,7 @@ from test_load_runner import ACCOUNT, HARNESS, SENSITIVE, Client, aws_of
 from advisor import deployer as d
 from advisor import rawformats as rf
 from advisor.analyst import analyse
-from advisor.collector import make_collector, make_eks_snapshot
+from advisor.collector import config, make_collector, make_eks_snapshot, moving_parts
 from advisor.cost import CellUsage, SharedUsage
 from advisor.planner import PlanConfig
 from advisor.state import Capacity, CellSpec, RunState
@@ -117,13 +118,45 @@ def test_analyst_yields_the_scale_out_time_for_both_fixtures(tmp_path):
     assert got[("eks-ec2", "scale_out_s")] == 22.0  # HPA 21:56:01, pod Ready 21:56:23
     assert got[("ecs-fargate", "cold_start_s")] == 38.0
     assert got[("ecs-fargate", "deploy_time_s")] == 660.0  # 19:50:00 to the first healthy minute, 20:01
-    assert got[("eks-ec2", "moving_parts")] == 4 and got[("eks-ec2", "config_lines")] > 0
+    assert got[("eks-ec2", "moving_parts")] == len(moving_parts("eks-ec2")) and got[("eks-ec2", "config_lines")] > 0
 
 
 def test_config_counts_the_cells_template_lines(tmp_path):
     _, raw, _ = collect(tmp_path)
     lines = len((d.ROOT / "infra/cfn/30-ecs.yaml").read_text().splitlines())
-    assert json.loads((raw / "ecs-fargate" / "config.json").read_text()) == {"config_lines": lines, "moving_parts": 4}
+    assert json.loads((raw / "ecs-fargate" / "config.json").read_text()) == {
+        "config_lines": lines, "moving_parts": 2, "moving_parts_list": ["LoadBalancer", "ScalableTarget"]}
+
+
+def test_ecs_ec2_counts_its_capacity_parts_and_eks_counts_each_add_on():
+    assert moving_parts("ecs-ec2") == ["LoadBalancer", "LaunchTemplate", "AutoScalingGroup", "CapacityProvider",
+                                       "ScalableTarget"]
+    assert len(moving_parts("ecs-ec2")) > len(moving_parts("ecs-fargate"))
+    assert moving_parts("eks-ec2") == ["vpc-cni", "kube-proxy", "coredns", "metrics-server", "eks-pod-identity-agent",
+                                       "NodeGroup", "LbcPodIdentity", "aws-load-balancer-controller"]
+    assert "NodeGroup" not in moving_parts("eks-fargate")
+
+
+@pytest.mark.parametrize("cell", ["ecs-fargate", "ecs-ec2", "eks-ec2", "eks-fargate"])
+def test_moving_parts_equals_the_length_of_the_recorded_list(cell):
+    got = config(cell)
+    assert got["moving_parts"] == len(got["moving_parts_list"]) > 0
+
+
+def test_moving_parts_are_read_from_the_template_files(tmp_path):
+    shutil.copytree(d.ROOT / "infra", tmp_path / "infra")
+    eks = tmp_path / "infra/cfn/40-eks.yaml"
+    text = eks.read_text().replace("\n  # eks-ec2 only.", "\n  ExtraAddon:\n    Type: AWS::EKS::Addon\n    Properties:\n"
+                                   "      AddonName: aws-ebs-csi-driver\n\n  # eks-ec2 only.", 1)
+    eks.write_text(text)
+    got = moving_parts("eks-ec2", tmp_path)
+    assert len(got) == len(moving_parts("eks-ec2")) + 1 and "aws-ebs-csi-driver" in got
+
+
+def test_the_helm_controller_is_the_one_deploy_eks_installs():
+    from scripts.deploy_eks import LBC_RELEASE
+
+    assert LBC_RELEASE in moving_parts("eks-ec2")
 
 
 def test_ec2_cell_config_records_the_instance_type(tmp_path):

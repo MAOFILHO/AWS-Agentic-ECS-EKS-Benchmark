@@ -1,0 +1,23 @@
+## AC1-AC3 targeted tests
+......................................                                   [100%]
+38 passed in 1.45s
+## counts per cell
+ecs-fargate 2 ['LoadBalancer', 'ScalableTarget'] True
+ecs-ec2 5 ['LoadBalancer', 'LaunchTemplate', 'AutoScalingGroup', 'CapacityProvider', 'ScalableTarget'] True
+eks-ec2 8 ['vpc-cni', 'kube-proxy', 'coredns', 'metrics-server', 'eks-pod-identity-agent', 'NodeGroup', 'LbcPodIdentity', 'aws-load-balancer-controller'] True
+eks-fargate 7 ['vpc-cni', 'kube-proxy', 'coredns', 'metrics-server', 'eks-pod-identity-agent', 'LbcPodIdentity', 'aws-load-balancer-controller'] True
+## recount + README regen on copies: diff vs committed (empty = up to date)
+published: no diff
+README: no diff
+## published moving_parts values
+      "cell": "ecs-fargate",	      "cell": "ecs-ec2",	      "cell": "eks-ec2",
+## METHOD.md rule
+79:Moving parts are counted from the cell's templates, not typed in (`advisor/collector.py`,
+aggregate [('ecs-fargate', 2.0, 2.0), ('ecs-ec2', 5.0, 5.0), ('eks-ec2', 8.0, 8.0)]
+short1-metrics.json [('ecs-fargate', 2.0), ('ecs-ec2', 5.0), ('eks-ec2', 8.0)]
+short2-metrics.json [('ecs-fargate', 2.0), ('ecs-ec2', 5.0), ('eks-ec2', 8.0)]
+short3-metrics.json [('ecs-fargate', 2.0), ('ecs-ec2', 5.0), ('eks-ec2', 8.0)]
+## edge probe: Type line with trailing comment
+plain count changes: True
+trailing comment count changes: False
+quoted type count changes: False

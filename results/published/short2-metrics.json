@@ -99,7 +99,7 @@
     },
     {
       "name": "moving_parts",
-      "value": 4.0,
+      "value": 2.0,
       "unit": "count",
       "source": "ecs-fargate/config.json",
       "cell": "ecs-fargate",
@@ -235,7 +235,7 @@
     },
     {
       "name": "moving_parts",
-      "value": 4.0,
+      "value": 5.0,
       "unit": "count",
       "source": "ecs-ec2/config.json",
       "cell": "ecs-ec2",
@@ -355,7 +355,7 @@
     },
     {
       "name": "moving_parts",
-      "value": 4.0,
+      "value": 8.0,
       "unit": "count",
       "source": "eks-ec2/config.json",
       "cell": "eks-ec2",

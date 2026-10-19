@@ -1,0 +1,13 @@
+## head ef588d9
+$ uv run --locked ruff check
+Creating virtual environment at: .venv
+Installed 59 packages in 97ms
+All checks passed!
+$ uv run --locked pytest -q
+........................................................................ [ 84%]
+........................................................................ [ 96%]
+....................                                                     [100%]
+592 passed, 4 skipped in 9.74s
+$ uv run --locked pytest -q tests/test_collector.py tests/test_recount_parts.py tests/test_readme.py
+.........................................                                [100%]
+41 passed in 1.63s

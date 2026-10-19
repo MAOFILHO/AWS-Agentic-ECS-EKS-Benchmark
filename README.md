@@ -56,8 +56,9 @@ And EKS Fargate against ECS Fargate:
 - **Idle cost and deploy time are stable and favour ECS Fargate:** 0.0348 USD/h idle against
   0.1348 on EKS Fargate, and a deploy of 402 s (389 to 439) against 1316 s (1294 to 1338).
 - **Cross-check:** `kf4`, one run of the `spike` profile alone, is not in the aggregate (other
-  profile set). Its EKS Fargate scale out and cold start were close to those of `kf5`, and its
-  ECS Fargate pair close to those of the `short` runs.
+  profile set). For EKS Fargate it gave a scale out of 53 s and a cold start of 17.3 s, against
+  61 s and 24.3 s in `kf5`. So the EKS Fargate `spike` scale out lies between 53 and 61 s, from
+  2 observations, not a measured spread. Its ECS Fargate pair was close to those of the `short` runs.
 
 Read the limits below before you generalise it.
 
@@ -159,8 +160,8 @@ This is the single `sample3` run (steady profile), the only run with its cost fi
 | **Run, total**                | **0.3252** |
 
 This prices only the load window. Real spend, with deploy and teardown time, was about two to
-three times this estimate. A Fargate run of 2 cells and 2 profiles (`kf5`, `kf6`) cost between
-one and two US dollars in real AWS spend.
+three times this estimate. A Fargate run of 2 cells and 2 profiles (`kf5`, `kf6`) cost
+USD 1.2 to 1.8 in real AWS spend.
 
 ## Limits
 
@@ -172,8 +173,8 @@ one and two US dollars in real AWS spend.
 - **Two profiles.** Only `spike` and `scale-from-min` were run; no steady, step or soak profile.
 - **Mock workload.** The agent ran with `LLM_MODE=mock`, so the numbers show platform overhead
   only, not model latency. No run with a real model has been done.
-- **Add-on versions.** The EKS add-ons ran the versions AWS picked by default on the day of `kf5`
-  and `kf6`.
+- **Add-on versions.** The EKS add-ons ran the versions AWS picked by default on 19 Oct 2026, the
+  day of `kf5` and `kf6`.
 - **Fargate sizing.** Fargate rounds each task or pod up to the next CPU and memory step AWS
   offers, so a cell may get more than it asked for.
 - **Two gaps.** In `scale-from-min`, ECS Fargate and EKS EC2 logged no scale-out in their load

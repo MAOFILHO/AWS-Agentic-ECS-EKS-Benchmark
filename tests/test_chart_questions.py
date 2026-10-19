@@ -72,7 +72,7 @@ def test_missing_figure_prints_na_and_draws_no_bar(tmp_path):
 def test_published_holds_aggregate_four_charts_and_five_metrics():
     names = {p.name for p in PUBLISHED.iterdir()}
     runs = ("short1", "short2", "short3", "kf5", "kf6")
-    assert names == {"aggregate.json", *CHARTS, *(f"{r}-metrics.json" for r in runs)}
+    assert names == {"aggregate.json", "readme-facts.json", *CHARTS, *(f"{r}-metrics.json" for r in runs)}
     agg = read_aggregate(PUBLISHED / "aggregate.json")
     assert agg.runs == list(runs)
     assert {f.cell for f in agg.figures} == {"ecs-fargate", "ecs-ec2", "eks-fargate", "eks-ec2"}
@@ -136,3 +136,37 @@ def test_burst_latency_chart_has_p50_p95_p99_for_each_cell(tmp_path):
     for metric in ("p50_ms", "p95_ms", "p99_ms"):
         assert {b.get("data-cell") for b in bars(svg, metric)} == CELLS, metric
 
+
+
+def fewer_runs_charts(tmp_path) -> tuple[dict[str, str], dict[str, str]]:
+    """Question charts of the fixture as is, and with the ecs-ec2 spike scale-out resting on 1 run (issue #163)."""
+    agg = read_aggregate(FIXTURE)
+    few = agg.model_copy(update={"figures": [
+        f.model_copy(update={"n": 1}) if (f.cell, f.name, f.profile) == ("ecs-ec2", "scale_out_s", "spike") else f
+        for f in agg.figures]})
+    return make_chart.render_questions(agg), make_chart.render_questions(few)
+
+
+def test_bar_with_fewer_runs_is_lighter_and_labelled_with_its_n(tmp_path):
+    _, few = fewer_runs_charts(tmp_path)
+    svg = tmp_path / "scaling.svg"
+    svg.write_text(few["chart-burst-scaling.svg"])
+    scale = {b.get("data-cell"): b for b in bars(svg, "scale_out_s")}
+    assert scale["ecs-ec2"].get("fill-opacity") == make_chart.FEWER_OPACITY
+    assert scale["ecs-fargate"].get("fill-opacity") is None
+    marks = [(t.get("data-cell"), t.get("data-metric"), t.text) for t in texts(svg, "data-n")]
+    assert marks == [("ecs-ec2", "scale_out_s", "n=1")]
+    words = [t.text for t in ET.parse(svg).iter(f"{SVG}text")]
+    assert "lighter bar: fewer runs" in words
+    # The n label sits under the value label and above the bar.
+    label = next(t for t in texts(svg, "data-label") if t.get("data-cell") == "ecs-ec2" and t.get("data-metric") == "scale_out_s")
+    n = texts(svg, "data-n")[0]
+    assert float(label.get("y")) < float(n.get("y")) < float(scale["ecs-ec2"].get("y"))
+
+
+def test_chart_with_equal_n_is_unchanged(tmp_path):
+    same, few = fewer_runs_charts(tmp_path)
+    for name in CHARTS:
+        assert "fill-opacity" not in same[name] and "data-n=" not in same[name] and "fewer runs" not in same[name]
+        if name != "chart-burst-scaling.svg":
+            assert few[name] == same[name], name

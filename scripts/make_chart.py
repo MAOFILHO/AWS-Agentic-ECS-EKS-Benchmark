@@ -5,7 +5,8 @@ Usage:
 
 One group per metric, one bar per cell, each group on its own scale. A missing figure shows "n/a" and no bar.
 With no metrics.json but an aggregate.json (scripts/aggregate_runs.py), each bar is the median with a min to max
-whisker, and one more chart per question (QUESTIONS) goes next to chart.svg.
+whisker, and one more chart per question (QUESTIONS) goes next to chart.svg. On a question chart, a bar that
+rests on fewer runs than every other bar of its group is lighter and labelled with its n.
 """
 
 import argparse
@@ -34,6 +35,7 @@ IDLE = ("idle_usd_per_hour", "idle cost (USD/h)")
 COLOURS = {"ecs-fargate": "#1f6fb2", "ecs-ec2": "#7fb3e0", "eks-fargate": "#c4561d", "eks-ec2": "#f0a868"}
 BAR_W, GAP, PLOT_H, TOP, LEFT = 44, 8, 180, 60, 20
 AXIS = 44  # room for tick labels left of each group on the question charts
+FEWER_OPACITY = "0.45"  # fill of a bar that rests on fewer runs than the others in its group
 # (file, question, profile, groups, log axis). Latency spans 4 ms to 7000 ms, so a linear axis hides the fast cells.
 QUESTIONS = [
     ("chart-burst-scaling.svg", "How fast does it scale out under a burst?", "spike",
@@ -78,13 +80,16 @@ def render_questions(agg: Aggregate) -> dict[str, str]:
         figs = [f for f in agg.figures if f.profile == profile]
         values = {(f.cell, f.name): f.median for f in figs}
         spread = {(f.cell, f.name): (f.min, f.max) for f in figs}
-        charts[file] = draw(question, values, spread, groups, cells, log, readable=True)
+        ns = {(f.cell, f.name): f.n for f in figs}
+        charts[file] = draw(question, values, spread, groups, cells, log, readable=True, ns=ns)
     return charts
 
 
 def draw(title: str, values: dict[tuple[str, str], float], spread: dict[tuple[str, str], tuple[float, float]],
-         groups=None, cells=None, log: bool = False, readable: bool = False) -> str:
-    """readable: 3 significant digit labels above the whisker, ticks and gridlines."""
+         groups=None, cells=None, log: bool = False, readable: bool = False, ns=None) -> str:
+    """readable: 3 significant digit labels above the whisker, ticks and gridlines.
+    ns: (cell, metric) -> run count. A bar whose n is under that of every other bar in its group is lighter and
+    carries an n= label under its value, and a legend line explains it."""
     if cells is None:
         cells = [c for c in get_args(CellName) if any(cell == c for cell, _ in values)]
     if groups is None:
@@ -93,7 +98,11 @@ def draw(title: str, values: dict[tuple[str, str], float], spread: dict[tuple[st
     group_w = max(len(cells) * (BAR_W + GAP) + 3 * GAP, 150) + pad
     width = max(LEFT * 2 + group_w * len(groups), LEFT * 2 + 130 * len(cells), LEFT * 2 + 9 * len(title))
     base = TOP + PLOT_H
-    height = base + 70
+    ns = ns or {}
+    fewer = {(c, name) for name, _ in groups for c in cells if (c, name) in ns
+             and all(ns[(c, name)] < ns[(o, name)] for o in cells if o != c and (o, name) in ns)
+             and any(o != c and (o, name) in ns for o in cells)}
+    height = base + 70 + (18 if fewer else 0)
     # On a log chart every group shares one axis, so p50, p95 and p99 bars compare across groups.
     names = [name for name, _ in groups]
     shared = (log_scale(names, cells, values, spread) if log and any(values.get((c, n)) for c in cells for n in names)
@@ -129,12 +138,18 @@ def draw(title: str, values: dict[tuple[str, str], float], spread: dict[tuple[st
                 out.append(f'<text x="{mid}" y="{base - 6}" text-anchor="middle" fill="#555555">n/a</text>')
                 continue
             h = max(scale(value), 1.0) if top > 0 else 1.0
+            few = (cell, name) in fewer
             out.append(f'<rect data-cell="{cell}" data-metric="{name}" x="{x}" y="{base - h:.1f}" '
-                       f'width="{BAR_W}" height="{h:.1f}" fill="{COLOURS[cell]}"/>')
+                       f'width="{BAR_W}" height="{h:.1f}" fill="{COLOURS[cell]}"'
+                       + (f' fill-opacity="{FEWER_OPACITY}"/>' if few else "/>"))
             whisker = (cell, name) in spread and top > 0
             lo, hi = (base - scale(v) for v in spread[(cell, name)]) if whisker else (base, base)
             if readable:
                 y = min(base - h, hi) - 4
+                if few:
+                    out.append(f'<text data-n="1" data-cell="{cell}" data-metric="{name}" x="{mid}" y="{y:.1f}" '
+                               f'text-anchor="middle" font-size="10" fill="#555555">n={ns[(cell, name)]}</text>')
+                    y -= 14
                 out.append(f'<text data-label="1" data-cell="{cell}" data-metric="{name}" x="{mid}" y="{y:.1f}" '
                            f'text-anchor="middle" fill="#1a1a1a">{sig3(value)}</text>')
             else:
@@ -145,8 +160,10 @@ def draw(title: str, values: dict[tuple[str, str], float], spread: dict[tuple[st
                            f'x2="{mid}" y2="{hi:.1f}" stroke="#1a1a1a"/>')
     for i, cell in enumerate(cells):
         x = LEFT + i * 130
-        out.append(f'<rect x="{x}" y="{height - 26}" width="12" height="12" fill="{COLOURS[cell]}"/>')
-        out.append(f'<text x="{x + 18}" y="{height - 16}" fill="#1a1a1a">{cell}</text>')
+        out.append(f'<rect x="{x}" y="{base + 44}" width="12" height="12" fill="{COLOURS[cell]}"/>')
+        out.append(f'<text x="{x + 18}" y="{base + 54}" fill="#1a1a1a">{cell}</text>')
+    if fewer:
+        out.append(f'<text x="{LEFT}" y="{base + 74}" fill="#555555">lighter bar: fewer runs</text>')
     out.append("</svg>")
     return "\n".join(out) + "\n"
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="868" height="310" viewBox="0 0 868 310" font-family="sans-serif" font-size="12" data-scale="log">
+<svg xmlns="http://www.w3.org/2000/svg" width="868" height="328" viewBox="0 0 868 328" font-family="sans-serif" font-size="12" data-scale="log">
 <rect width="100%" height="100%" fill="#ffffff"/>
 <text x="20" y="24" font-size="16" font-weight="bold" fill="#1a1a1a">How slow do replies get under a burst?</text>
 <text data-tick="1" x="66" y="244.0" text-anchor="end" fill="#555555">1</text>
@@ -18,8 +18,9 @@
 <rect data-cell="ecs-ec2" data-metric="p50_ms" x="132" y="72.0" width="44" height="168.0" fill="#7fb3e0"/>
 <text data-label="1" data-cell="ecs-ec2" data-metric="p50_ms" x="154.0" y="65.3" text-anchor="middle" fill="#1a1a1a">5410</text>
 <line data-whisker="1" data-cell="ecs-ec2" data-metric="p50_ms" x1="154.0" y1="72.0" x2="154.0" y2="69.3" stroke="#1a1a1a"/>
-<rect data-cell="eks-fargate" data-metric="p50_ms" x="184" y="214.6" width="44" height="25.4" fill="#c4561d"/>
-<text data-label="1" data-cell="eks-fargate" data-metric="p50_ms" x="206.0" y="208.2" text-anchor="middle" fill="#1a1a1a">3.66</text>
+<rect data-cell="eks-fargate" data-metric="p50_ms" x="184" y="214.6" width="44" height="25.4" fill="#c4561d" fill-opacity="0.45"/>
+<text data-n="1" data-cell="eks-fargate" data-metric="p50_ms" x="206.0" y="208.2" text-anchor="middle" font-size="10" fill="#555555">n=2</text>
+<text data-label="1" data-cell="eks-fargate" data-metric="p50_ms" x="206.0" y="194.2" text-anchor="middle" fill="#1a1a1a">3.66</text>
 <line data-whisker="1" data-cell="eks-fargate" data-metric="p50_ms" x1="206.0" y1="217.4" x2="206.0" y2="212.2" stroke="#1a1a1a"/>
 <rect data-cell="eks-ec2" data-metric="p50_ms" x="236" y="205.7" width="44" height="34.3" fill="#f0a868"/>
 <text data-label="1" data-cell="eks-ec2" data-metric="p50_ms" x="258.0" y="201.4" text-anchor="middle" fill="#1a1a1a">5.79</text>
@@ -32,8 +33,9 @@
 <rect data-cell="ecs-ec2" data-metric="p95_ms" x="408" y="69.4" width="44" height="170.6" fill="#7fb3e0"/>
 <text data-label="1" data-cell="ecs-ec2" data-metric="p95_ms" x="430.0" y="61.4" text-anchor="middle" fill="#1a1a1a">6170</text>
 <line data-whisker="1" data-cell="ecs-ec2" data-metric="p95_ms" x1="430.0" y1="69.7" x2="430.0" y2="65.4" stroke="#1a1a1a"/>
-<rect data-cell="eks-fargate" data-metric="p95_ms" x="460" y="209.5" width="44" height="30.5" fill="#c4561d"/>
-<text data-label="1" data-cell="eks-fargate" data-metric="p95_ms" x="482.0" y="204.1" text-anchor="middle" fill="#1a1a1a">4.75</text>
+<rect data-cell="eks-fargate" data-metric="p95_ms" x="460" y="209.5" width="44" height="30.5" fill="#c4561d" fill-opacity="0.45"/>
+<text data-n="1" data-cell="eks-fargate" data-metric="p95_ms" x="482.0" y="204.1" text-anchor="middle" font-size="10" fill="#555555">n=2</text>
+<text data-label="1" data-cell="eks-fargate" data-metric="p95_ms" x="482.0" y="190.1" text-anchor="middle" fill="#1a1a1a">4.75</text>
 <line data-whisker="1" data-cell="eks-fargate" data-metric="p95_ms" x1="482.0" y1="211.1" x2="482.0" y2="208.1" stroke="#1a1a1a"/>
 <rect data-cell="eks-ec2" data-metric="p95_ms" x="512" y="74.9" width="44" height="165.1" fill="#f0a868"/>
 <text data-label="1" data-cell="eks-ec2" data-metric="p95_ms" x="534.0" y="68.4" text-anchor="middle" fill="#1a1a1a">4680</text>
@@ -46,8 +48,9 @@
 <rect data-cell="ecs-ec2" data-metric="p99_ms" x="684" y="66.5" width="44" height="173.5" fill="#7fb3e0"/>
 <text data-label="1" data-cell="ecs-ec2" data-metric="p99_ms" x="706.0" y="59.8" text-anchor="middle" fill="#1a1a1a">7170</text>
 <line data-whisker="1" data-cell="ecs-ec2" data-metric="p99_ms" x1="706.0" y1="66.5" x2="706.0" y2="63.8" stroke="#1a1a1a"/>
-<rect data-cell="eks-fargate" data-metric="p99_ms" x="736" y="197.0" width="44" height="43.0" fill="#c4561d"/>
-<text data-label="1" data-cell="eks-fargate" data-metric="p99_ms" x="758.0" y="189.0" text-anchor="middle" fill="#1a1a1a">9.01</text>
+<rect data-cell="eks-fargate" data-metric="p99_ms" x="736" y="197.0" width="44" height="43.0" fill="#c4561d" fill-opacity="0.45"/>
+<text data-n="1" data-cell="eks-fargate" data-metric="p99_ms" x="758.0" y="189.0" text-anchor="middle" font-size="10" fill="#555555">n=2</text>
+<text data-label="1" data-cell="eks-fargate" data-metric="p99_ms" x="758.0" y="175.0" text-anchor="middle" fill="#1a1a1a">9.01</text>
 <line data-whisker="1" data-cell="eks-fargate" data-metric="p99_ms" x1="758.0" y1="202.2" x2="758.0" y2="193.0" stroke="#1a1a1a"/>
 <rect data-cell="eks-ec2" data-metric="p99_ms" x="788" y="69.8" width="44" height="170.2" fill="#f0a868"/>
 <text data-label="1" data-cell="eks-ec2" data-metric="p99_ms" x="810.0" y="65.8" text-anchor="middle" fill="#1a1a1a">6050</text>
@@ -60,4 +63,5 @@
 <text x="298" y="294" fill="#1a1a1a">eks-fargate</text>
 <rect x="410" y="284" width="12" height="12" fill="#f0a868"/>
 <text x="428" y="294" fill="#1a1a1a">eks-ec2</text>
+<text x="20" y="314" fill="#555555">lighter bar: fewer runs</text>
 </svg>

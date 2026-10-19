@@ -1,0 +1,5 @@
+{
+  "kf4": {"eks-fargate": {"scale_out_s": 53, "cold_start_s": 17.3}},
+  "fargate_run_usd": {"min": 1.2, "max": 1.8},
+  "addon_date": "19 Oct 2026"
+}

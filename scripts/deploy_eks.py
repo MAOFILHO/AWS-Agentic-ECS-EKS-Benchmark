@@ -2,11 +2,13 @@
 
 Usage:
     AWS_PROFILE=<sso-profile> AWS_REGION=<region> IMAGE_URI=<ecr-image-uri> [INSTANCE_TYPE=<type>] \
-    python -m scripts.deploy_eks --cell eks-ec2|eks-fargate --run-id <id> [--region <region>] [--yes]
+    python -m scripts.deploy_eks --cell eks-ec2|eks-fargate --run-id <id> [--region <region>] [--yes] \
+    [--diagnostics <file>]
 
 Stacks go through deploy_stack.py (change sets, y/N per stack; --yes skips the prompts). The kubeconfig is a temp file,
 never ~/.kube/config. Credentials come from the AWS_PROFILE profile through boto3. Output masks
-12-digit account ids.
+12-digit account ids. With --diagnostics, a failed controller or workload install, or an ALB that never comes,
+writes kubectl output to that file (account ids and role ARNs masked) before the error exits.
 """
 
 import argparse
@@ -38,6 +40,17 @@ LBC_CHART_VERSION = "3.6.0"
 SSM_AMI = "/aws/service/eks/optimized-ami/1.{}/amazon-linux-2023/x86_64/standard/recommended/image_id"
 FIRST_MINOR = 30
 ALB_INTERVAL = 15
+LBC_SELECTOR = "app.kubernetes.io/name=aws-load-balancer-controller"  # the chart's pod label
+LBC_READY_TIMEOUT = 300  # a controller not Ready by then will not make the ALB (issue #155)
+ROLE_ARN = re.compile(r"arn:aws[\w-]*:(?:iam|sts)::\d{12}:[\w+=,.@/-]+")
+# What the controller saw, for an ALB that never came (issue #155). Each runs with --kubeconfig.
+DIAGNOSTICS = (
+    ["get", "pods", "-A", "-o", "wide"],
+    ["describe", "ingress", WORKLOAD_RELEASE],
+    ["describe", "pod", "-n", LBC_NAMESPACE, "-l", LBC_SELECTOR],
+    ["logs", "-n", LBC_NAMESPACE, "-l", LBC_SELECTOR, "--tail", "200"],
+    ["get", "events", "-A", "--sort-by", ".lastTimestamp"],
+)
 # Each Fargate pod waits for its own micro VM, so Helm's 5 min default --wait is too short there.
 FARGATE_HELM_TIMEOUT = "15m"
 
@@ -88,10 +101,22 @@ def sh(run, args):
         raise SystemExit(mask(f"error: {args[0]} {args[1]} failed: {reason}")) from None
 
 
+def controller_ready(run, kubeconfig):
+    ready = sh(run, ["kubectl", "get", "deployment", LBC_RELEASE, "-n", LBC_NAMESPACE, "--kubeconfig", kubeconfig,
+                     "-o", "jsonpath={.status.readyReplicas}"]).strip()
+    return ready.isdigit() and int(ready) > 0
+
+
 def wait_for_alb(run, kubeconfig, timeout, sleep=time.sleep, clock=time.monotonic):
-    deadline = clock() + timeout
+    start = clock()
+    deadline, checked = start + timeout, False
     while not (host := sh(run, ["kubectl", "get", "ingress", WORKLOAD_RELEASE, "--kubeconfig", kubeconfig,
                                 "-o", "jsonpath={.status.loadBalancer.ingress[0].hostname}"]).strip()):
+        if not checked and clock() - start >= LBC_READY_TIMEOUT:
+            if not controller_ready(run, kubeconfig):
+                raise SystemExit(f"error: {LBC_RELEASE} pod not Ready after {LBC_READY_TIMEOUT} s; "
+                                 f"it cannot create the ALB.")
+            checked = True
         if clock() >= deadline:
             raise SystemExit(f"error: Ingress {WORKLOAD_RELEASE} has no ALB hostname after {timeout} s.")
         print("waiting for the ALB hostname...", flush=True)
@@ -99,8 +124,28 @@ def wait_for_alb(run, kubeconfig, timeout, sleep=time.sleep, clock=time.monotoni
     return host
 
 
+def write_diagnostics(run, kubeconfig, path):
+    """Best effort: a kubectl error goes in the file as its text. Returns the path, or None if it cannot write."""
+    parts = []
+    for args in DIAGNOSTICS:
+        argv = ["kubectl", *args, "--request-timeout", "30s", "--kubeconfig", kubeconfig]
+        try:
+            res = run(argv, check=False, capture_output=True, text=True)
+            out = f"{res.stdout}{res.stderr}"
+        except Exception as err:  # noqa: BLE001 - a missing kubectl must not hide the deploy error
+            out = f"{type(err).__name__}: {err}"
+        parts.append(f"## kubectl {' '.join(args)}\n{out.rstrip()}\n")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(mask(ROLE_ARN.sub("<role-arn>", "\n".join(parts))))
+    except OSError:
+        return None
+    return path
+
+
 def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
-           deploy_one=deploy_stack.deploy, run=subprocess.run, sleep=time.sleep, instance_type=None):
+           deploy_one=deploy_stack.deploy, run=subprocess.run, sleep=time.sleep, instance_type=None,
+           diagnostics=None):
     compute_type, values_file = CELLS[cell]
     repo, tag = split_image(image_uri)
     version = kubernetes_version(ssm)
@@ -131,21 +176,28 @@ def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
         kubeconfig = os.path.join(tmp, "config")  # never ~/.kube/config (SPEC risk table)
         sh(run, ["aws", "eks", "update-kubeconfig", "--name", cluster, "--region", region,
                  "--kubeconfig", kubeconfig])
-        # vpcId and region are set because pods cannot read them from instance metadata.
-        # Shield and WAF stay off: 41-eks-lbc-iam does not grant them.
-        sh(run, ["helm", "upgrade", "--install", LBC_RELEASE, LBC_RELEASE, "--repo", LBC_CHART_REPO,
-                 "--version", LBC_CHART_VERSION, "--namespace", LBC_NAMESPACE, "--wait",
-                 "--set", f"clusterName={cluster}", "--set", f"region={region}", "--set", f"vpcId={vpc_id}",
-                 "--set", "serviceAccount.create=true", "--set", f"serviceAccount.name={LBC_RELEASE}",
-                 "--set", "enableShield=false", "--set", "enableWaf=false", "--set", "enableWafv2=false",
-                 *lbc_extra, *wait_extra, "--kubeconfig", kubeconfig])
-        print(f"{cluster}: {LBC_RELEASE} {LBC_CHART_VERSION} installed.")
-        sh(run, ["helm", "upgrade", "--install", WORKLOAD_RELEASE, str(WORKLOAD_CHART), "--wait",
-                 "--values", str(WORKLOAD_CHART / values_file),
-                 "--set", f"image.repository={repo}", "--set", f"image.tag={tag}",
-                 *wait_extra, "--kubeconfig", kubeconfig])
-        print(f"{cluster}: {WORKLOAD_RELEASE} installed, image tag {tag}.")
-        host = wait_for_alb(run, kubeconfig, alb_timeout, sleep=sleep)
+        try:
+            # vpcId and region are set because pods cannot read them from instance metadata.
+            # Shield and WAF stay off: 41-eks-lbc-iam does not grant them.
+            sh(run, ["helm", "upgrade", "--install", LBC_RELEASE, LBC_RELEASE, "--repo", LBC_CHART_REPO,
+                     "--version", LBC_CHART_VERSION, "--namespace", LBC_NAMESPACE, "--wait",
+                     "--set", f"clusterName={cluster}", "--set", f"region={region}", "--set", f"vpcId={vpc_id}",
+                     "--set", "serviceAccount.create=true", "--set", f"serviceAccount.name={LBC_RELEASE}",
+                     "--set", "enableShield=false", "--set", "enableWaf=false", "--set", "enableWafv2=false",
+                     *lbc_extra, *wait_extra, "--kubeconfig", kubeconfig])
+            print(f"{cluster}: {LBC_RELEASE} {LBC_CHART_VERSION} installed.")
+            sh(run, ["helm", "upgrade", "--install", WORKLOAD_RELEASE, str(WORKLOAD_CHART), "--wait",
+                     "--values", str(WORKLOAD_CHART / values_file),
+                     "--set", f"image.repository={repo}", "--set", f"image.tag={tag}",
+                     *wait_extra, "--kubeconfig", kubeconfig])
+            print(f"{cluster}: {WORKLOAD_RELEASE} installed, image tag {tag}.")
+            host = wait_for_alb(run, kubeconfig, alb_timeout, sleep=sleep)
+        except SystemExit as err:  # before teardown: the cluster still holds the evidence (issue #155)
+            if diagnostics is None:
+                raise
+            written = write_diagnostics(run, kubeconfig, Path(diagnostics))
+            note = f" Diagnostics: {written}" if written else " Diagnostics could not be written."
+            raise SystemExit(f"{err.code}{note}") from None
     print(mask(f"ALB: http://{host}"))
     return host
 
@@ -156,6 +208,7 @@ def main(argv=None):
     parser.add_argument("--run-id", default="")
     parser.add_argument("--region")
     parser.add_argument("--yes", action="store_true", help="Execute every change set without the y/N prompt.")
+    parser.add_argument("--diagnostics", help="File for kubectl diagnostics when the controller or the ALB fails.")
     args = parser.parse_args(argv)
 
     region = args.region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
@@ -170,7 +223,7 @@ def main(argv=None):
             deploy_one = functools.partial(deploy_stack.deploy, answer=lambda _prompt: "y")
         deploy(session.client("cloudformation"), session.client("ssm"), session.client("eks"),
                args.run_id, args.cell, region, image_uri, deploy_one=deploy_one,
-               instance_type=os.environ.get("INSTANCE_TYPE"))
+               instance_type=os.environ.get("INSTANCE_TYPE"), diagnostics=args.diagnostics)
     except (BotoCoreError, ClientError) as err:
         raise SystemExit(mask(f"error: {err}")) from None
 

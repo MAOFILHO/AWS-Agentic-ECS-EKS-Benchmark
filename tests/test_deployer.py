@@ -174,3 +174,11 @@ def test_cli_hands_the_plan_instance_type_to_the_deployer(tmp_path, monkeypatch)
     config = json.loads(cli.RUN_CONFIG.read_text())
     cli.deploy_nodes(tmp_path, config)
     assert got["instance_type"] == config["plan"]["instance_type"]
+
+
+def test_eks_cell_gets_a_diagnostics_path_in_the_run_raw_folder(tmp_path):
+    # Issue #155: deploy_eks writes why the ALB never came there, before the graph reaches teardown.
+    run = FakeRunner()
+    make_deployer("sso", IMAGE, tmp_path, k6_image_uri=K6, run=run)(state(("eks-fargate",)))
+    argv = next(a for a, _ in run.calls if "scripts.deploy_eks" in a)
+    assert argv[argv.index("--diagnostics") + 1] == str(tmp_path / "results" / "dep-01" / "raw" / "eks-diagnostics.txt")

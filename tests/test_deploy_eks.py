@@ -49,18 +49,22 @@ class FakeEks:
         return Waiter()
 
 
-def runner(events, alb_after=1, fail=None):
+def runner(events, alb_after=1, fail=None, ready="1"):
     polls = []
 
     def run(args, check, capture_output, text):
-        assert check and capture_output and text
+        assert capture_output and text
         events.append(("run", *args))
         if fail and args[0] == fail:
             raise subprocess.CalledProcessError(1, args, stderr=f"denied for arn:aws:iam::{ACCOUNT}:role/x")
         out = ""
-        if args[:2] == ["kubectl", "get"]:
+        if args[:3] == ["kubectl", "get", "ingress"]:
             polls.append(1)
             out = ALB if len(polls) >= alb_after else ""
+        elif args[:3] == ["kubectl", "get", "deployment"]:
+            out = ready
+        elif args[0] == "kubectl":  # a diagnostics command
+            out = f"{' '.join(args[1:3])}: AWS_ROLE_ARN=arn:aws:iam::{ACCOUNT}:role/r1-lbc account {ACCOUNT}\n"
         return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
 
     return run
@@ -298,3 +302,100 @@ def test_main_reads_the_instance_type_from_the_env(monkeypatch):
     monkeypatch.setattr(deploy_eks, "deploy", lambda *a, **kw: got.update(kw))
     deploy_eks.main(["--cell", "eks-ec2", "--run-id", "r1"])
     assert got["instance_type"] == "t3.medium"
+
+
+class Clock:
+    """Fake monotonic clock; each sleep moves it forward."""
+
+    def __init__(self):
+        self.now = 0
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+def test_alb_timeout_writes_the_diagnostics_file_before_exiting(tmp_path):
+    # Issue #155: deploy_eks exits only after the file is written, and the deployer runs teardown after that exit.
+    events, path = [], tmp_path / "results" / "r1" / "raw" / "eks-diagnostics.txt"
+    with pytest.raises(SystemExit) as exc:
+        deploy(events, cell="eks-fargate", run=runner(events, alb_after=10**6), alb_timeout=0, diagnostics=path)
+    assert "no ALB hostname" in str(exc.value) and str(path) in str(exc.value)
+    text = path.read_text()
+    for section in ("kubectl get pods -A -o wide", "kubectl describe ingress workload",
+                    "kubectl describe pod -n kube-system", "kubectl logs -n kube-system", "--tail 200",
+                    "kubectl get events -A --sort-by .lastTimestamp"):
+        assert section in text, section
+    diag = [e for e in events if e[0] == "run" and e[1] == "kubectl" and e[2] in ("describe", "logs")]
+    assert diag and all("--kubeconfig" in e for e in diag)
+
+
+def test_diagnostics_mask_account_ids_and_role_arns(tmp_path):
+    events, path = [], tmp_path / "eks-diagnostics.txt"
+    with pytest.raises(SystemExit):
+        deploy(events, cell="eks-fargate", run=runner(events, alb_after=10**6), alb_timeout=0, diagnostics=path)
+    text = path.read_text()
+    assert ACCOUNT not in text and not re.search(r"\b\d{12}\b", text)
+    assert "arn:aws:iam" not in text and "role/r1-lbc" not in text
+    assert "<role-arn>" in text
+
+
+def test_a_failed_controller_install_also_writes_diagnostics(tmp_path):
+    events, path = [], tmp_path / "eks-diagnostics.txt"
+    with pytest.raises(SystemExit) as exc:
+        deploy(events, cell="eks-fargate", run=runner(events, fail="helm"), diagnostics=path)
+    assert "helm upgrade failed" in str(exc.value) and path.is_file()
+
+
+def test_unwritable_diagnostics_keep_the_original_error(tmp_path):
+    # Teardown must still run: the deploy error comes back whatever the diagnostics do.
+    events = []
+    with pytest.raises(SystemExit) as exc:
+        deploy(events, run=runner(events, alb_after=10**6), alb_timeout=0, diagnostics=tmp_path)  # a directory
+    assert "no ALB hostname" in str(exc.value) and "could not be written" in str(exc.value)
+
+
+def test_no_diagnostics_path_runs_no_diagnostics():
+    events = []
+    with pytest.raises(SystemExit):
+        deploy(events, run=runner(events, alb_after=10**6), alb_timeout=0)
+    assert not [e for e in events if e[0] == "run" and e[2] in ("describe", "logs")]
+
+
+def test_a_not_ready_controller_stops_the_wait_after_5_minutes():
+    events, clock = [], Clock()
+    with pytest.raises(SystemExit) as exc:
+        deploy_eks.wait_for_alb(runner(events, alb_after=10**6, ready=""), "kc", 900, sleep=clock.sleep, clock=clock)
+    assert "aws-load-balancer-controller" in str(exc.value) and "not Ready after 300 s" in str(exc.value)
+    assert 300 <= clock.now < 900
+
+
+def test_a_ready_controller_keeps_waiting_until_the_alb_timeout():
+    events, clock = [], Clock()
+    with pytest.raises(SystemExit, match="no ALB hostname after 900 s"):
+        deploy_eks.wait_for_alb(runner(events, alb_after=10**6, ready="1"), "kc", 900, sleep=clock.sleep, clock=clock)
+    assert clock.now >= 900
+    assert len([e for e in events if e[1:4] == ("kubectl", "get", "deployment")]) == 1
+
+
+def test_irsa_trust_sub_is_the_service_account_the_controller_is_installed_with():
+    template = (deploy_eks.CFN / "41-eks-lbc-iam.yaml").read_text()
+    (sub,) = re.findall(r'"\$\{Issuer\}:sub": "([^"]+)"', template)
+    assert sub == f"system:serviceaccount:{deploy_eks.LBC_NAMESPACE}:{deploy_eks.LBC_RELEASE}"
+    events = []
+    deploy(events, cell="eks-fargate")
+    lbc, _ = helm_installs(events)
+    assert lbc[lbc.index("--namespace") + 1] == deploy_eks.LBC_NAMESPACE
+    assert f"serviceAccount.name={deploy_eks.LBC_RELEASE}" in lbc and "serviceAccount.create=true" in lbc
+
+
+def test_main_passes_the_diagnostics_path(monkeypatch):
+    got = {}
+    for name, value in {"IMAGE_URI": IMAGE, "AWS_PROFILE": "sso", "AWS_REGION": "us-east-1"}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(deploy_eks.boto3, "Session", lambda **kw: type("S", (), {"client": lambda self, n: n})())
+    monkeypatch.setattr(deploy_eks, "deploy", lambda *a, **kw: got.update(kw))
+    deploy_eks.main(["--cell", "eks-fargate", "--run-id", "r1", "--diagnostics", "results/x/raw/eks-diagnostics.txt"])
+    assert got["diagnostics"] == "results/x/raw/eks-diagnostics.txt"

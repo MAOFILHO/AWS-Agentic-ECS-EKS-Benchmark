@@ -1,0 +1,8 @@
+## missing node analyst edge renamed (extra analystX)
+1 failed, 17 deselected in 0.59s
+## analyst removed from diagram
+1 failed, 17 deselected in 0.53s
+## extra node cleanup
+1 failed, 17 deselected in 0.53s
+## new STEPS entry auditor in graph.py
+1 failed, 17 deselected in 0.56s

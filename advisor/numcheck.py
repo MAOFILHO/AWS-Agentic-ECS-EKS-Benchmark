@@ -97,3 +97,95 @@ def check(text: str, metrics: Metrics) -> list[str]:
         ):
             offenders.append(m.group(0))
     return offenders + ACCOUNT_ID_RE.findall(text) + EMAIL_RE.findall(text)
+
+
+# Which metric a table row label or a sentence is about (issue #150).
+_METRIC_WORDS = {
+    "p50_ms": r"\bp50\b",
+    "p95_ms": r"\bp95\b",
+    "p99_ms": r"\bp99\b",
+    "error_rate": r"\berrors?\b",
+    "scale_out_s": r"\bscal(?:e|ed|es|ing)[ -]out\b",
+    "cold_start_s": r"\bcold start",
+    "deploy_time_s": r"\bdeploy",
+    "config_lines": r"\bconfig lines\b",
+    "moving_parts": r"\bmoving parts\b",
+    "idle_usd_per_hour": r"\bidle\b",
+    "usd_per_1k_requests": r"\bper (?:1k|thousand)\b",
+}
+_CELL_NAME_RE = re.compile(r"\b(ECS|EKS)(?:-|\s+(?:with\s+|on\s+|using\s+)?)(EC2|Fargate)\b", re.IGNORECASE)
+_BLOCK_START_RE = re.compile(r"\s*(?:\d+\.|[-*])\s")
+_PROFILE_HEAD_RE = re.compile(r"\*\*(?:Profile `([\w-]+)`|Per cell)\*\*")
+
+
+def _scoped(metrics: Metrics, names: set[str], cells: set[str], profile: str | None, any_profile: bool) -> Metrics:
+    keep = [
+        f for f in metrics.figures
+        if (not names or f.name in names) and (not cells or f.cell in cells) and (any_profile or f.profile == profile)
+    ]
+    return metrics.model_copy(update={"figures": keep})
+
+
+def _blocks(text: str) -> list[tuple[str, str | None, list[str] | None]]:
+    """(text, profile, header) per piece: a table row (with its header), or a sentence of prose.
+
+    A fenced code block comes back as one piece with the header `[]`: it names no cell or metric.
+    """
+    out, para, profile, header, fenced = [], [], None, None, []
+    in_fence = False
+    for line in [*text.splitlines(), ""]:
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            if not in_fence:
+                out.append(("\n".join(fenced), None, []))
+                fenced = []
+            continue
+        if in_fence:
+            fenced.append(line)
+            continue
+        row = line.strip().startswith("|")
+        if row or not line.strip() or _BLOCK_START_RE.match(line):
+            sentences = re.split(r"(?<=[.!?])\s+", " ".join(para).strip()) if para else []
+            out += [(s, None, None) for s in sentences if s]
+            para = []
+        if row:
+            cols = [c.strip() for c in line.strip().strip("|").split("|")]
+            if cols[0].lower() == "metric":
+                header = [c.lower() for c in cols]
+            elif not set(line.strip()) <= set("|-: "):
+                out.append((line, profile, header))
+            continue
+        header = None
+        if head := _PROFILE_HEAD_RE.fullmatch(line.strip()):
+            profile = head.group(1)
+        elif line.strip():
+            marker = _BLOCK_START_RE.match(line)
+            para.append(line[marker.end():].strip() if marker else line.strip())
+    return out
+
+
+def check_scoped(text: str, metrics: Metrics) -> list[str]:
+    """Like `check`, but a number must match a figure of the cell and metric its row or sentence names.
+
+    A table row takes its metric from the row label, its cell from the column header and its
+    profile from the heading above the table. A sentence takes the metrics and cells it names, and
+    the cells of the sentence before it ("ECS Fargate. Its p95 was ..."); one that names none of a
+    kind accepts any. Within a sentence the numbers are not told apart per cell.
+    """
+    offenders, previous = [], set()
+    for piece, profile, header in _blocks(text):
+        if header is None:
+            names = {n for n, w in _METRIC_WORDS.items() if re.search(w, piece, re.IGNORECASE)}
+            cells = {"-".join(m.groups()).lower() for m in _CELL_NAME_RE.finditer(piece)}
+            offenders += check(piece, _scoped(metrics, names, cells | previous if cells else cells, None, True))
+            previous = cells
+            continue
+        previous = set()
+        if not header:  # fenced code
+            offenders += check(piece, metrics)
+            continue
+        cols = [c.strip() for c in piece.strip().strip("|").split("|")]
+        names = {n for n, w in _METRIC_WORDS.items() if re.search(w, cols[0], re.IGNORECASE)}
+        for cell, col in zip(header[1:], cols[1:]):
+            offenders += check(col, _scoped(metrics, names, {cell}, profile, False))
+    return offenders

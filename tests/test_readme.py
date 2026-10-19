@@ -10,7 +10,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from advisor.numcheck import check
+from advisor.numcheck import check, check_scoped
 from advisor.schemas import Figure, Metrics, SharedCost, read_aggregate, read_metrics
 from scripts.make_readme_tables import END, START, render
 
@@ -38,7 +38,7 @@ def test_sample_run_is_tracked():
         assert f"results/sample/{name}" in tracked
 
 
-def test_every_readme_number_comes_from_the_aggregate_or_cost_files():
+def _readme_metrics_and_text() -> tuple[Metrics, str]:
     agg = read_aggregate(PUBLISHED / "aggregate.json")
     figures = [
         Figure(name=f.name, value=v, unit=f.unit, source="aggregate.json", cell=f.cell, profile=f.profile)
@@ -51,7 +51,37 @@ def test_every_readme_number_comes_from_the_aggregate_or_cost_files():
     text = README.read_text()
     for run_id in agg.runs:  # run ids are names, not figures
         text = text.replace(run_id, "")
+    return metrics, text
+
+
+def test_every_readme_number_comes_from_the_aggregate_or_cost_files():
+    metrics, text = _readme_metrics_and_text()
     assert check(text, metrics) == []
+
+
+def test_every_readme_number_matches_the_cell_and_metric_it_sits_with():
+    metrics, text = _readme_metrics_and_text()
+    assert check_scoped(text, metrics) == []
+
+
+def test_swapping_two_real_readme_figures_fails_the_number_check():
+    metrics, text = _readme_metrics_and_text()
+    # Table: the p50 of ecs-ec2 and eks-ec2 in `spike` trade places. Both are real figures.
+    row = "| p50 latency (ms) | 4.08 (3.76 to 4.33) | 5412 (5406 to 6210) | 5.79 (5.74 to 5.88) |"
+    swapped = "| p50 latency (ms) | 4.08 (3.76 to 4.33) | 5.79 (5.74 to 5.88) | 5412 (5406 to 6210) |"
+    assert row in text
+    swapped_text = text.replace(row, swapped)
+    assert check(swapped_text, metrics) == []  # the pooled check cannot see it
+    assert check_scoped(swapped_text, metrics) != []
+    # Prose: the idle cost of ECS Fargate quoted for a metric it is not (deploy time 426 s -> 0.0348).
+    prose = "ECS Fargate deployed in 426 s"
+    assert prose in text
+    assert check_scoped(text.replace(prose, "ECS Fargate deployed in 5412 s"), metrics) != []
+    assert check_scoped(text.replace(prose, "ECS Fargate deployed in 0.0348 s"), metrics) != []
+    # A figure of another cell in a sentence that names one cell.
+    other = "EKS EC2 kept p50 at 5.79 ms"
+    assert other in text
+    assert check_scoped(text.replace(other, "EKS EC2 kept p50 at 4.08 ms"), metrics) != []
 
 
 def test_readme_tables_are_written_from_the_aggregate():
@@ -115,3 +145,12 @@ def test_tables_put_units_on_row_labels_only():
         assert header, path.name
         assert "(" not in header.group(0), path.name
     assert re.search(r"^## Verdict\n+\S", (SAMPLE / "report.md").read_text(), re.MULTILINE)
+
+
+def test_sample_report_verdict_still_passes_the_ranking_checks():
+    from advisor.reporter import contradicted_rankings, unsupported_claims, verdict_of
+
+    metrics = read_metrics(SAMPLE / "metrics.json")
+    verdict = verdict_of((SAMPLE / "report.md").read_text().split("## Verdict", 1)[1].split("\n## ", 1)[0])
+    assert contradicted_rankings(verdict, metrics) == []
+    assert unsupported_claims(verdict, metrics) == []

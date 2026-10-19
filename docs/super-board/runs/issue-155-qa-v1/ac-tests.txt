@@ -1,0 +1,14 @@
+tests/test_deploy_eks.py::test_alb_timeout_writes_the_diagnostics_file_before_exiting PASSED
+tests/test_deploy_eks.py::test_diagnostics_mask_account_ids_and_role_arns PASSED
+tests/test_deploy_eks.py::test_a_failed_controller_install_also_writes_diagnostics PASSED
+tests/test_deploy_eks.py::test_unwritable_diagnostics_keep_the_original_error PASSED
+tests/test_deploy_eks.py::test_no_diagnostics_path_runs_no_diagnostics PASSED
+tests/test_deploy_eks.py::test_a_not_ready_controller_stops_the_wait_after_5_minutes PASSED
+tests/test_deploy_eks.py::test_a_ready_controller_keeps_waiting_until_the_alb_timeout PASSED
+tests/test_deploy_eks.py::test_irsa_trust_sub_is_the_service_account_the_controller_is_installed_with PASSED
+tests/test_deploy_eks.py::test_main_passes_the_diagnostics_path PASSED
+tests/test_deploy_eks.py::test_a_missing_kubectl_still_writes_diagnostics_and_keeps_the_error PASSED
+tests/test_deploy_eks.py::test_the_diagnostics_file_masks_the_cluster_arn_account_too PASSED
+tests/test_deploy_eks.py::test_a_short_alb_timeout_never_asks_about_the_controller PASSED
+tests/test_deployer.py::test_eks_cell_gets_a_diagnostics_path_in_the_run_raw_folder PASSED
+====================== 13 passed, 33 deselected in 0.82s =======================

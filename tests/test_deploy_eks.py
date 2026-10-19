@@ -399,3 +399,41 @@ def test_main_passes_the_diagnostics_path(monkeypatch):
     monkeypatch.setattr(deploy_eks, "deploy", lambda *a, **kw: got.update(kw))
     deploy_eks.main(["--cell", "eks-fargate", "--run-id", "r1", "--diagnostics", "results/x/raw/eks-diagnostics.txt"])
     assert got["diagnostics"] == "results/x/raw/eks-diagnostics.txt"
+
+
+def test_a_missing_kubectl_still_writes_diagnostics_and_keeps_the_error(tmp_path):
+    # QA #155 edge: a diagnostics command that cannot start goes in the file; teardown still gets the deploy error.
+    events, path, base = [], tmp_path / "eks-diagnostics.txt", runner([], alb_after=10**6)
+
+    def run(args, check, capture_output, text):
+        if not check:  # only diagnostics run with check=False
+            raise FileNotFoundError(2, "No such file or directory", "kubectl")
+        return base(args, check=check, capture_output=capture_output, text=text)
+
+    with pytest.raises(SystemExit) as exc:
+        deploy(events, cell="eks-fargate", run=run, alb_timeout=0, diagnostics=path)
+    assert "no ALB hostname" in str(exc.value) and str(path) in str(exc.value)
+    assert path.read_text().count("FileNotFoundError") == len(deploy_eks.DIAGNOSTICS)
+
+
+def test_the_diagnostics_file_masks_the_cluster_arn_account_too(tmp_path):
+    # QA #155 edge: a non-IAM ARN keeps its shape but loses the account id.
+    events, path = [], tmp_path / "eks-diagnostics.txt"
+    cluster_arn = f"arn:aws:eks:us-east-1:{ACCOUNT}:cluster/r1-eks-fargate"
+
+    def run(args, check, capture_output, text):
+        if not check:
+            return subprocess.CompletedProcess(args, 0, stdout=cluster_arn, stderr="")
+        return runner([], alb_after=10**6)(args, check=check, capture_output=capture_output, text=text)
+
+    with pytest.raises(SystemExit):
+        deploy(events, cell="eks-fargate", run=run, alb_timeout=0, diagnostics=path)
+    assert ACCOUNT not in path.read_text() and "cluster/r1-eks-fargate" in path.read_text()
+
+
+def test_a_short_alb_timeout_never_asks_about_the_controller():
+    # QA #155 edge: under 5 minutes the ALB timeout alone decides; no readiness call.
+    events, clock = [], Clock()
+    with pytest.raises(SystemExit, match="no ALB hostname after 120 s"):
+        deploy_eks.wait_for_alb(runner(events, alb_after=10**6, ready=""), "kc", 120, sleep=clock.sleep, clock=clock)
+    assert not [e for e in events if e[1:4] == ("kubectl", "get", "deployment")]

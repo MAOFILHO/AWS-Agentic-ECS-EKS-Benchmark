@@ -1,0 +1,277 @@
+{
+  "run_id": "kf5",
+  "figures": [
+    {
+      "name": "p50_ms",
+      "value": 3.867145,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p95_ms",
+      "value": 4.533658,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p99_ms",
+      "value": 8.815122,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "ecs-fargate/k6-spike.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p50_ms",
+      "value": 4.387318,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p95_ms",
+      "value": 5.931496,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p99_ms",
+      "value": 10.987294,
+      "unit": "ms",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "scale_out_s",
+      "value": 43.648,
+      "unit": "s",
+      "source": "ecs-fargate/events.json + ecs-fargate/windows.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "cold_start_s",
+      "value": 36.871,
+      "unit": "s",
+      "source": "ecs-fargate/events.json + ecs-fargate/windows.json",
+      "cell": "ecs-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "deploy_time_s",
+      "value": 401.988296,
+      "unit": "s",
+      "source": "ecs-fargate/deploy.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "config_lines",
+      "value": 436.0,
+      "unit": "lines",
+      "source": "ecs-fargate/config.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "moving_parts",
+      "value": 2.0,
+      "unit": "count",
+      "source": "ecs-fargate/config.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "value": 0.034842,
+      "unit": "usd/h",
+      "source": "ecs-fargate/cost.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "value": 0.000906,
+      "unit": "usd",
+      "source": "ecs-fargate/cost.json + ecs-fargate/k6-spike.json + ecs-fargate/k6-scale-from-min.json",
+      "cell": "ecs-fargate",
+      "profile": null
+    },
+    {
+      "name": "p50_ms",
+      "value": 4.139248,
+      "unit": "ms",
+      "source": "eks-fargate/k6-spike.json",
+      "cell": "eks-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p95_ms",
+      "value": 5.11554,
+      "unit": "ms",
+      "source": "eks-fargate/k6-spike.json",
+      "cell": "eks-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p99_ms",
+      "value": 6.915427,
+      "unit": "ms",
+      "source": "eks-fargate/k6-spike.json",
+      "cell": "eks-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "eks-fargate/k6-spike.json",
+      "cell": "eks-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "p50_ms",
+      "value": 4.283622,
+      "unit": "ms",
+      "source": "eks-fargate/k6-scale-from-min.json",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p95_ms",
+      "value": 5.323565,
+      "unit": "ms",
+      "source": "eks-fargate/k6-scale-from-min.json",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "p99_ms",
+      "value": 8.159935,
+      "unit": "ms",
+      "source": "eks-fargate/k6-scale-from-min.json",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "error_rate",
+      "value": 0.0,
+      "unit": "ratio",
+      "source": "eks-fargate/k6-scale-from-min.json",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min"
+    },
+    {
+      "name": "scale_out_s",
+      "value": 61.0,
+      "unit": "s",
+      "source": "eks-fargate/events.json + eks-fargate/windows.json",
+      "cell": "eks-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "cold_start_s",
+      "value": 24.292608,
+      "unit": "s",
+      "source": "eks-fargate/events.json + eks-fargate/windows.json",
+      "cell": "eks-fargate",
+      "profile": "spike"
+    },
+    {
+      "name": "deploy_time_s",
+      "value": 1338.395202,
+      "unit": "s",
+      "source": "eks-fargate/deploy.json",
+      "cell": "eks-fargate",
+      "profile": null
+    },
+    {
+      "name": "config_lines",
+      "value": 577.0,
+      "unit": "lines",
+      "source": "eks-fargate/config.json",
+      "cell": "eks-fargate",
+      "profile": null
+    },
+    {
+      "name": "moving_parts",
+      "value": 8.0,
+      "unit": "count",
+      "source": "eks-fargate/config.json",
+      "cell": "eks-fargate",
+      "profile": null
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "value": 0.134843,
+      "unit": "usd/h",
+      "source": "eks-fargate/cost.json",
+      "cell": "eks-fargate",
+      "profile": null
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "value": 0.00139,
+      "unit": "usd",
+      "source": "eks-fargate/cost.json + eks-fargate/k6-spike.json + eks-fargate/k6-scale-from-min.json",
+      "cell": "eks-fargate",
+      "profile": null
+    }
+  ],
+  "shared_costs": [
+    {
+      "item": "shared nat gateway",
+      "usd": 0.033549,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared nat data",
+      "usd": 0.045,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared vpc endpoints",
+      "usd": 0.037277,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared harness vcpu",
+      "usd": 0.03018,
+      "source": "shared-cost.json"
+    },
+    {
+      "item": "shared harness memory",
+      "usd": 0.006628,
+      "source": "shared-cost.json"
+    }
+  ],
+  "gaps": [
+    "ecs-fargate/scale-from-min scale_out_s, cold_start_s: no scale-out happened in its load window",
+    "eks-fargate/scale-from-min scale_out_s, cold_start_s: no scale-out happened in its load window"
+  ],
+  "harness_bound": false
+}

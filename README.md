@@ -7,25 +7,57 @@ the run, asks before any spend, deploys, measures, tears everything down and wri
 
 ## Verdict
 
-Three runs (`short1`, `short2`, `short3`) in us-east-1, mock workload, on ECS Fargate, ECS EC2 and
-EKS EC2. Each figure is the median, with the min to max of the 3 runs in brackets. One finding per
-question:
+Five runs in us-east-1, mock workload, on four cells. `short1`, `short2` and `short3` measured ECS
+Fargate, ECS EC2 and EKS EC2; `kf5` and `kf6` measured ECS Fargate and EKS Fargate. So ECS EC2 and
+EKS EC2 rest on 3 runs, EKS Fargate on 2 and ECS Fargate on 5. Each figure is the median, with the
+min to max of its runs in brackets. One finding per question:
 
 1. **Scale out under a burst: EKS EC2 is fastest.** In the `spike` profile EKS EC2 went from alarm
    to a healthy new replica in 21 s (21 to 23), against 72.8 s (72.5 to 76.5) on ECS EC2 and
-   75.9 s (72.8 to 84.7) on ECS Fargate. In `scale-from-min` only ECS EC2 scaled out, in 186 s
-   (148 to 233). [Chart](results/published/chart-burst-scaling.svg).
-2. **Latency under a burst: only ECS Fargate stayed fast.** In `spike` ECS Fargate held p50
-   4.08 ms and p95 4.84 ms. ECS EC2 had a p50 of 5412 ms (5406 to 6210), so most of its requests
-   waited. EKS EC2 kept p50 at 5.79 ms but its p95 was 4675 ms (3862 to 5311): most requests were
-   fast and a tail waited. One EKS EC2 run returned errors on 1.57% of requests. The cause is not
-   proven: the runs did not record why requests waited on the EC2 cells.
+   72.8 s (42.9 to 84.7) on ECS Fargate. EKS Fargate scaled out in 61 s with a cold start of
+   24.3 s, both from `kf5` alone (n=1): `kf6` logged neither, so draw no conclusion from them.
+   In `scale-from-min` only ECS EC2 scaled out, in 186 s (148 to 233).
+   [Chart](results/published/chart-burst-scaling.svg).
+2. **Latency under a burst: both Fargate cells stayed fast.** In `spike` ECS Fargate held p50
+   3.87 ms (3.67 to 4.33) and p95 4.83 ms (4.47 to 5.63), and EKS Fargate held p50 3.66 ms
+   (3.18 to 4.14) and p95 4.75 ms (4.39 to 5.12). The ranges overlap, so neither Fargate cell is
+   faster. ECS EC2 had a p50 of 5412 ms (5406 to 6210), so most of its requests waited.
+   EKS EC2 kept p50 at 5.79 ms but its p95 was 4675 ms (3862 to 5311): most requests were fast and
+   a tail waited. One EKS EC2 run returned errors on 1.57% of requests. The cause is not proven: the runs
+   did not record why requests waited on the EC2 cells.
    [Chart](results/published/chart-burst-latency.svg).
-3. **Cost: ECS Fargate is cheapest.** Idle cost was 0.0348 USD/h on ECS Fargate, 0.0641 on ECS EC2
-   and 0.1641 on EKS EC2. Per thousand requests: 0.0009, 0.0011 and 0.0015 USD.
-   [Chart](results/published/chart-cost.svg).
-4. **Deploy: EKS EC2 is slowest.** ECS Fargate deployed in 426 s (401 to 439), ECS EC2 in 467 s
-   (460 to 505) and EKS EC2 in 1125 s (1041 to 1171). [Chart](results/published/chart-deploy.svg).
+3. **Cost: ECS Fargate is cheapest.** Idle cost was 0.0348 USD/h on ECS Fargate, 0.0641 on ECS EC2,
+   0.1348 on EKS Fargate and 0.1641 on EKS EC2. Per thousand requests: 0.0009, 0.0011, 0.0014 and
+   0.0015 USD. [Chart](results/published/chart-cost.svg).
+4. **Deploy: the EKS cells are slowest.** ECS Fargate deployed in 402 s (389 to 439), ECS EC2 in
+   467 s (460 to 505), EKS EC2 in 1125 s (1041 to 1171) and EKS Fargate in 1316 s (1294 to 1338).
+   [Chart](results/published/chart-deploy.svg).
+
+### Fargate against Fargate
+
+What changes when EKS runs on Fargate instead of EC2:
+
+- **Scale out and cold start:** EKS Fargate scaled out in 61 s and started cold in 24.3 s, from one
+  run (n=1). EKS EC2 scaled out in 21 s (21 to 23). One run is not enough to rank them.
+- **Latency:** in `spike` the EKS Fargate p95 was 4.75 ms (4.39 to 5.12), against 4675 ms
+  (3862 to 5311) on EKS EC2. The slow tail seen on EKS EC2 did not show on EKS Fargate.
+- **Idle cost:** 0.1348 USD/h on EKS Fargate, against 0.1641 on EKS EC2.
+- **Deploy time:** 1316 s (1294 to 1338) on EKS Fargate, against 1125 s (1041 to 1171) on EKS EC2.
+- **Moving parts:** 8 on EKS Fargate and 8 on EKS EC2. The node group and the controller's pod
+  identity give way to a Fargate profile and an OIDC provider.
+
+And EKS Fargate against ECS Fargate:
+
+- **Latency overlaps.** Their `spike` p50 ranges are 3.18 to 4.14 ms on EKS Fargate and 3.67 to
+  4.33 ms on ECS Fargate.
+- **No winner on scale out.** ECS Fargate scaled out in 42.9 to 84.7 s and its cold start took
+  36.6 to 74.3 s. The low ends come from `kf5` and `kf6`, the high ends from the `short` runs; the cause
+  of that gap is not proven. The one EKS Fargate scale-out figure, 61 s, sits inside that range.
+- **Idle cost and deploy time are stable and favour ECS Fargate:** 0.0348 USD/h idle against
+  0.1348 on EKS Fargate, and a deploy of 402 s (389 to 439) against 1316 s (1294 to 1338).
+- **Cross-check:** `kf4`, one run of the `spike` profile alone, is not in the aggregate (other
+  profile set). Its EKS Fargate scale out and cold start were close to those of `kf5`, and its
+  ECS Fargate pair close to those of the `short` runs.
 
 Read the limits below before you generalise it.
 
@@ -39,62 +71,71 @@ Read the limits below before you generalise it.
 
 ## Which one should I pick?
 
-- **Replies must stay fast through a burst:** ECS Fargate. Its `spike` p95 was 4.84 ms, against
+- **Replies must stay fast through a burst:** ECS Fargate or EKS Fargate. In `spike` the ECS
+  Fargate p95 was 4.83 ms and the EKS Fargate p95 4.75 ms, with overlapping ranges, against
   6167 ms on ECS EC2 and 4675 ms on EKS EC2.
 - **New capacity must arrive fast:** EKS EC2. It scaled out in 21 s, but in the same burst its p95
   reached 4675 ms, so test the tail before you rely on it.
-- **The idle bill matters most:** ECS Fargate, at 0.0348 USD/h idle, against 0.1641 on EKS EC2.
+- **The idle bill matters most:** ECS Fargate, at 0.0348 USD/h idle, against 0.1348 on EKS Fargate
+  and 0.1641 on EKS EC2.
+- **You need Kubernetes and no nodes to run:** EKS Fargate. Its burst latency matched ECS Fargate,
+  but it rests on 2 runs, its scale-out figure on 1, and it took longest to deploy.
 
 ## Comparison
 
 Written by `python -m scripts.make_readme_tables` from
 [`results/published/aggregate.json`](results/published/aggregate.json), which
-`scripts/aggregate_runs.py` built from the three runs' `metrics.json`
+`scripts/aggregate_runs.py` built from the five runs' `metrics.json`
 ([`short1`](results/published/short1-metrics.json), [`short2`](results/published/short2-metrics.json),
-[`short3`](results/published/short3-metrics.json)). Each cell is `median (min to max)`, or one value when
-all runs agreed. The Runs row gives n, how many runs each column rests on.
+[`short3`](results/published/short3-metrics.json), [`kf5`](results/published/kf5-metrics.json),
+[`kf6`](results/published/kf6-metrics.json)). Each cell is `median (min to max)`, or one value when
+all runs agreed. The Runs row gives n, how many runs each column rests on; a figure that rests on
+fewer runs shows its own n.
 
 <!-- tables: python -m scripts.make_readme_tables -->
 **Profile `spike`**
 
-| Metric | ecs-fargate | ecs-ec2 | eks-ec2 |
-|---|---|---|---|
-| Runs | n=3 | n=3 | n=3 |
-| p50 latency (ms) | 4.08 (3.76 to 4.33) | 5412 (5406 to 6210) | 5.79 (5.74 to 5.88) |
-| p95 latency (ms) | 4.84 (4.83 to 5.63) | 6167 (6077 to 7586) | 4675 (3862 to 5311) |
-| p99 latency (ms) | 12.2 (10.4 to 16.1) | 7174 (7168 to 8252) | 6051 (6020 to 6056) |
-| Error rate | 0.00% | 0.00% | 0.00% (0.00% to 1.57%) |
-| Scale out (s) | 75.9 (72.8 to 84.7) | 72.8 (72.5 to 76.5) | 21 (21 to 23) |
-| Cold start (s) | 66.8 (66.0 to 74.3) | 66.0 (65.5 to 66.2) | 21 (20 to 23) |
+| Metric | ecs-fargate | ecs-ec2 | eks-fargate | eks-ec2 |
+|---|---|---|---|---|
+| Runs | n=5 | n=3 | n=2 | n=3 |
+| p50 latency (ms) | 3.87 (3.67 to 4.33) | 5412 (5406 to 6210) | 3.66 (3.18 to 4.14) | 5.79 (5.74 to 5.88) |
+| p95 latency (ms) | 4.83 (4.47 to 5.63) | 6167 (6077 to 7586) | 4.75 (4.39 to 5.12) | 4675 (3862 to 5311) |
+| p99 latency (ms) | 10.4 (8.82 to 16.1) | 7174 (7168 to 8252) | 9.01 (6.92 to 11.1) | 6051 (6020 to 6056) |
+| Error rate | 0.00% | 0.00% | 0.00% | 0.00% (0.00% to 1.57%) |
+| Scale out (s) | 72.8 (42.9 to 84.7) | 72.8 (72.5 to 76.5) | 61 (n=1) | 21 (21 to 23) |
+| Cold start (s) | 66.0 (36.6 to 74.3) | 66.0 (65.5 to 66.2) | 24.3 (n=1) | 21 (20 to 23) |
 
 **Profile `scale-from-min`**
 
-| Metric | ecs-fargate | ecs-ec2 | eks-ec2 |
-|---|---|---|---|
-| Runs | n=3 | n=3 | n=3 |
-| p50 latency (ms) | 4.77 (4.09 to 5.22) | 5.48 (5.03 to 5.77) | 5.35 (5.33 to 5.75) |
-| p95 latency (ms) | 6.13 (4.83 to 6.55) | 6.55 (5.95 to 11.1) | 8.28 (8.23 to 9.09) |
-| p99 latency (ms) | 20.0 (9.30 to 45.3) | 11.0 (9.98 to 26.7) | 15.6 (13.0 to 16.1) |
-| Error rate | 0.00% | 0.00% | 0.00% |
-| Scale out (s) | n/a | 186 (148 to 233) | n/a |
-| Cold start (s) | n/a | 183 (144 to 222) | n/a |
+| Metric | ecs-fargate | ecs-ec2 | eks-fargate | eks-ec2 |
+|---|---|---|---|---|
+| Runs | n=5 | n=3 | n=2 | n=3 |
+| p50 latency (ms) | 4.39 (4.09 to 5.22) | 5.48 (5.03 to 5.77) | 3.64 (2.99 to 4.28) | 5.35 (5.33 to 5.75) |
+| p95 latency (ms) | 5.93 (4.83 to 6.55) | 6.55 (5.95 to 11.1) | 4.34 (3.36 to 5.32) | 8.28 (8.23 to 9.09) |
+| p99 latency (ms) | 11.8 (9.30 to 45.3) | 11.0 (9.98 to 26.7) | 7.35 (6.53 to 8.16) | 15.6 (13.0 to 16.1) |
+| Error rate | 0.00% | 0.00% | 0.00% | 0.00% |
+| Scale out (s) | n/a | 186 (148 to 233) | n/a | n/a |
+| Cold start (s) | n/a | 183 (144 to 222) | n/a | n/a |
 
 **Per cell**
 
-| Metric | ecs-fargate | ecs-ec2 | eks-ec2 |
-|---|---|---|---|
-| Runs | n=3 | n=3 | n=3 |
-| Deploy time (s) | 426 (401 to 439) | 467 (460 to 505) | 1125 (1041 to 1171) |
-| Config lines | 436 | 436 | 534 |
-| Moving parts | 2 | 5 | 8 |
-| Idle cost (USD/h) | 0.0348 | 0.0641 | 0.1641 |
-| USD per thousand requests | 0.0009 | 0.0011 (0.0011 to 0.0012) | 0.0015 (0.0015 to 0.0016) |
+| Metric | ecs-fargate | ecs-ec2 | eks-fargate | eks-ec2 |
+|---|---|---|---|---|
+| Runs | n=5 | n=3 | n=2 | n=3 |
+| Deploy time (s) | 402 (389 to 439) | 467 (460 to 505) | 1316 (1294 to 1338) | 1125 (1041 to 1171) |
+| Config lines | 436 | 436 | 577 | 534 |
+| Moving parts | 2 | 5 | 8 | 8 |
+| Idle cost (USD/h) | 0.0348 | 0.0641 | 0.1348 | 0.1641 |
+| USD per thousand requests | 0.0009 | 0.0011 (0.0011 to 0.0012) | 0.0014 | 0.0015 (0.0015 to 0.0016) |
 
 Moving parts by cell, counted from its templates:
 
 - ecs-fargate: LoadBalancer, ScalableTarget
 - ecs-ec2: LoadBalancer, LaunchTemplate, AutoScalingGroup, CapacityProvider, ScalableTarget
+- eks-fargate: vpc-cni, kube-proxy, coredns, metrics-server, eks-pod-identity-agent, FargateProfile, LbcOidcProvider, aws-load-balancer-controller
 - eks-ec2: vpc-cni, kube-proxy, coredns, metrics-server, eks-pod-identity-agent, NodeGroup, LbcPodIdentity, aws-load-balancer-controller
+
+Limits: cells were measured in different run sets; ecs-fargate appears in all of them.
 <!-- /tables -->
 
 ## Cost of one run
@@ -118,18 +159,26 @@ This is the single `sample3` run (steady profile), the only run with its cost fi
 | **Run, total**                | **0.3252** |
 
 This prices only the load window. Real spend, with deploy and teardown time, was about two to
-three times this estimate.
+three times this estimate. A Fargate run of 2 cells and 2 profiles (`kf5`, `kf6`) cost between
+one and two US dollars in real AWS spend.
 
 ## Limits
 
-- **3 runs.** Three repeats in us-east-1. The brackets show their spread; there are no error bars.
+- **3 runs, 2 for eks-fargate.** ECS EC2 and EKS EC2 rest on 3 runs, EKS Fargate on 2 and ECS
+  Fargate on 5, all in us-east-1. The brackets show their spread; there are no error bars. The
+  EKS Fargate `spike` scale out and cold start rest on 1 run.
+- **Different run sets.** The cells were not all measured in the same runs: EKS Fargate ran only
+  in `kf5` and `kf6`, and ECS EC2 and EKS EC2 only in the `short` runs.
 - **Two profiles.** Only `spike` and `scale-from-min` were run; no steady, step or soak profile.
 - **Mock workload.** The agent ran with `LLM_MODE=mock`, so the numbers show platform overhead
-  only, not model latency.
-- **Three cells.** ECS Fargate, ECS EC2 and EKS EC2; **eks-fargate was not run**.
+  only, not model latency. No run with a real model has been done.
+- **Add-on versions.** The EKS add-ons ran the versions AWS picked by default on the day of `kf5`
+  and `kf6`.
+- **Fargate sizing.** Fargate rounds each task or pod up to the next CPU and memory step AWS
+  offers, so a cell may get more than it asked for.
 - **Two gaps.** In `scale-from-min`, ECS Fargate and EKS EC2 logged no scale-out in their load
   window: the load stayed under their CPU scaling target, so they have no scale-out or cold-start
-  figure there.
+  figure there. EKS Fargate logged none there either.
 
 ## How to run
 

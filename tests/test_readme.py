@@ -1,4 +1,4 @@
-"""README.md, the published 3-run results and the sample run (issues #118 and #144).
+"""README.md, the published 5-run results and the sample run (issues #118, #144 and #161).
 
 Every number in README.md must come from results/published/aggregate.json (a min, median or max),
 the run count, or the sample's cost files. A sum of cost-file values counts as from the cost files:
@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 SAMPLE = ROOT / "results" / "sample"
 PUBLISHED = ROOT / "results" / "published"
+CROSS_CHECK_RUNS = ("kf4",)  # named in the README as an unaggregated cross-check, with no figure quoted
 CHARTS = ("chart-burst-scaling.svg", "chart-burst-latency.svg", "chart-cost.svg", "chart-deploy.svg")
 
 
@@ -51,7 +52,7 @@ def _readme_metrics_and_text() -> tuple[Metrics, str]:
     extra += [SharedCost(item="runs per cell", usd=n, source="aggregate.json") for n in sorted({f.n for f in agg.figures})]
     metrics = Metrics(run_id=sample.run_id, figures=figures, shared_costs=sample.shared_costs + extra)
     text = README.read_text()
-    for run_id in agg.runs:  # run ids are names, not figures
+    for run_id in [*agg.runs, *CROSS_CHECK_RUNS]:  # run ids are names, not figures
         text = text.replace(run_id, "")
     return metrics, text
 
@@ -69,14 +70,14 @@ def test_every_readme_number_matches_the_cell_and_metric_it_sits_with():
 def test_swapping_two_real_readme_figures_fails_the_number_check():
     metrics, text = _readme_metrics_and_text()
     # Table: the p50 of ecs-ec2 and eks-ec2 in `spike` trade places. Both are real figures.
-    row = "| p50 latency (ms) | 4.08 (3.76 to 4.33) | 5412 (5406 to 6210) | 5.79 (5.74 to 5.88) |"
-    swapped = "| p50 latency (ms) | 4.08 (3.76 to 4.33) | 5.79 (5.74 to 5.88) | 5412 (5406 to 6210) |"
+    row = "| p50 latency (ms) | 3.87 (3.67 to 4.33) | 5412 (5406 to 6210) | 3.66 (3.18 to 4.14) | 5.79 (5.74 to 5.88) |"
+    swapped = "| p50 latency (ms) | 3.87 (3.67 to 4.33) | 5.79 (5.74 to 5.88) | 3.66 (3.18 to 4.14) | 5412 (5406 to 6210) |"
     assert row in text
     swapped_text = text.replace(row, swapped)
     assert check(swapped_text, metrics) == []  # the pooled check cannot see it
     assert check_scoped(swapped_text, metrics) != []
-    # Prose: the idle cost of ECS Fargate quoted for a metric it is not (deploy time 426 s -> 0.0348).
-    prose = "ECS Fargate deployed in 426 s"
+    # Prose: the idle cost of ECS Fargate quoted for a metric it is not (deploy time 402 s -> 0.0348).
+    prose = "ECS Fargate deployed in 402 s"
     assert prose in text
     assert check_scoped(text.replace(prose, "ECS Fargate deployed in 5412 s"), metrics) != []
     assert check_scoped(text.replace(prose, "ECS Fargate deployed in 0.0348 s"), metrics) != []
@@ -108,6 +109,11 @@ def test_readme_shows_verdict_cost_and_limits():
     limits = text.split("## Limits", 1)[1].split("\n## ", 1)[0].lower()
     for phrase in ("3 runs", "`spike`", "`scale-from-min`", "mock", "eks-fargate", "two gaps", "logged no scale-out"):
         assert phrase in limits, phrase
+    # Issue #161: eks-fargate rests on 2 runs, and its spike scale-out on 1.
+    for phrase in ("2 for eks-fargate", "rest on 1 run", "different run sets", "add-on versions", "fargate sizing",
+                   "no run with a real model"):
+        assert phrase in limits, phrase
+    assert not re.search(r"eks fargate (?:rests )?on 3 runs|3 runs for eks-fargate", limits)
 
 
 def test_readme_claims_no_cause_for_the_ec2_spike_latency():
@@ -154,7 +160,7 @@ def test_readme_lists_the_moving_parts_of_each_cell():
     from advisor.collector import moving_parts
 
     block = README.read_text().split(START, 1)[1].split(END, 1)[0]
-    for cell in ("ecs-fargate", "ecs-ec2", "eks-ec2"):
+    for cell in ("ecs-fargate", "ecs-ec2", "eks-fargate", "eks-ec2"):
         assert f"- {cell}: " + ", ".join(moving_parts(cell)) in block, cell
 
 

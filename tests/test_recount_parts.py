@@ -27,7 +27,7 @@ def test_recount_sets_each_cells_count_and_rebuilds_the_aggregate(tmp_path):
             if fig.name == "moving_parts":
                 assert fig.value == len(moving_parts(fig.cell))
     agg = read_aggregate(tmp_path / "aggregate.json")
-    assert agg.runs == ["short1", "short2", "short3"]
+    assert agg.runs == ["short1", "short2", "short3", "kf5", "kf6"]  # the order of the aggregate it replaced
     for fig in agg.figures:
         if fig.name == "moving_parts":
             assert fig.min == fig.max == len(moving_parts(fig.cell))

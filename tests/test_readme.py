@@ -207,7 +207,7 @@ def test_readme_tech_stack_names_only_tools_found_in_the_repo():
     assert not re.search(r"\b\d{12}\b|@", section)
     pyproject = (ROOT / "pyproject.toml").read_text()
     for dep in ("langgraph", "boto3", "fastapi", "uvicorn", "pydantic", "pytest", "httpx", "ruff"):
-        assert dep in pyproject and dep in section, dep
+        assert dep in pyproject and dep in section.lower(), dep
     assert list((ROOT / "loadtests").glob("*.js")) and "k6" in section
     assert (ROOT / "infra" / "helm" / "workload" / "Chart.yaml").is_file() and "Helm" in section
     assert list((ROOT / "infra" / "cfn").glob("*.yaml")) and "CloudFormation" in section

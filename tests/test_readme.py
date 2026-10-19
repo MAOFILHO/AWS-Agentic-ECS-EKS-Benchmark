@@ -215,3 +215,37 @@ def test_readme_tech_stack_names_only_tools_found_in_the_repo():
     for tool in ("cfn-lint", "cfn-guard", "helm lint"):
         assert tool in ci and tool in section, tool
     assert "amazon.nova-micro" in (ROOT / "advisor" / "reporter.py").read_text() and "Bedrock" in section
+
+
+def _how_it_works() -> str:
+    return README.read_text().split("## How it works", 1)[1].split("\n## ", 1)[0]
+
+
+def _mermaid_nodes(block: str) -> set[str]:
+    """Node ids of a Mermaid flowchart: edge labels and node shapes stripped, then split on arrows."""
+    nodes = set()
+    for line in block.strip().splitlines()[1:]:
+        line = re.sub(r"\|[^|]*\||\[[^\]]*\]|\{[^}]*\}|\([^)]*\)", "", line.split("%%", 1)[0])
+        nodes.update(part.strip() for part in re.split(r"-\.->|-->", line) if part.strip())
+    return nodes
+
+
+def test_readme_agent_graph_names_exactly_the_graph_nodes():
+    # Issue #167: the diagram cannot drift from advisor/graph.py.
+    from advisor.graph import STEPS
+
+    section = _how_it_works()
+    block = re.search(r"```mermaid\n(.*?)```", section, re.DOTALL)
+    assert block, "no mermaid block in How it works"
+    nodes = {"planner", "gate", *STEPS, "teardown"}
+    assert _mermaid_nodes(block.group(1)) == {"START", "END", *nodes}
+    listed = re.findall(r"^\d+\. `(\w+)`", section, re.MULTILINE)
+    assert listed == ["planner", "gate", *STEPS, "teardown"]
+    assert "—" not in section and "<" not in section
+    assert not re.search(r"\b\d{12}\b|@", section)
+
+
+def test_mermaid_node_parser_sees_a_missing_or_extra_node():
+    block = "flowchart LR\n    START --> planner\n    planner --> gate{\"gate: y/N\"}\n    gate -->|no| END\n"
+    assert _mermaid_nodes(block) == {"START", "planner", "gate", "END"}
+    assert _mermaid_nodes(block.replace("planner", "plan")) != {"START", "planner", "gate", "END"}

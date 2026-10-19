@@ -195,6 +195,45 @@ USD 1.2 to 1.8 in real AWS spend.
 | Testing and quality | pytest, httpx, ruff, cfn-lint, cfn-guard | Unit tests, README number checks, lint and template checks |
 | CI | GitHub Actions | Lint, tests, `helm lint`, image build and template checks on every pull request |
 
+## How it works
+
+The advisor is a LangGraph graph (`advisor/graph.py`). Nothing is spent before the gate's yes,
+and every path after it ends in teardown.
+
+```mermaid
+flowchart LR
+    START([START]) --> planner
+    planner --> gate{"gate: approve the estimate? y/N"}
+    gate -->|no| END([END])
+    gate -->|yes| deployer
+    deployer --> load_runner
+    load_runner --> collector
+    collector --> analyst
+    analyst --> reporter
+    reporter --> teardown
+    deployer -.->|failed| teardown
+    load_runner -.->|failed| teardown
+    collector -.->|failed| teardown
+    analyst -.->|failed| teardown
+    teardown --> END
+```
+
+1. `planner`: builds the run matrix and estimates the cost before any spend.
+1. `gate`: pauses for a y/N answer; a no ends the run.
+1. `deployer`: deploys each cell's stacks; a failed command stops it.
+1. `load_runner`: runs k6 as an ECS task in the harness, per profile.
+1. `collector`: reads CloudWatch, events and costs into raw files; changes nothing.
+1. `analyst`: turns the raw files into `metrics.json` with code, no LLM.
+1. `reporter`: writes `report.md` tables; the LLM writes only the Verdict.
+1. `teardown`: deletes every stack of the run and reports any leftovers.
+
+The deployer creates three stacks per cell, in this order. Teardown deletes them newest first.
+
+```mermaid
+flowchart LR
+    network["network stack"] --> harness["k6 harness stack"] --> cell["cell stack"]
+```
+
 ## How to run
 
 You need an AWS account, an `AWS_PROFILE` (SSO or `aws login`), a region, `uv`, Docker, `helm`

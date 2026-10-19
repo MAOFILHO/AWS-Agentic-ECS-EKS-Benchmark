@@ -48,6 +48,8 @@ flowchart TD
     deployer -. "failure" .-> teardown
     loadr -. "failure" .-> teardown
     collector -. "failure" .-> teardown
+    analyst -. "failure" .-> teardown
+    reporter -. "failure" .-> teardown
     teardown --> done(["Report<br/>actual spend"])
 ```
 

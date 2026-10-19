@@ -63,7 +63,7 @@ def test_readme_tables_are_written_from_the_aggregate():
 def test_readme_embeds_the_four_published_charts():
     text = README.read_text()
     for name in CHARTS:
-        assert f"](results/published/{name})" in text, name
+        assert re.search(rf"!\[[^\]]*\]\(results/published/{re.escape(name)}\)", text), name
         assert (PUBLISHED / name).is_file(), name
 
 
@@ -74,7 +74,7 @@ def test_readme_shows_verdict_cost_and_limits():
     assert "## Which one should I pick?" in text
     assert "## Cost of one run" in text
     limits = text.split("## Limits", 1)[1].split("\n## ", 1)[0].lower()
-    for phrase in ("3 runs", "`spike`", "`scale-from-min`", "mock", "eks-fargate", "no scale-out"):
+    for phrase in ("3 runs", "`spike`", "`scale-from-min`", "mock", "eks-fargate", "two gaps", "logged no scale-out"):
         assert phrase in limits, phrase
 
 

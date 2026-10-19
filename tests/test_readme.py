@@ -197,3 +197,21 @@ def test_readme_reads_fargate_spend_and_addon_date_from_their_source():
     assert f"USD {spend['min']:g} to {spend['max']:g}" in README.read_text().split("## Cost of one run", 1)[1]
     limits = README.read_text().split("## Limits", 1)[1].split("\n## ", 1)[0]
     assert FACTS["addon_date"] in " ".join(limits.split())
+
+
+def test_readme_tech_stack_names_only_tools_found_in_the_repo():
+    # Issue #165: each tool named in the section is read back from the repo file that uses it.
+    section = README.read_text().split("## Tech stack", 1)[1].split("\n## ", 1)[0]
+    assert len(section.strip().splitlines()) < 25
+    assert "—" not in section
+    assert not re.search(r"\b\d{12}\b|@", section)
+    pyproject = (ROOT / "pyproject.toml").read_text()
+    for dep in ("langgraph", "boto3", "fastapi", "uvicorn", "pydantic", "pytest", "httpx", "ruff"):
+        assert dep in pyproject and dep in section, dep
+    assert list((ROOT / "loadtests").glob("*.js")) and "k6" in section
+    assert (ROOT / "infra" / "helm" / "workload" / "Chart.yaml").is_file() and "Helm" in section
+    assert list((ROOT / "infra" / "cfn").glob("*.yaml")) and "CloudFormation" in section
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    for tool in ("cfn-lint", "cfn-guard", "helm lint"):
+        assert tool in ci and tool in section, tool
+    assert "amazon.nova-micro" in (ROOT / "advisor" / "reporter.py").read_text() and "Bedrock" in section

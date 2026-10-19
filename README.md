@@ -52,13 +52,14 @@ Written by `python -m scripts.make_readme_tables` from
 `scripts/aggregate_runs.py` built from the three runs' `metrics.json`
 ([`short1`](results/published/short1-metrics.json), [`short2`](results/published/short2-metrics.json),
 [`short3`](results/published/short3-metrics.json)). Each cell is `median (min to max)`, or one value when
-all runs agreed.
+all runs agreed. The Runs row gives n, how many runs each column rests on.
 
 <!-- tables: python -m scripts.make_readme_tables -->
 **Profile `spike`**
 
 | Metric | ecs-fargate | ecs-ec2 | eks-ec2 |
 |---|---|---|---|
+| Runs | n=3 | n=3 | n=3 |
 | p50 latency (ms) | 4.08 (3.76 to 4.33) | 5412 (5406 to 6210) | 5.79 (5.74 to 5.88) |
 | p95 latency (ms) | 4.84 (4.83 to 5.63) | 6167 (6077 to 7586) | 4675 (3862 to 5311) |
 | p99 latency (ms) | 12.2 (10.4 to 16.1) | 7174 (7168 to 8252) | 6051 (6020 to 6056) |
@@ -70,6 +71,7 @@ all runs agreed.
 
 | Metric | ecs-fargate | ecs-ec2 | eks-ec2 |
 |---|---|---|---|
+| Runs | n=3 | n=3 | n=3 |
 | p50 latency (ms) | 4.77 (4.09 to 5.22) | 5.48 (5.03 to 5.77) | 5.35 (5.33 to 5.75) |
 | p95 latency (ms) | 6.13 (4.83 to 6.55) | 6.55 (5.95 to 11.1) | 8.28 (8.23 to 9.09) |
 | p99 latency (ms) | 20.0 (9.30 to 45.3) | 11.0 (9.98 to 26.7) | 15.6 (13.0 to 16.1) |
@@ -81,6 +83,7 @@ all runs agreed.
 
 | Metric | ecs-fargate | ecs-ec2 | eks-ec2 |
 |---|---|---|---|
+| Runs | n=3 | n=3 | n=3 |
 | Deploy time (s) | 426 (401 to 439) | 467 (460 to 505) | 1125 (1041 to 1171) |
 | Config lines | 436 | 436 | 534 |
 | Moving parts | 2 | 5 | 8 |

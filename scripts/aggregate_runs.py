@@ -4,7 +4,8 @@ Usage:
     python -m scripts.aggregate_runs --runs a,b,c --out results/<name>/aggregate.json
 
 For each (name, cell, profile) it records n, min, median, max and the source run ids.
-Runs with different cell or profile sets are refused.
+Runs may hold different cells: each figure aggregates over the runs that have it.
+Runs with different profile sets are refused.
 """
 
 import argparse
@@ -28,11 +29,10 @@ def aggregate(runs: list[Metrics]) -> Aggregate:
     repeated = sorted({rid for rid in ids if ids.count(rid) > 1})
     if repeated:
         raise MetricsError(f"run ids repeated ({', '.join(repeated)}); each run counts once")
-    for attr in ("cell", "profile"):
-        sets = {r.run_id: {getattr(f, attr) for f in r.figures} for r in runs}
-        if len({frozenset(s) for s in sets.values()}) > 1:
-            shown = "; ".join(f"{rid}: {sorted(s, key=str)}" for rid, s in sets.items())
-            raise MetricsError(f"runs have different {attr} sets ({shown})")
+    sets = {r.run_id: {f.profile for f in r.figures} for r in runs}
+    if len({frozenset(s) for s in sets.values()}) > 1:
+        shown = "; ".join(f"{rid}: {sorted(s, key=str)}" for rid, s in sets.items())
+        raise MetricsError(f"runs have different profile sets ({shown})")
     groups: dict[tuple, list[tuple[str, float, str]]] = {}
     for run in runs:
         for fig in run.figures:

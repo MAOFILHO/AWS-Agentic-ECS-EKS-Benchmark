@@ -47,6 +47,8 @@ def _readme_metrics_and_text() -> tuple[Metrics, str]:
     sample = read_metrics(SAMPLE / "metrics.json")
     extra = [SharedCost(item="cost file", usd=v, source="cost.json") for v in _cost_values()]
     extra.append(SharedCost(item="run count", usd=len(agg.runs), source="aggregate.json"))
+    # Issue #159: the Runs row shows n per cell, which can be under the run count.
+    extra += [SharedCost(item="runs per cell", usd=n, source="aggregate.json") for n in sorted({f.n for f in agg.figures})]
     metrics = Metrics(run_id=sample.run_id, figures=figures, shared_costs=sample.shared_costs + extra)
     text = README.read_text()
     for run_id in agg.runs:  # run ids are names, not figures

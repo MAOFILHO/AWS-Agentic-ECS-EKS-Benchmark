@@ -16,6 +16,7 @@ OUTPUTS = {
     "r1-network": {"VpcId": "vpc-0abc"},
     "r1-eks-ec2": {"ClusterName": "r1-eks-ec2"},
     "r1-eks-fargate": {"ClusterName": "r1-eks-fargate"},
+    "r1-eks-lbc-iam": {"LbcRoleArn": f"arn:aws:iam::{ACCOUNT}:role/r1-lbc"},
 }
 
 
@@ -138,6 +139,31 @@ def test_fargate_cell_skips_node_group_and_uses_fargate_values():
         "KubernetesVersion": "1.34"})
     workload = [e for e in events if e[0] == "run" and e[1] == "helm"][1]
     assert workload[workload.index("--values") + 1].endswith("values-fargate.yaml")
+
+
+def helm_installs(events):
+    lbc, workload = [e for e in events if e[0] == "run" and e[1] == "helm"]
+    return lbc, workload
+
+
+def test_fargate_waits_longer_and_gives_the_controller_vpc_id_and_its_irsa_role():
+    # Issue #153: Fargate pods have no node metadata and no Pod Identity, and each one waits for a micro VM.
+    events = []
+    deploy(events, cell="eks-fargate")
+    lbc, workload = helm_installs(events)
+    for install in (lbc, workload):
+        assert install[install.index("--timeout") + 1] == deploy_eks.FARGATE_HELM_TIMEOUT == "15m"
+    assert "vpcId=vpc-0abc" in lbc and "region=us-east-1" in lbc
+    assert f"serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=arn:aws:iam::{ACCOUNT}:role/r1-lbc" in lbc
+
+
+def test_ec2_keeps_helm_default_wait_and_pod_identity():
+    events = []
+    deploy(events)
+    lbc, workload = helm_installs(events)
+    assert "--timeout" not in lbc + workload
+    assert not any("role-arn" in arg for arg in lbc)
+    assert "vpcId=vpc-0abc" in lbc
 
 
 def test_kubernetes_version_comes_from_ssm_and_is_printed(capsys):

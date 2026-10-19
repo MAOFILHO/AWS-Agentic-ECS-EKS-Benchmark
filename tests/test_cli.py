@@ -150,3 +150,25 @@ def test_one_profile_and_no_flag_behave_as_before(tmp_path, capsys):
     main(["run", "--cells", "ecs-fargate", "--region", "us-east-1", "--run-id", "cli-12"], tmp_path)
     matrix = next(l for l in capsys.readouterr().out.splitlines() if l.startswith("matrix:"))
     assert matrix == "matrix: " + ", ".join(f"ecs-fargate/{p}" for p in PROFILES)
+
+
+def test_four_cell_two_profile_estimate_prints_before_the_prompt(tmp_path, capsys):
+    # Issue #153: the full run adds eks-fargate; its priced lines must be on screen when the y/N is asked.
+    seen = []
+
+    def ask(prompt):
+        seen.append(capsys.readouterr().out)
+        return "n"
+
+    argv = ["run", "--cells", "ecs-fargate,ecs-ec2,eks-ec2,eks-fargate", "--profile", "spike,scale-from-min",
+            "--region", "us-east-1", "--run-id", "cli-4c"]
+    assert cli.main(argv, pricing=StubPricing(), ask=ask, root=tmp_path) == 0
+    (before,) = seen
+    for cell in ("ecs-fargate", "ecs-ec2", "eks-ec2", "eks-fargate"):
+        for profile in ("spike", "scale-from-min"):
+            assert f"{cell}/{profile}" in before
+    assert "eks-fargate/spike eks control plane: $" in before
+    assert "eks-fargate/scale-from-min fargate vcpu: $" in before
+    assert "shared nat gateway: $" in before and "shared vpc endpoints: $" in before
+    assert re.search(r"^estimate: \$\d+\.\d\d$", before, re.MULTILINE)
+    assert "stopped" in capsys.readouterr().out

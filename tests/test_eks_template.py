@@ -1,5 +1,6 @@
 """Static checks on infra/cfn/40-eks.yaml and 41-eks-lbc-iam.yaml. Nothing is deployed."""
 
+import json
 import re
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -200,15 +201,61 @@ def test_coredns_runs_on_fargate_only_in_fargate_mode():
 
 def test_eks_outputs():
     outputs = _eks()["Outputs"]
-    assert set(outputs) == {"ClusterName", "ClusterEndpoint"}
+    assert set(outputs) == {"ClusterName", "ClusterEndpoint", "OidcIssuerUrl"}
     assert outputs["ClusterName"]["Export"] == {"Name": {"Sub": "${AWS::StackName}-ClusterName"}}
+    assert outputs["OidcIssuerUrl"]["Value"] == {"GetAtt": "Cluster.OpenIdConnectIssuerUrl"}
+    assert outputs["OidcIssuerUrl"]["Export"] == {"Name": {"Sub": "${AWS::StackName}-OidcIssuerUrl"}}
 
 
-def test_lbc_role_is_assumed_through_pod_identity_only():
-    trust = _load(LBC)["Resources"]["LbcRole"]["Properties"]["AssumeRolePolicyDocument"]
+ISSUER = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE0123456789"
+PROVIDER_ARN = f"arn:aws:iam::{'1' * 12}:oidc-provider/{ISSUER}"
+
+
+def _lbc_for(cell):
+    """41-eks-lbc-iam as CloudFormation creates it for one Cell: resources kept by Condition, trust policy resolved."""
+    template = _load(LBC)
+    assert template["Conditions"] == {
+        "IsEc2": {"Equals": [{"Ref": "Cell"}, "eks-ec2"]},
+        "IsFargate": {"Equals": [{"Ref": "Cell"}, "eks-fargate"]},
+    }
+    keep = {None, "IsEc2" if cell == "eks-ec2" else "IsFargate"}
+    resources = {k: v for k, v in template["Resources"].items() if v.get("Condition") in keep}
+    condition, fargate, ec2 = resources["LbcRole"]["Properties"]["AssumeRolePolicyDocument"]["If"]
+    assert condition == "IsFargate"
+    if cell == "eks-ec2":
+        return resources, ec2
+    body, variables = fargate["Sub"]
+    # Issuer is the OidcIssuerUrl export without its https:// scheme.
+    assert variables["Issuer"] == {"Select": [1, {"Split": ["//", {"ImportValue": {"Fn::Sub": "${EksStackName}-OidcIssuerUrl"}}]}]}
+    return resources, json.loads(body.replace("${Issuer}", ISSUER).replace("${LbcOidcProvider}", PROVIDER_ARN))
+
+
+def test_lbc_role_on_ec2_is_assumed_through_pod_identity_only():
+    resources, trust = _lbc_for("eks-ec2")
     (statement,) = trust["Statement"]
     assert statement["Principal"] == {"Service": "pods.eks.amazonaws.com"}
     assert sorted(statement["Action"]) == ["sts:AssumeRole", "sts:TagSession"]
+    assert "LbcPodIdentity" in resources and "LbcOidcProvider" not in resources
+
+
+def test_lbc_role_on_fargate_trusts_only_the_controller_service_account_through_irsa():
+    # Issue #153: Pod Identity does not run on Fargate, so the controller gets its role through IRSA.
+    resources, trust = _lbc_for("eks-fargate")
+    (statement,) = trust["Statement"]
+    assert statement == {
+        "Effect": "Allow",
+        "Principal": {"Federated": PROVIDER_ARN},
+        "Action": "sts:AssumeRoleWithWebIdentity",
+        "Condition": {"StringEquals": {
+            f"{ISSUER}:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller",
+            f"{ISSUER}:aud": "sts.amazonaws.com",
+        }},
+    }
+    assert "LbcPodIdentity" not in resources
+    provider = resources["LbcOidcProvider"]
+    assert provider["Type"] == "AWS::IAM::OIDCProvider"
+    assert provider["Properties"]["Url"] == {"ImportValue": {"Fn::Sub": "${EksStackName}-OidcIssuerUrl"}}
+    assert provider["Properties"]["ClientIdList"] == ["sts.amazonaws.com"]
 
 
 def test_lbc_association_binds_the_controller_service_account():

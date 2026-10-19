@@ -482,3 +482,41 @@ def test_fargate_add_ons_wait_for_the_fargate_profile_and_ec2_order_is_unchanged
         assert "DependsOn" not in resources[name], name  # a plain DependsOn would break the EC2 render
     others = [n for n, r in resources.items() if n not in ("CoreDnsAddon", "MetricsServerAddon")]
     assert not [n for n in others if _depends_on_profile(resources[n])]
+
+
+def _render(node, compute_type):
+    """Resolve Fn::If on IsEc2/IsFargate and drop AWS::NoValue, as CloudFormation does for one ComputeType."""
+    if isinstance(node, list):
+        out = [_render(item, compute_type) for item in node]
+        return [item for item in out if item != {"Ref": "AWS::NoValue"}]
+    if isinstance(node, dict):
+        if set(node) == {"If"}:
+            cond, yes, no = node["If"]
+            taken = (cond == "IsEc2") == (compute_type == "EC2")
+            return _render(yes if taken else no, compute_type)
+        return {k: _render(v, compute_type) for k, v in node.items()}
+    return node
+
+
+def _refs(node):
+    """Every Ref and GetAtt target name in a rendered node."""
+    if isinstance(node, list):
+        return {r for item in node for r in _refs(item)}
+    if isinstance(node, dict):
+        found = {node["Ref"]} if isinstance(node.get("Ref"), str) else set()
+        if isinstance(node.get("GetAtt"), str):
+            found.add(node["GetAtt"].split(".")[0])
+        return found | {r for v in node.values() for r in _refs(v)}
+    return set()
+
+
+def test_rendered_add_ons_need_the_profile_on_fargate_only():
+    # Issue #157 (QA): resolve the conditions, as CloudFormation does, for each ComputeType.
+    for name in ("CoreDnsAddon", "MetricsServerAddon"):
+        ec2 = _render(_resources_for("EC2")[name], "EC2")
+        assert "FargateProfile" not in _refs(ec2), name
+        assert {t["Key"] for t in ec2["Properties"]["Tags"]} == TAG_KEYS, name
+        fargate = _render(_resources_for("FARGATE")[name], "FARGATE")
+        assert "FargateProfile" in _refs(fargate), name
+    ec2_all = {n: _render(r, "EC2") for n, r in _resources_for("EC2").items()}
+    assert not [n for n, r in ec2_all.items() if "FargateProfile" in _refs(r)]

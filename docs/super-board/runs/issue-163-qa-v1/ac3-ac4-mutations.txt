@@ -1,0 +1,11 @@
+== AC3 mutations (README restored after each)
+drop 17.3 s: 1 failed, 14 passed in 0.39s
+drop 53 s: 1 failed, 14 passed in 0.34s
+drop both: 1 failed, 14 passed in 0.35s
+== AC4 mutations on readme-facts.json (restored after each)
+spend max 1.8->1.9: 4 failed, 11 passed in 0.29s
+date 19->20 Oct: 4 failed, 11 passed in 0.30s
+README spend 1.2->1.3: 4 failed, 11 passed in 0.30s
+README date 19->18: 4 failed, 11 passed in 0.29s
+restored clean: 15 passed in 0.32s
+?? docs/super-board/runs/issue-163-qa-v1/

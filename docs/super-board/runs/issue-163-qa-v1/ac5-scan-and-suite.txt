@@ -1,0 +1,10 @@
+== AC5: the 9 changed files scanned for a 12-digit account id, an ARN account or an email
+no hits in changed files
+== whole tracked tree: only pre-existing placeholder emails in vendored skill docs and old QA logs (example.com, you+bot@gmail.com); no ARN account id
+(end ARN hits)
+== measured data files untouched by the PR (results/**/*.json except readme-facts.json)
+(empty = none changed)
+== verify commands
+All checks passed!
+628 passed, 4 skipped in 9.08s
+head: 746cf28

@@ -1,0 +1,18 @@
+== AC2: rebuild published charts from results/published/aggregate.json into a scratch copy
+chart-burst-scaling.svg: committed == rebuilt
+chart-burst-latency.svg: committed == rebuilt
+chart-cost.svg: committed == rebuilt
+chart-deploy.svg: committed == rebuilt
+== AC2: results/sample/chart.svg byte-equal
+sample chart regenerated on branch == main: byte-equal
+results/sample untouched by the PR
+== fewer-run marks in the published charts
+results/published/chart-deploy.svg:data-n="1" data-cell="eks-fargate" data-metric="deploy_time_s" n=2
+results/published/chart-burst-latency.svg:data-n="1" data-cell="eks-fargate" data-metric="p50_ms" n=2
+results/published/chart-burst-latency.svg:data-n="1" data-cell="eks-fargate" data-metric="p95_ms" n=2
+results/published/chart-burst-latency.svg:data-n="1" data-cell="eks-fargate" data-metric="p99_ms" n=2
+results/published/chart-burst-scaling.svg:data-n="1" data-cell="eks-fargate" data-metric="scale_out_s" n=1
+results/published/chart-burst-scaling.svg:data-n="1" data-cell="eks-fargate" data-metric="cold_start_s" n=1
+results/published/chart-cost.svg:data-n="1" data-cell="eks-fargate" data-metric="idle_usd_per_hour" n=2
+results/published/chart-cost.svg:data-n="1" data-cell="eks-fargate" data-metric="usd_per_1k_requests" n=2
+(results/published has no chart.svg on main or branch; only the 4 question charts are published)

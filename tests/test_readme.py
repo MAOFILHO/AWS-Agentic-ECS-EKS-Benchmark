@@ -18,7 +18,10 @@ ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 SAMPLE = ROOT / "results" / "sample"
 PUBLISHED = ROOT / "results" / "published"
-CROSS_CHECK_RUNS = ("kf4",)  # named in the README as an unaggregated cross-check, with no figure quoted
+CROSS_CHECK_RUNS = ("kf4",)  # named in the README as an unaggregated cross-check
+# Issue #163: README facts with no run file in the aggregate: the kf4 cross-check figures, the real spend of
+# one Fargate run and the add-on version date.
+FACTS = json.loads((PUBLISHED / "readme-facts.json").read_text())
 CHARTS = ("chart-burst-scaling.svg", "chart-burst-latency.svg", "chart-cost.svg", "chart-deploy.svg")
 
 
@@ -50,6 +53,12 @@ def _readme_metrics_and_text() -> tuple[Metrics, str]:
     extra.append(SharedCost(item="run count", usd=len(agg.runs), source="aggregate.json"))
     # Issue #159: the Runs row shows n per cell, which can be under the run count.
     extra += [SharedCost(item="runs per cell", usd=n, source="aggregate.json") for n in sorted({f.n for f in agg.figures})]
+    figures += [Figure(name=name, value=v, unit="s", source="kf4", cell=cell, profile="spike")
+                for cell, named in FACTS["kf4"].items() for name, v in named.items()]
+    extra += [SharedCost(item="Fargate run spend", usd=v, source="readme-facts.json")
+              for v in FACTS["fargate_run_usd"].values()]
+    extra += [SharedCost(item="add-on date", usd=int(part), source="readme-facts.json")
+              for part in FACTS["addon_date"].split() if part.isdigit()]
     metrics = Metrics(run_id=sample.run_id, figures=figures, shared_costs=sample.shared_costs + extra)
     text = README.read_text()
     for run_id in [*agg.runs, *CROSS_CHECK_RUNS]:  # run ids are names, not figures
@@ -171,3 +180,20 @@ def test_sample_report_verdict_still_passes_the_ranking_checks():
     verdict = verdict_of((SAMPLE / "report.md").read_text().split("## Verdict", 1)[1].split("\n## ", 1)[0])
     assert contradicted_rankings(verdict, metrics) == []
     assert unsupported_claims(verdict, metrics) == []
+
+
+
+def test_kf4_cross_check_quotes_its_two_eks_fargate_figures():
+    # Issue #163: kf4 is quoted with its figures, not "close to" kf5.
+    kf4 = FACTS["kf4"]["eks-fargate"]
+    bullet = " ".join(README.read_text().split("**Cross-check:**", 1)[1].split("\n\n", 1)[0].split())
+    for value in (kf4["scale_out_s"], kf4["cold_start_s"]):
+        assert re.search(rf"(?<![\d.]){re.escape(f'{value:g}')} s\b", bullet), value
+    assert "2 observations, not a measured spread" in bullet
+
+
+def test_readme_reads_fargate_spend_and_addon_date_from_their_source():
+    spend = FACTS["fargate_run_usd"]
+    assert f"USD {spend['min']:g} to {spend['max']:g}" in README.read_text().split("## Cost of one run", 1)[1]
+    limits = README.read_text().split("## Limits", 1)[1].split("\n## ", 1)[0]
+    assert FACTS["addon_date"] in " ".join(limits.split())

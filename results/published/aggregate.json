@@ -2,7 +2,9 @@
   "runs": [
     "short1",
     "short2",
-    "short3"
+    "short3",
+    "kf5",
+    "kf6"
   ],
   "figures": [
     {
@@ -10,14 +12,16 @@
       "unit": "ms",
       "cell": "ecs-fargate",
       "profile": "spike",
-      "n": 3,
-      "min": 3.759845,
-      "median": 4.077531,
+      "n": 5,
+      "min": 3.667227,
+      "median": 3.867145,
       "max": 4.325449,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -25,14 +29,16 @@
       "unit": "ms",
       "cell": "ecs-fargate",
       "profile": "spike",
-      "n": 3,
-      "min": 4.831969,
-      "median": 4.835586,
+      "n": 5,
+      "min": 4.473608,
+      "median": 4.831969,
       "max": 5.627606,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -40,14 +46,16 @@
       "unit": "ms",
       "cell": "ecs-fargate",
       "profile": "spike",
-      "n": 3,
-      "min": 10.363333,
-      "median": 12.232909,
+      "n": 5,
+      "min": 8.815122,
+      "median": 10.363333,
       "max": 16.075989,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -55,14 +63,16 @@
       "unit": "ratio",
       "cell": "ecs-fargate",
       "profile": "spike",
-      "n": 3,
+      "n": 5,
       "min": 0.0,
       "median": 0.0,
       "max": 0.0,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -70,14 +80,16 @@
       "unit": "ms",
       "cell": "ecs-fargate",
       "profile": "scale-from-min",
-      "n": 3,
+      "n": 5,
       "min": 4.091434,
-      "median": 4.769319,
+      "median": 4.387318,
       "max": 5.22321,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -85,14 +97,16 @@
       "unit": "ms",
       "cell": "ecs-fargate",
       "profile": "scale-from-min",
-      "n": 3,
+      "n": 5,
       "min": 4.830549,
-      "median": 6.133465,
+      "median": 5.931496,
       "max": 6.550526,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -100,14 +114,16 @@
       "unit": "ms",
       "cell": "ecs-fargate",
       "profile": "scale-from-min",
-      "n": 3,
+      "n": 5,
       "min": 9.300815,
-      "median": 20.002178,
+      "median": 11.844537,
       "max": 45.314599,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -115,14 +131,16 @@
       "unit": "ratio",
       "cell": "ecs-fargate",
       "profile": "scale-from-min",
-      "n": 3,
+      "n": 5,
       "min": 0.0,
       "median": 0.0,
       "max": 0.0,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -130,14 +148,16 @@
       "unit": "s",
       "cell": "ecs-fargate",
       "profile": "spike",
-      "n": 3,
-      "min": 72.768,
-      "median": 75.867,
+      "n": 5,
+      "min": 42.91,
+      "median": 72.768,
       "max": 84.659,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -145,14 +165,16 @@
       "unit": "s",
       "cell": "ecs-fargate",
       "profile": "spike",
-      "n": 3,
-      "min": 66.024,
-      "median": 66.85,
+      "n": 5,
+      "min": 36.559,
+      "median": 66.024,
       "max": 74.31,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -160,14 +182,16 @@
       "unit": "s",
       "cell": "ecs-fargate",
       "profile": null,
-      "n": 3,
-      "min": 400.795825,
-      "median": 426.442562,
+      "n": 5,
+      "min": 389.173476,
+      "median": 401.988296,
       "max": 438.801709,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -175,14 +199,16 @@
       "unit": "lines",
       "cell": "ecs-fargate",
       "profile": null,
-      "n": 3,
+      "n": 5,
       "min": 436.0,
       "median": 436.0,
       "max": 436.0,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -190,14 +216,16 @@
       "unit": "count",
       "cell": "ecs-fargate",
       "profile": null,
-      "n": 3,
+      "n": 5,
       "min": 2.0,
       "median": 2.0,
       "max": 2.0,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -205,14 +233,16 @@
       "unit": "usd/h",
       "cell": "ecs-fargate",
       "profile": null,
-      "n": 3,
+      "n": 5,
       "min": 0.034842,
       "median": 0.034842,
       "max": 0.034842,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -220,14 +250,16 @@
       "unit": "usd",
       "cell": "ecs-fargate",
       "profile": null,
-      "n": 3,
+      "n": 5,
       "min": 0.000894,
       "median": 0.000894,
-      "max": 0.000895,
+      "max": 0.000906,
       "runs": [
         "short1",
         "short2",
-        "short3"
+        "short3",
+        "kf5",
+        "kf6"
       ]
     },
     {
@@ -708,6 +740,214 @@
         "short1",
         "short2",
         "short3"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "eks-fargate",
+      "profile": "spike",
+      "n": 2,
+      "min": 3.181647,
+      "median": 3.660448,
+      "max": 4.139248,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "eks-fargate",
+      "profile": "spike",
+      "n": 2,
+      "min": 4.389065,
+      "median": 4.752303,
+      "max": 5.11554,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "eks-fargate",
+      "profile": "spike",
+      "n": 2,
+      "min": 6.915427,
+      "median": 9.005821,
+      "max": 11.096216,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "eks-fargate",
+      "profile": "spike",
+      "n": 2,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "p50_ms",
+      "unit": "ms",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min",
+      "n": 2,
+      "min": 2.994578,
+      "median": 3.6391,
+      "max": 4.283622,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "p95_ms",
+      "unit": "ms",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min",
+      "n": 2,
+      "min": 3.355927,
+      "median": 4.339746,
+      "max": 5.323565,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "p99_ms",
+      "unit": "ms",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min",
+      "n": 2,
+      "min": 6.53257,
+      "median": 7.346253,
+      "max": 8.159935,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "cell": "eks-fargate",
+      "profile": "scale-from-min",
+      "n": 2,
+      "min": 0.0,
+      "median": 0.0,
+      "max": 0.0,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "scale_out_s",
+      "unit": "s",
+      "cell": "eks-fargate",
+      "profile": "spike",
+      "n": 1,
+      "min": 61.0,
+      "median": 61.0,
+      "max": 61.0,
+      "runs": [
+        "kf5"
+      ]
+    },
+    {
+      "name": "cold_start_s",
+      "unit": "s",
+      "cell": "eks-fargate",
+      "profile": "spike",
+      "n": 1,
+      "min": 24.292608,
+      "median": 24.292608,
+      "max": 24.292608,
+      "runs": [
+        "kf5"
+      ]
+    },
+    {
+      "name": "deploy_time_s",
+      "unit": "s",
+      "cell": "eks-fargate",
+      "profile": null,
+      "n": 2,
+      "min": 1294.385898,
+      "median": 1316.39055,
+      "max": 1338.395202,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "config_lines",
+      "unit": "lines",
+      "cell": "eks-fargate",
+      "profile": null,
+      "n": 2,
+      "min": 577.0,
+      "median": 577.0,
+      "max": 577.0,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "moving_parts",
+      "unit": "count",
+      "cell": "eks-fargate",
+      "profile": null,
+      "n": 2,
+      "min": 8.0,
+      "median": 8.0,
+      "max": 8.0,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "idle_usd_per_hour",
+      "unit": "usd/h",
+      "cell": "eks-fargate",
+      "profile": null,
+      "n": 2,
+      "min": 0.134843,
+      "median": 0.134843,
+      "max": 0.134843,
+      "runs": [
+        "kf5",
+        "kf6"
+      ]
+    },
+    {
+      "name": "usd_per_1k_requests",
+      "unit": "usd",
+      "cell": "eks-fargate",
+      "profile": null,
+      "n": 2,
+      "min": 0.00139,
+      "median": 0.00139,
+      "max": 0.00139,
+      "runs": [
+        "kf5",
+        "kf6"
       ]
     }
   ]

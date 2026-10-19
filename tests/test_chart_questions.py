@@ -69,9 +69,13 @@ def test_missing_figure_prints_na_and_draws_no_bar(tmp_path):
     assert "n/a" in [t.text for t in ET.parse(svg).iter(f"{SVG}text")]
 
 
-def test_published_holds_aggregate_four_charts_and_three_metrics():
+def test_published_holds_aggregate_four_charts_and_five_metrics():
     names = {p.name for p in PUBLISHED.iterdir()}
-    assert names == {"aggregate.json", *CHARTS, "short1-metrics.json", "short2-metrics.json", "short3-metrics.json"}
+    runs = ("short1", "short2", "short3", "kf5", "kf6")
+    assert names == {"aggregate.json", *CHARTS, *(f"{r}-metrics.json" for r in runs)}
+    agg = read_aggregate(PUBLISHED / "aggregate.json")
+    assert agg.runs == list(runs)
+    assert {f.cell for f in agg.figures} == {"ecs-fargate", "ecs-ec2", "eks-fargate", "eks-ec2"}
     charts = make_chart.render_questions(read_aggregate(PUBLISHED / "aggregate.json"))
     for name, svg in charts.items():
         assert (PUBLISHED / name).read_text() == svg, name

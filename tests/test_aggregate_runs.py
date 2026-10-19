@@ -189,6 +189,18 @@ def test_readme_tables_print_n_per_cell():
     assert "cells were measured in different run sets; ecs-fargate appears in all of them." in render(agg).lower()
 
 
+def test_readme_table_names_n_on_a_figure_with_fewer_runs_than_its_column():
+    # Issue #161: eks-fargate spike scale-out exists in kf5 only, while its column rests on 2 runs.
+    from scripts.make_readme_tables import render
+
+    two = ["kf5", "kf6"]
+    agg = Aggregate(runs=two, figures=[_fig("eks-fargate", two), _fig("eks-fargate", ["kf5"], name="scale_out_s")])
+    lines = render(agg).splitlines()
+    assert "| Runs | n=2 |" in lines
+    assert "| p95 latency (ms) | 5 (4 to 6) |" in lines
+    assert "| Scale out (s) | 5 (4 to 6) (n=1) |" in lines
+
+
 def test_readme_tables_with_one_cell_set_have_no_run_set_note():
     from scripts.make_readme_tables import render
 

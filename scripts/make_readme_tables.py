@@ -4,7 +4,8 @@ Usage:
     python -m scripts.make_readme_tables [--aggregate results/published/aggregate.json] [--readme README.md]
 
 Each cell shows `median (min to max)`, or one value when every run agreed. A missing figure shows n/a.
-The Runs row gives n, how many runs each cell's numbers in that table rest on. When cells come from
+The Runs row gives n, how many runs each cell's numbers in that table rest on; a figure that
+rests on fewer runs than that shows its own n. When cells come from
 different run sets, a note under the tables names the cells found in every run.
 Under the table with moving parts, a list names each cell's parts (advisor.collector.moving_parts).
 The tables replace whatever sits between the START and END markers in the README.
@@ -47,12 +48,13 @@ def _fmt(value: float, unit: str) -> str:
     return f"{value:.1f}" if abs(value) >= 10 else f"{value:.2f}"
 
 
-def _cell(fig: AggregateFigure | None) -> str:
+def _cell(fig: AggregateFigure | None, n: int) -> str:
     if fig is None:
         return "n/a"
     median = _fmt(fig.median, fig.unit)
     low, high = _fmt(fig.min, fig.unit), _fmt(fig.max, fig.unit)
-    return median if low == high == median else f"{median} ({low} to {high})"
+    shown = median if low == high == median else f"{median} ({low} to {high})"
+    return shown if fig.n >= n else f"{shown} (n={fig.n})"
 
 
 def render(agg: Aggregate) -> str:
@@ -62,11 +64,11 @@ def render(agg: Aggregate) -> str:
     for profile, title in TABLES:
         rows = [(name, label) for name, label in ROWS if any(k[0] == profile and k[2] == name for k in figs)]
         out += [f"**{title}**", "", "| Metric | " + " | ".join(cells) + " |", "|---" * (len(cells) + 1) + "|"]
+        runs = {c: {r for f in agg.figures if f.profile == profile and f.cell == c for r in f.runs} for c in cells}
         if rows:
-            runs = {c: {r for f in agg.figures if f.profile == profile and f.cell == c for r in f.runs} for c in cells}
             out.append("| Runs | " + " | ".join(f"n={len(runs[c])}" for c in cells) + " |")
         for name, label in rows:
-            out.append(f"| {label} | " + " | ".join(_cell(figs.get((profile, c, name))) for c in cells) + " |")
+            out.append(f"| {label} | " + " | ".join(_cell(figs.get((profile, c, name)), len(runs[c])) for c in cells) + " |")
         out.append("")
         if any(name == "moving_parts" for name, _ in rows):
             out += ["Moving parts by cell, counted from its templates:", "",

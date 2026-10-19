@@ -82,8 +82,11 @@ def run_logged(run: Runner, root: Path, run_id: str, argv: list[str], env: dict[
     return code, out
 
 
-def deploy_commands(cell: str, rid: str, region: str) -> list[list[str]]:
-    """Network, harness, then the cell's Makefile target, with --region and --yes added. An ECS cell then reads its ALB."""
+def deploy_commands(cell: str, rid: str, region: str, diagnostics: Path | None = None) -> list[list[str]]:
+    """Network, harness, then the cell's Makefile target, with --region and --yes added. An ECS cell then reads its ALB.
+
+    An EKS cell writes kubectl diagnostics to `diagnostics` when its controller or ALB fails (issue #155).
+    """
     py = sys.executable
     stack = [py, "scripts/deploy_stack.py", "--region", region, "--yes"]
     network = [*stack, "--stack", f"{rid}-network", "--template", "infra/cfn/10-network.yaml", "--env-param", "RunId=RUN_ID"]
@@ -91,7 +94,8 @@ def deploy_commands(cell: str, rid: str, region: str) -> list[list[str]]:
                "RunId=RUN_ID", "--env-param", "NetworkStackName=NETWORK_STACK", "--env-param", "K6ImageUri=K6_IMAGE_URI"]
     if cell.startswith("eks-"):  # deploy_eks.py finds the network stack already there: no changes
         return [network, harness,
-                [py, "-m", "scripts.deploy_eks", "--cell", cell, "--run-id", rid, "--region", region, "--yes"]]
+                [py, "-m", "scripts.deploy_eks", "--cell", cell, "--run-id", rid, "--region", region, "--yes",
+                 *(["--diagnostics", str(diagnostics)] if diagnostics else [])]]
     ecs = [*stack, "--stack", f"{rid}-{cell}", "--template", "infra/cfn/30-ecs.yaml", "--env-param", "RunId=RUN_ID",
            "--env-param", "NetworkStackName=NETWORK_STACK", "--env-param", "ImageUri=IMAGE_URI"]
     if cell == "ecs-ec2":
@@ -131,7 +135,7 @@ def make_deployer(profile: str | None, image_uri: str | None, root: Path, run: R
             if cell.endswith("-ec2"):
                 env["INSTANCE_TYPE"] = instance_type
             start = now()
-            for argv in deploy_commands(cell, rid, state.region):
+            for argv in deploy_commands(cell, rid, state.region, raw / "eks-diagnostics.txt"):
                 code, out = run_logged(runner, root, state.run_id, argv, env)
                 if code:
                     return failed(f"{cell}: exit {code} from {' '.join(argv[1:])}" + (f" ({out.strip()})" if code == 127 else ""))

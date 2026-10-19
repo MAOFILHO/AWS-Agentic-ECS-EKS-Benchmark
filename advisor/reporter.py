@@ -67,6 +67,28 @@ _RANK_RE = re.compile(
 )
 # "ECS EC2", "ECS with EC2", "EKS on Fargate", "ecs-ec2".
 _CELL_RE = re.compile(r"\b(ECS|EKS)(?:-|\s+(?:with\s+|on\s+|using\s+)?)(EC2|Fargate)\b", re.IGNORECASE)
+# Superlatives (issue #150): "fastest", "most expensive". highest/lowest take their kind from the sentence.
+_SUPERLATIVES = {
+    r"slowest": ("latency", 1),
+    r"fastest|quickest": ("latency", -1),
+    r"most (?:costly|expensive)": ("cost", 1),
+    r"cheapest|least (?:costly|expensive)": ("cost", -1),
+    r"highest": (None, 1),
+    r"lowest": (None, -1),
+}
+_SUPER_RE = re.compile(
+    r"\b(?:" + "|".join(f"(?P<s{i}>{p})" for i, p in enumerate(_SUPERLATIVES)) + r")\b", re.IGNORECASE
+)
+_KIND_WORDS = {"latency": r"\blatency\b|\bp(?:50|95|99)\b", "cost": r"\bcosts?\b|\bidle\b|\bprice|\bexpensive\b|\bcheap"}
+_METRIC_WORDS = {
+    "p50_ms": r"\bp50\b",
+    "p95_ms": r"\bp95\b",
+    "p99_ms": r"\bp99\b",
+    "idle_usd_per_hour": r"\bidle\b",
+    "usd_per_1k_requests": r"\bper (?:1k|thousand)\b",
+}
+# "not faster than", "never the slowest", "isn't cheaper than".
+_NEGATION_RE = re.compile(r"\b(?:not|no|never)\b|n't", re.IGNORECASE)
 _SENTENCE_RE = re.compile(r"[^.!?\n]+(?:[.!?](?!\s|$)[^.!?\n]*)*")
 
 
@@ -129,6 +151,8 @@ def build_prompt(metrics: Metrics) -> str:
         rules.append(
             "Ranking facts, the only cost or latency rankings you may state:\n"
             + "\n".join(f"- {fact}" for fact in facts)
+            + "\nUse fastest, slowest, lowest, highest or cheapest only for a cell that is at that end "
+            "of every fact for the metric and profile you name."
         )
     return (
         "Write the Verdict of a report on ECS vs EKS for hosting an AI agent fleet: one short "
@@ -228,33 +252,91 @@ def rank_facts(metrics: Metrics) -> list[str]:
     return facts
 
 
-def contradicted_rankings(text: str, metrics: Metrics) -> list[str]:
-    """Sentences ranking two cells on cost or latency that no figure in metrics.json supports.
+def _cell_spans(sentence: str) -> list[tuple[str, int, int]]:
+    return [("-".join(m.groups()).lower(), m.start(), m.end()) for m in _CELL_RE.finditer(sentence)]
 
-    A sentence counts only when a cell is named before the comparative word and another after
-    "than"; anything less clear is left alone. A claim passes when any figure of that kind, in any
-    profile, ranks the two cells that way.
-    """
-    groups = _ranked_groups(metrics)
-    claims = []
-    for sentence in _SENTENCE_RE.findall(text):
-        m = _RANK_RE.search(sentence)
-        if not m:
+
+def _false_comparison(sentence: str, groups: dict) -> bool:
+    """Any "X is faster than Y" in the sentence that no figure supports, a "not" flipping the claim."""
+    matches = list(_RANK_RE.finditer(sentence))
+    cells = _cell_spans(sentence)
+    subject, floor, prev_object = None, 0, None
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(sentence)
+        new = [c for c in cells if c[1] >= floor and c[2] <= m.start() and c != prev_object]
+        if new:
+            subject, floor = new[-1], new[-1][2]
+        objects = [c for c in cells if c[1] >= m.end() and c[2] <= end]
+        prev_object = objects[0] if objects else None
+        if subject is None or not objects:
+            floor = m.end()
             continue
-        before = _CELL_RE.findall(sentence[: m.start()])
-        after = _CELL_RE.findall(sentence[m.end():])
-        if not before or not after:
-            continue
-        (a, b) = ("-".join(before[-1]).lower(), "-".join(after[0]).lower())
-        kind, sign = next(v for i, v in enumerate(_COMPARATIVES.values()) if m.group(f"c{i}"))
+        a, b = subject[0], objects[0][0]
+        kind, sign = next(v for j, v in enumerate(_COMPARATIVES.values()) if m.group(f"c{j}"))
+        if _NEGATION_RE.search(sentence[floor : m.start()]):
+            sign = -sign
         pairs = [
-            (cells[a], cells[b])
-            for (name, _), cells in groups.items()
-            if name in RANKED[kind] and a in cells and b in cells
+            (g[a], g[b])
+            for (name, _), g in groups.items()
+            if name in RANKED[kind] and a in g and b in g
         ]
         if a != b and pairs and not any(sign * (x - y) > 0 for x, y in pairs):
-            claims.append(sentence.strip())
-    return claims
+            return True
+        floor = m.end()
+    return False
+
+
+def _false_superlative(sentence: str, groups: dict) -> bool:
+    """Any "fastest", "most expensive" tied to a cell that is not the extreme on the metric named.
+
+    The metric is the one the sentence names (p95, idle), else every metric of that kind; the
+    profile is the one it names (spike), else every profile. A "not" before the word flips it.
+    """
+    cells = _cell_spans(sentence)
+    for m in _SUPER_RE.finditer(sentence):
+        before = [c for c in cells if c[2] <= m.start()]
+        after = [c for c in cells if c[1] >= m.end()]
+        cell = before[-1] if before else after[0] if after else None
+        if cell is None:
+            continue
+        kind, sign = next(v for j, v in enumerate(_SUPERLATIVES.values()) if m.group(f"s{j}"))
+        if kind is None:
+            found = {k: x.start() for k, w in _KIND_WORDS.items() if (x := re.search(w, sentence, re.IGNORECASE))}
+            if not found:
+                continue
+            kind = min(found, key=found.get)
+        named = [n for n in RANKED[kind] if re.search(_METRIC_WORDS[n], sentence, re.IGNORECASE)]
+        profiles = {
+            p for _, p in groups
+            if p and re.search(rf"(?<![\w-]){re.escape(p)}(?![\w-])", sentence, re.IGNORECASE)
+        }
+        verdicts = [
+            all(sign * (g[cell[0]] - v) >= 0 for c, v in g.items() if c != cell[0])
+            for (name, profile), g in groups.items()
+            if name in (named or RANKED[kind]) and cell[0] in g and len(g) > 1
+            and (not profiles or profile in profiles)
+        ]
+        if verdicts:
+            negated = bool(_NEGATION_RE.search(sentence[(before[-1][2] if before else 0) : m.start()]))
+            if all(verdicts) == negated:  # a true claim that is negated, or a false one that is not
+                return True
+    return False
+
+
+def contradicted_rankings(text: str, metrics: Metrics) -> list[str]:
+    """Sentences ranking cells on cost or latency that no figure in metrics.json supports.
+
+    A comparison counts only when a cell is named before the comparative word and another after
+    "than"; anything less clear is left alone. A comparison passes when any figure of that kind, in
+    any profile, ranks the two cells that way; "not" flips it. Every comparison in a sentence is
+    checked. A superlative ("slowest", "cheapest") tied to a cell must hold on the metric the
+    sentence names, or on every metric of its kind (issue #150).
+    """
+    groups = _ranked_groups(metrics)
+    return [
+        s.strip() for s in _SENTENCE_RE.findall(text)
+        if _false_comparison(s, groups) or _false_superlative(s, groups)
+    ]
 
 
 def _redact(offender: str) -> str:

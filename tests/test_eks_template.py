@@ -179,7 +179,7 @@ def _tag_keys(props):
     tags = props.get("Tags")
     if isinstance(tags, dict):
         return set(tags)
-    return {t["Key"] for t in tags}
+    return {t["Key"] for t in tags if "If" not in t}  # a Fargate-only tag is checked on its own
 
 
 def test_every_taggable_resource_carries_the_four_tags():
@@ -466,3 +466,19 @@ def test_boundary_allows_every_reference_ec2_and_elb_action():
     ]
     actions = {a for acts, _, _ in LBC_REFERENCE for a in acts}
     assert [a for a in sorted(actions) if not any(fnmatchcase(a, b) for b in boundary)] == []
+
+
+def _depends_on_profile(resource):
+    """True when the resource refs FargateProfile in a Fargate-only tag (an implicit, conditional DependsOn)."""
+    return any(t == {"If": ["IsFargate", {"Key": "fargate-profile", "Value": {"GetAtt": "FargateProfile.Arn"}},
+                            {"Ref": "AWS::NoValue"}]} for t in resource["Properties"]["Tags"])
+
+
+def test_fargate_add_ons_wait_for_the_fargate_profile_and_ec2_order_is_unchanged():
+    # Issue #157: CoreDNS and metrics-server pods made before the profile stay Pending on Fargate.
+    resources = _eks()["Resources"]
+    for name in ("CoreDnsAddon", "MetricsServerAddon"):
+        assert _depends_on_profile(resources[name]), name
+        assert "DependsOn" not in resources[name], name  # a plain DependsOn would break the EC2 render
+    others = [n for n, r in resources.items() if n not in ("CoreDnsAddon", "MetricsServerAddon")]
+    assert not [n for n in others if _depends_on_profile(resources[n])]

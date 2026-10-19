@@ -437,3 +437,76 @@ def test_a_short_alb_timeout_never_asks_about_the_controller():
     with pytest.raises(SystemExit, match="no ALB hostname after 120 s"):
         deploy_eks.wait_for_alb(runner(events, alb_after=10**6, ready=""), "kc", 120, sleep=clock.sleep, clock=clock)
     assert not [e for e in events if e[1:4] == ("kubectl", "get", "deployment")]
+
+
+def kube_system_runner(events, pending=("coredns",), ready_after=1):
+    """CoreDNS and metrics-server pods, Pending until restarted (issue #157). Ready after `ready_after` polls."""
+    base, polls = runner(events), {}
+
+    def run(args, check, capture_output, text):
+        if args[:5] == ["kubectl", "get", "pods", "-n", "kube-system"] and check:
+            events.append(("run", *args))
+            phase = {name: "Pending" if name in pending else "Running" for name in deploy_eks.KUBE_SYSTEM_DEPLOYMENTS}
+            out = "".join(f"{name}-5d8f-x{i} {phase[name]}\n" for name in phase for i in range(2))
+            return subprocess.CompletedProcess(args, 0, stdout=out + "aws-node-x Running\n", stderr="")
+        if args[:3] == ["kubectl", "get", "deployment"] and args[3] in deploy_eks.KUBE_SYSTEM_DEPLOYMENTS:
+            events.append(("run", *args))
+            polls[args[3]] = polls.get(args[3], 0) + 1
+            out = "2" if polls[args[3]] >= ready_after else ""
+            return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
+        return base(args, check=check, capture_output=capture_output, text=text)
+
+    return run
+
+
+def test_fargate_restarts_pending_coredns_and_waits_before_the_controller():
+    # Issue #157: add-on pods created before the Fargate profile stay Pending; no DNS, so no ALB.
+    events = []
+    deploy(events, cell="eks-fargate", run=kube_system_runner(events, ready_after=3))
+    runs = [e[1:] for e in events if e[0] == "run"]
+    restarts = [r for r in runs if r[:3] == ("kubectl", "rollout", "restart")]
+    assert [r[3] for r in restarts] == ["deployment/coredns"]
+    assert all(r[r.index("-n") + 1] == "kube-system" and "--kubeconfig" in r for r in restarts)
+    restart_at = runs.index(restarts[0])
+    lbc_at = next(i for i, r in enumerate(runs) if r[0] == "helm")
+    waits = [i for i, r in enumerate(runs) if r[:4] == ("kubectl", "get", "deployment", "coredns")]
+    assert restart_at < min(waits) and max(waits) < lbc_at and len(waits) == 3
+
+
+def test_fargate_restarts_every_pending_add_on_and_none_when_all_run():
+    events = []
+    deploy(events, cell="eks-fargate", run=kube_system_runner(events, pending=("coredns", "metrics-server")))
+    assert [e[4] for e in events if e[1:4] == ("kubectl", "rollout", "restart")] == [
+        "deployment/coredns", "deployment/metrics-server"]
+    events = []
+    deploy(events, cell="eks-fargate", run=kube_system_runner(events, pending=()))
+    assert not [e for e in events if e[1:3] == ("kubectl", "rollout")]
+
+
+def test_a_coredns_that_never_gets_ready_stops_the_deploy_and_writes_diagnostics(tmp_path):
+    events, path, clock = [], tmp_path / "eks-diagnostics.txt", Clock()
+    with pytest.raises(SystemExit) as exc:
+        deploy_eks.deploy(
+            FakeCfn(), FakeSsm(set(range(30, 35))), FakeEks(events), "r1", "eks-fargate", "us-east-1", IMAGE,
+            deploy_one=lambda *a: None, run=kube_system_runner(events, ready_after=10**6),
+            sleep=clock.sleep, clock=clock, diagnostics=path)
+    msg = str(exc.value)
+    assert "coredns" in msg and "not Ready after 600 s" in msg and str(path) in msg
+    assert 600 <= clock.now < 700
+    assert path.is_file()
+    assert not [e for e in events if e[0] == "run" and e[1] == "helm"]
+
+
+def test_ec2_never_touches_kube_system_add_ons():
+    events = []
+    deploy(events, run=kube_system_runner(events))
+    assert not [e for e in events if e[1:3] == ("kubectl", "rollout") or e[1:4] == ("kubectl", "get", "pods")]
+
+
+def test_diagnostics_list_the_ingress_class_and_the_previous_controller_log(tmp_path):
+    events, path = [], tmp_path / "eks-diagnostics.txt"
+    with pytest.raises(SystemExit):
+        deploy(events, cell="eks-fargate", run=runner(events, alb_after=10**6), alb_timeout=0, diagnostics=path)
+    text = path.read_text()
+    assert "## kubectl get ingressclass -o yaml" in text
+    assert "## kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --previous" in text

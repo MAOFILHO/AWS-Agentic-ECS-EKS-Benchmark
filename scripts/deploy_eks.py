@@ -9,6 +9,8 @@ Stacks go through deploy_stack.py (change sets, y/N per stack; --yes skips the p
 never ~/.kube/config. Credentials come from the AWS_PROFILE profile through boto3. Output masks
 12-digit account ids. With --diagnostics, a failed controller or workload install, or an ALB that never comes,
 writes kubectl output to that file (account ids and role ARNs masked) before the error exits.
+On Fargate, CoreDNS and metrics-server are restarted if a pod is Pending and must be Ready before the controller
+install (issue #157).
 """
 
 import argparse
@@ -49,8 +51,14 @@ DIAGNOSTICS = (
     ["describe", "ingress", WORKLOAD_RELEASE],
     ["describe", "pod", "-n", LBC_NAMESPACE, "-l", LBC_SELECTOR],
     ["logs", "-n", LBC_NAMESPACE, "-l", LBC_SELECTOR, "--tail", "200"],
+    ["logs", "-n", LBC_NAMESPACE, "-l", LBC_SELECTOR, "--previous", "--tail", "200"],  # a restarted pod (issue #157)
+    ["get", "ingressclass", "-o", "yaml"],
     ["get", "events", "-A", "--sort-by", ".lastTimestamp"],
 )
+# EKS add-on pods made before the Fargate profile stay Pending; with no CoreDNS the controller cannot reach AWS
+# (issue #157). On Fargate they are restarted, then waited for, before the controller install.
+KUBE_SYSTEM_DEPLOYMENTS = ("coredns", "metrics-server")
+KUBE_SYSTEM_TIMEOUT = 600
 # Each Fargate pod waits for its own micro VM, so Helm's 5 min default --wait is too short there.
 FARGATE_HELM_TIMEOUT = "15m"
 
@@ -101,10 +109,33 @@ def sh(run, args):
         raise SystemExit(mask(f"error: {args[0]} {args[1]} failed: {reason}")) from None
 
 
-def controller_ready(run, kubeconfig):
-    ready = sh(run, ["kubectl", "get", "deployment", LBC_RELEASE, "-n", LBC_NAMESPACE, "--kubeconfig", kubeconfig,
+def deployment_ready(run, kubeconfig, name):
+    ready = sh(run, ["kubectl", "get", "deployment", name, "-n", LBC_NAMESPACE, "--kubeconfig", kubeconfig,
                      "-o", "jsonpath={.status.readyReplicas}"]).strip()
     return ready.isdigit() and int(ready) > 0
+
+
+def controller_ready(run, kubeconfig):
+    return deployment_ready(run, kubeconfig, LBC_RELEASE)
+
+
+def ready_kube_system(run, kubeconfig, sleep=time.sleep, clock=time.monotonic):
+    """Fargate: restart CoreDNS and metrics-server if a pod is Pending, then wait until both are Ready."""
+    pods = sh(run, ["kubectl", "get", "pods", "-n", LBC_NAMESPACE, "--kubeconfig", kubeconfig, "-o",
+                    'jsonpath={range .items[*]}{.metadata.name} {.status.phase}{"\\n"}{end}'])
+    pending = [line.split()[0] for line in pods.splitlines() if line.endswith(" Pending")]
+    for name in KUBE_SYSTEM_DEPLOYMENTS:
+        if any(pod.startswith(f"{name}-") for pod in pending):
+            sh(run, ["kubectl", "rollout", "restart", f"deployment/{name}", "-n", LBC_NAMESPACE,
+                     "--kubeconfig", kubeconfig])
+            print(f"{name}: pods were Pending, restarted.", flush=True)
+    deadline = clock() + KUBE_SYSTEM_TIMEOUT
+    while waiting := [name for name in KUBE_SYSTEM_DEPLOYMENTS if not deployment_ready(run, kubeconfig, name)]:
+        if clock() >= deadline:
+            raise SystemExit(f"error: {', '.join(waiting)} not Ready after {KUBE_SYSTEM_TIMEOUT} s in "
+                             f"{LBC_NAMESPACE}. Without CoreDNS the controller cannot reach AWS to make the ALB.")
+        print(f"waiting for {', '.join(waiting)}...", flush=True)
+        sleep(ALB_INTERVAL)
 
 
 def wait_for_alb(run, kubeconfig, timeout, sleep=time.sleep, clock=time.monotonic):
@@ -145,7 +176,7 @@ def write_diagnostics(run, kubeconfig, path):
 
 def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
            deploy_one=deploy_stack.deploy, run=subprocess.run, sleep=time.sleep, instance_type=None,
-           diagnostics=None):
+           diagnostics=None, clock=time.monotonic):
     compute_type, values_file = CELLS[cell]
     repo, tag = split_image(image_uri)
     version = kubernetes_version(ssm)
@@ -177,6 +208,8 @@ def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
         sh(run, ["aws", "eks", "update-kubeconfig", "--name", cluster, "--region", region,
                  "--kubeconfig", kubeconfig])
         try:
+            if compute_type == "FARGATE":
+                ready_kube_system(run, kubeconfig, sleep=sleep, clock=clock)
             # vpcId and region are set because pods cannot read them from instance metadata.
             # Shield and WAF stay off: 41-eks-lbc-iam does not grant them.
             sh(run, ["helm", "upgrade", "--install", LBC_RELEASE, LBC_RELEASE, "--repo", LBC_CHART_REPO,

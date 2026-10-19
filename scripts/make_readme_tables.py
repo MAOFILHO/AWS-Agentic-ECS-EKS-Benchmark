@@ -4,6 +4,7 @@ Usage:
     python -m scripts.make_readme_tables [--aggregate results/published/aggregate.json] [--readme README.md]
 
 Each cell shows `median (min to max)`, or one value when every run agreed. A missing figure shows n/a.
+Under the table with moving parts, a list names each cell's parts (advisor.collector.moving_parts).
 The tables replace whatever sits between the START and END markers in the README.
 """
 
@@ -12,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import get_args
 
+from advisor.collector import moving_parts
 from advisor.schemas import Aggregate, AggregateFigure, read_aggregate
 from advisor.state import CellName
 
@@ -61,6 +63,9 @@ def render(agg: Aggregate) -> str:
         for name, label in rows:
             out.append(f"| {label} | " + " | ".join(_cell(figs.get((profile, c, name))) for c in cells) + " |")
         out.append("")
+        if any(name == "moving_parts" for name, _ in rows):
+            out += ["Moving parts by cell, counted from its templates:", "",
+                    *(f"- {c}: " + ", ".join(moving_parts(c)) for c in cells), ""]
     return "\n".join(out).rstrip("\n")
 
 

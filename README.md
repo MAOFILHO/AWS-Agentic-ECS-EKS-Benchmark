@@ -83,9 +83,15 @@ all runs agreed.
 |---|---|---|---|
 | Deploy time (s) | 426 (401 to 439) | 467 (460 to 505) | 1125 (1041 to 1171) |
 | Config lines | 436 | 436 | 534 |
-| Moving parts | 4 | 4 | 4 |
+| Moving parts | 2 | 5 | 8 |
 | Idle cost (USD/h) | 0.0348 | 0.0641 | 0.1641 |
 | USD per thousand requests | 0.0009 | 0.0011 (0.0011 to 0.0012) | 0.0015 (0.0015 to 0.0016) |
+
+Moving parts by cell, counted from its templates:
+
+- ecs-fargate: LoadBalancer, ScalableTarget
+- ecs-ec2: LoadBalancer, LaunchTemplate, AutoScalingGroup, CapacityProvider, ScalableTarget
+- eks-ec2: vpc-cni, kube-proxy, coredns, metrics-server, eks-pod-identity-agent, NodeGroup, LbcPodIdentity, aws-load-balancer-controller
 <!-- /tables -->
 
 ## Cost of one run

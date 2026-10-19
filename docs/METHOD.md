@@ -76,6 +76,18 @@ The analyst computes them in plain Python, with no model in the loop. Each figur
 `metrics.json` names the raw file it came from, and a missing input is listed as a gap, never
 filled in. The reporter may only state numbers found in `metrics.json`, and a test checks it.
 
+Moving parts are counted from the cell's templates, not typed in (`advisor/collector.py`,
+`moving_parts`). A part is a controller or add-on the cell needs beyond the workload itself:
+
+- ECS: the ALB and the application scaling target. EC2 adds the capacity provider, the auto
+  scaling group and the launch template.
+- EKS: each `AWS::EKS::Addon`, the Pod Identity association and the AWS Load Balancer
+  Controller that `scripts/deploy_eks.py` installs with Helm. EC2 adds the node group.
+
+A resource counts when its type is one of these and its `Condition` holds for the cell.
+`config.json` records the count as `moving_parts` and the names as `moving_parts_list`.
+`python -m scripts.recount_parts` rewrites the published counts after a template changes.
+
 ### Cost model
 
 - Cost is resource-seconds times the on-demand price, per cell. Prices come from the AWS Pricing

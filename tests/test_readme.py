@@ -115,3 +115,12 @@ def test_tables_put_units_on_row_labels_only():
         assert header, path.name
         assert "(" not in header.group(0), path.name
     assert re.search(r"^## Verdict\n+\S", (SAMPLE / "report.md").read_text(), re.MULTILINE)
+
+
+def test_readme_lists_the_moving_parts_of_each_cell():
+    # Issue #149: the count is measured from the templates, and the names under the table show what was counted.
+    from advisor.collector import moving_parts
+
+    block = README.read_text().split(START, 1)[1].split(END, 1)[0]
+    for cell in ("ecs-fargate", "ecs-ec2", "eks-ec2"):
+        assert f"- {cell}: " + ", ".join(moving_parts(cell)) in block, cell

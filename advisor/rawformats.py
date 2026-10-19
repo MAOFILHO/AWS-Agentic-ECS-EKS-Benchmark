@@ -18,7 +18,8 @@ including a NaN or Infinity number. The analyst turns a missing or bad file into
   analyst counts a scaling event toward the profile whose window holds it.
 - `deploy.json`: `{"stack_create_start", "stack_create_end", "target_healthy"}`, ISO 8601, and
   `alb_dns_name`. The deployer writes all but `target_healthy` (DeployStarted), which the collector adds.
-- `config.json`: `{"config_lines": int, "moving_parts": int}`, plus `instance_type` for an EC2 cell.
+- `config.json`: `{"config_lines": int, "moving_parts": int, "moving_parts_list": [str]}`, plus `instance_type`
+  for an EC2 cell. `moving_parts` is the length of `moving_parts_list`, the part names (docs/METHOD.md).
 - `cost.json`: `{"load_usd": number, "idle_usd_per_hour": number}`, from the cost model.
 - `shared-cost.json` (in raw/, not in a cell): a list of `{"item": str, "usd": number}`, the run's shared
   lines (NAT gateway, VPC endpoints, harness). They are never added into a cell's `load_usd`.
@@ -111,6 +112,7 @@ class Deploy(DeployStarted):
 class Config(Strict):
     config_lines: int = Field(ge=0)
     moving_parts: int = Field(ge=0)
+    moving_parts_list: list[str] = []
     instance_type: str | None = None
 
 

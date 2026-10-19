@@ -38,6 +38,8 @@ LBC_CHART_VERSION = "3.6.0"
 SSM_AMI = "/aws/service/eks/optimized-ami/1.{}/amazon-linux-2023/x86_64/standard/recommended/image_id"
 FIRST_MINOR = 30
 ALB_INTERVAL = 15
+# Each Fargate pod waits for its own micro VM, so Helm's 5 min default --wait is too short there.
+FARGATE_HELM_TIMEOUT = "15m"
 
 
 def mask(text):
@@ -116,9 +118,14 @@ def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
 
     cluster = stack_output(cfn, eks_stack, "ClusterName")
     vpc_id = stack_output(cfn, network, "VpcId")
+    lbc_extra, wait_extra = [], []
     if compute_type == "EC2":
         eks.get_waiter("nodegroup_active").wait(clusterName=cluster, nodegroupName=NODEGROUP)
         print(f"{cluster}: node group {NODEGROUP} ACTIVE.")
+    else:  # Fargate: no Pod Identity, so the service account names its IRSA role (41-eks-lbc-iam).
+        role_arn = stack_output(cfn, lbc_stack, "LbcRoleArn")
+        lbc_extra = ["--set", f"serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn={role_arn}"]
+        wait_extra = ["--timeout", FARGATE_HELM_TIMEOUT]
 
     with tempfile.TemporaryDirectory() as tmp:
         kubeconfig = os.path.join(tmp, "config")  # never ~/.kube/config (SPEC risk table)
@@ -131,12 +138,12 @@ def deploy(cfn, ssm, eks, run_id, cell, region, image_uri, alb_timeout=900,
                  "--set", f"clusterName={cluster}", "--set", f"region={region}", "--set", f"vpcId={vpc_id}",
                  "--set", "serviceAccount.create=true", "--set", f"serviceAccount.name={LBC_RELEASE}",
                  "--set", "enableShield=false", "--set", "enableWaf=false", "--set", "enableWafv2=false",
-                 "--kubeconfig", kubeconfig])
+                 *lbc_extra, *wait_extra, "--kubeconfig", kubeconfig])
         print(f"{cluster}: {LBC_RELEASE} {LBC_CHART_VERSION} installed.")
         sh(run, ["helm", "upgrade", "--install", WORKLOAD_RELEASE, str(WORKLOAD_CHART), "--wait",
                  "--values", str(WORKLOAD_CHART / values_file),
                  "--set", f"image.repository={repo}", "--set", f"image.tag={tag}",
-                 "--kubeconfig", kubeconfig])
+                 *wait_extra, "--kubeconfig", kubeconfig])
         print(f"{cluster}: {WORKLOAD_RELEASE} installed, image tag {tag}.")
         host = wait_for_alb(run, kubeconfig, alb_timeout, sleep=sleep)
     print(mask(f"ALB: http://{host}"))

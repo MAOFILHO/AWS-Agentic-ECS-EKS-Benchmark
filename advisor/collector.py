@@ -29,7 +29,8 @@ from advisor.store import create_run_dirs
 # It is counted from the cell's templates: each resource of these types whose Condition holds for the cell.
 PART_TYPES = {"AWS::ECS::CapacityProvider", "AWS::AutoScaling::AutoScalingGroup", "AWS::EC2::LaunchTemplate",
               "AWS::ApplicationAutoScaling::ScalableTarget", "AWS::ElasticLoadBalancingV2::LoadBalancer",
-              "AWS::EKS::Addon", "AWS::EKS::Nodegroup", "AWS::EKS::PodIdentityAssociation"}
+              "AWS::EKS::Addon", "AWS::EKS::Nodegroup", "AWS::EKS::PodIdentityAssociation",
+              "AWS::EKS::FargateProfile", "AWS::IAM::OIDCProvider"}  # the last two: eks-fargate's node group and IRSA
 CONDITIONS = {"IsEc2": "ec2", "IsFargate": "fargate"}  # template Condition -> the cell's compute
 HELM_CONTROLLERS = ("aws-load-balancer-controller",)  # scripts/deploy_eks.py installs it with Helm, not a template
 HELM = "infra/helm/workload"

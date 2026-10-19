@@ -266,3 +266,7 @@ Outputs:
   ClusterEndpoint:
     Description: Kubernetes API endpoint. Public information, not a secret.
     Value: !GetAtt Cluster.Endpoint
+  OidcIssuerUrl:
+    Description: Cluster OIDC issuer URL. The 41-eks-lbc-iam stack builds its IRSA provider from it on Fargate.
+    Value: !GetAtt Cluster.OpenIdConnectIssuerUrl
+    Export: { Name: !Sub "${AWS::StackName}-OidcIssuerUrl" }

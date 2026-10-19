@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  IAM role for the AWS Load Balancer Controller, bound by a Pod Identity association to
-  service account aws-load-balancer-controller in kube-system of the 40-eks cluster.
+  IAM role for the AWS Load Balancer Controller, for service account aws-load-balancer-controller
+  in kube-system of the 40-eks cluster. eks-ec2 binds it with a Pod Identity association;
+  eks-fargate trusts the cluster OIDC provider (IRSA), since Pod Identity does not run on Fargate.
 
 # The policy is the controller's published policy trimmed to what this benchmark uses:
 # ALBs and target groups for an Ingress. WAF, Shield and certificate write actions are left
@@ -26,20 +27,49 @@ Parameters:
     AllowedValues: [eks-ec2, eks-fargate]
     Description: Cell tag value, matching the ComputeType of the 40-eks stack.
 
+Conditions:
+  IsEc2: !Equals [!Ref Cell, eks-ec2]
+  IsFargate: !Equals [!Ref Cell, eks-fargate]
+
 Resources:
+  # eks-fargate only. IAM provider for the cluster OIDC issuer; IAM fetches the thumbprint itself.
+  LbcOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: IsFargate
+    Properties:
+      Url: !ImportValue { "Fn::Sub": "${EksStackName}-OidcIssuerUrl" }
+      ClientIdList: [sts.amazonaws.com]
+      Tags:
+        - { Key: run-id, Value: !Ref RunId }
+        - { Key: ttl-hours, Value: !Ref TtlHours }
+        - { Key: project, Value: agentic-platform-advisor }
+        - { Key: cell, Value: !Ref Cell }
+
   LbcRole:
     Type: AWS::IAM::Role
     Properties:
       PermissionsBoundary: !ImportValue agentic-platform-advisor-StackRoleBoundaryArn
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: pods.eks.amazonaws.com
-            Action:
-              - sts:AssumeRole
-              - sts:TagSession
+      # Fargate: IRSA, scoped to the controller service account. The condition keys hold the issuer
+      # host and path, which CloudFormation cannot put in a map key, so the policy is a JSON string.
+      AssumeRolePolicyDocument: !If
+        - IsFargate
+        - !Sub
+          - >-
+            {"Version": "2012-10-17", "Statement": [{"Effect": "Allow",
+            "Principal": {"Federated": "${LbcOidcProvider}"},
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {"StringEquals": {
+            "${Issuer}:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller",
+            "${Issuer}:aud": "sts.amazonaws.com"}}}]}
+          - Issuer: !Select [1, !Split ["//", !ImportValue { "Fn::Sub": "${EksStackName}-OidcIssuerUrl" }]]
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: pods.eks.amazonaws.com
+              Action:
+                - sts:AssumeRole
+                - sts:TagSession
       Policies:
         - PolicyName: aws-load-balancer-controller
           PolicyDocument:
@@ -221,6 +251,7 @@ Resources:
 
   LbcPodIdentity:
     Type: AWS::EKS::PodIdentityAssociation
+    Condition: IsEc2
     Properties:
       ClusterName: !ImportValue { "Fn::Sub": "${EksStackName}-ClusterName" }
       Namespace: kube-system
@@ -234,5 +265,5 @@ Resources:
 
 Outputs:
   LbcRoleArn:
-    Description: Role the AWS Load Balancer Controller assumes through Pod Identity.
+    Description: Role the AWS Load Balancer Controller assumes (Pod Identity on EC2, IRSA on Fargate).
     Value: !GetAtt LbcRole.Arn

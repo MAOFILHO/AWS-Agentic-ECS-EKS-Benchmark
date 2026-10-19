@@ -1,2 +1,6 @@
 # eks-fargate cell: the Fargate profile places pods, so no node selector.
+# CPU and memory requests, limits and the HPA target are the shared values.yaml ones, as on eks-ec2.
+# Forced difference: Fargate adds 256 MB for kubelet, kube-proxy and containerd and rounds up to its
+# next size, so it bills each pod as 0.25 vCPU and 1 GB (requests stay 256m and 512Mi).
+# Source: https://docs.aws.amazon.com/eks/latest/userguide/fargate-pod-configuration.html
 nodeSelector: {}

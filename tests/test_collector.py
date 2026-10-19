@@ -137,6 +137,12 @@ def test_ecs_ec2_counts_its_capacity_parts_and_eks_counts_each_add_on():
     assert "NodeGroup" not in moving_parts("eks-fargate")
 
 
+def test_eks_fargate_counts_its_fargate_profile_and_irsa_provider_in_place_of_node_group_and_pod_identity():
+    # Issue #153: the Fargate profile places pods and the OIDC provider gives the controller its role.
+    assert moving_parts("eks-fargate") == ["vpc-cni", "kube-proxy", "coredns", "metrics-server", "eks-pod-identity-agent",
+                                           "FargateProfile", "LbcOidcProvider", "aws-load-balancer-controller"]
+
+
 @pytest.mark.parametrize("cell", ["ecs-fargate", "ecs-ec2", "eks-ec2", "eks-fargate"])
 def test_moving_parts_equals_the_length_of_the_recorded_list(cell):
     got = config(cell)

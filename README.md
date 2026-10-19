@@ -2,7 +2,7 @@
 
 Should a team host a fleet of AI agents on Amazon ECS or on Amazon EKS, and on Fargate or on EC2?
 This repo deploys the same agent workload on each platform, drives the same load at it, and
-reports latency, deploy time, configuration size and cost side by side. A LangGraph advisor plans
+reports latency, deploy time, configuration size and cost side by side (see the [tech stack](#tech-stack)). A LangGraph advisor plans
 the run, asks before any spend, deploys, measures, tears everything down and writes the report.
 
 ## Verdict
@@ -180,6 +180,20 @@ USD 1.2 to 1.8 in real AWS spend.
 - **Two gaps.** In `scale-from-min`, ECS Fargate and EKS EC2 logged no scale-out in their load
   window: the load stayed under their CPU scaling target, so they have no scale-out or cold-start
   figure there. EKS Fargate logged none there either.
+
+## Tech stack
+
+| Area | Tools | Used for |
+|---|---|---|
+| Agent and orchestration | Python, LangGraph, langgraph-checkpoint-sqlite, uv | The advisor that plans, deploys, measures and tears down, with a SQLite checkpoint to resume a run |
+| Cloud compute | Amazon ECS, Amazon EKS, AWS Fargate, Amazon EC2, Application Load Balancer | The four cells under test |
+| Infrastructure as code | AWS CloudFormation, boto3, awscrt | VPC with NAT and endpoints, clusters, IAM (IRSA and Pod Identity), ECR, CloudWatch with Container Insights, AWS Budgets |
+| Kubernetes packaging | Helm, kubectl | The workload chart and the load balancer controller on the EKS cells |
+| Load testing | k6 | The `steady`, `step`, `spike` and `scale-from-min` profiles |
+| Workload | FastAPI, uvicorn, pydantic, Docker | The mock triage agent image |
+| Reporting and charts | Amazon Bedrock (Nova Micro), pydantic, SVG charts from `scripts/` | The Verdict, the tables and the charts |
+| Testing and quality | pytest, httpx, ruff, cfn-lint, cfn-guard | Unit tests, README number checks, lint and template checks |
+| CI | GitHub Actions | Lint, tests, `helm lint`, image build and template checks on every pull request |
 
 ## How to run
 

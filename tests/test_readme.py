@@ -27,7 +27,8 @@ CHARTS = ("chart-burst-scaling.svg", "chart-burst-latency.svg", "chart-cost.svg"
 
 AUTHOR_LINE = "**Marcos Oliveira** \u2014 [LinkedIn](https://www.linkedin.com/in/mfilho1/) | [GitHub](https://github.com/MAOFILHO)"
 REQUIRED_SECTIONS = ("Project description", "Why this is production-grade", "The Problem", "The Solution",
-                     "Results and Impact", "Limits", "Architecture", "Tech stack", "AWS services used", "License", "Author")
+                     "Results and Impact", "Limits", "Architecture", "Tech stack", "AWS services used", "AWS region", "Cost estimate",
+                     "Key engineering decisions", "License", "Author")
 BADGE_RE = re.compile(r"^!?\[.*?\]\(https://(?:img\.shields\.io|github\.com)/\S+?\)(?:\]\(\S+\))?$", re.MULTILINE)
 
 

@@ -199,30 +199,6 @@ Moving parts by cell, counted from its templates:
 Limits: cells were measured in different run sets; ecs-fargate appears in all of them.
 <!-- /tables -->
 
-## Cost estimate
-
-This is the single `sample3` run (steady profile), the only run with its cost files published.
-**About $0.33** for the load window: $0.3252 in all, from the per-cell
-[`cost.json`](results/sample/raw) files and [`shared-cost.json`](results/sample/raw/shared-cost.json).
-
-| Item                          | USD    |
-|-------------------------------|--------|
-| ECS Fargate cell              | 0.0577 |
-| ECS EC2 cell                  | 0.0632 |
-| EKS EC2 cell                  | 0.0810 |
-| Cells, total                  | 0.2019 |
-| Shared NAT gateway            | 0.0244 |
-| Shared NAT data               | 0.0450 |
-| Shared VPC endpoints          | 0.0271 |
-| Shared harness vCPU           | 0.0220 |
-| Shared harness memory         | 0.0048 |
-| Shared, total                 | 0.1233 |
-| **Run, total**                | **0.3252** |
-
-This prices only the load window. Real spend, with deploy and teardown time, was about two to
-three times this estimate. A Fargate run of 2 cells and 2 profiles (`kf5`, `kf6`) cost
-USD 1.2 to 1.8 in real AWS spend.
-
 ## Limits
 
 - **3 runs, 2 for eks-fargate.** ECS EC2 and EKS EC2 rest on 3 runs, EKS Fargate on 2 and ECS
@@ -405,6 +381,30 @@ uv run --locked ruff check
 ## AWS region
 
 All runs were measured in us-east-1.
+
+## Cost estimate
+
+This is the single `sample3` run (steady profile), the only run with its cost files published.
+**About $0.33** for the load window: $0.3252 in all, from the per-cell
+[`cost.json`](results/sample/raw) files and [`shared-cost.json`](results/sample/raw/shared-cost.json).
+
+| Item                          | USD    |
+|-------------------------------|--------|
+| ECS Fargate cell              | 0.0577 |
+| ECS EC2 cell                  | 0.0632 |
+| EKS EC2 cell                  | 0.0810 |
+| Cells, total                  | 0.2019 |
+| Shared NAT gateway            | 0.0244 |
+| Shared NAT data               | 0.0450 |
+| Shared VPC endpoints          | 0.0271 |
+| Shared harness vCPU           | 0.0220 |
+| Shared harness memory         | 0.0048 |
+| Shared, total                 | 0.1233 |
+| **Run, total**                | **0.3252** |
+
+This prices only the load window. Real spend, with deploy and teardown time, was about two to
+three times this estimate. A Fargate run of 2 cells and 2 profiles (`kf5`, `kf6`) cost
+USD 1.2 to 1.8 in real AWS spend.
 
 ## Key engineering decisions
 

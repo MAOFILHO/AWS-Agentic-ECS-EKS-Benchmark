@@ -26,7 +26,7 @@ Should a team host a fleet of AI agents on **Amazon ECS** or on **Amazon EKS**, 
 
 This is a measured comparison with guard rails, not a one-off script. It runs real AWS resources, so it is built to cost little and leave nothing behind:
 
-- **CloudFormation and Helm only**: all AWS resources are CloudFormation and all Kubernetes objects are Helm. No console step.
+- **CloudFormation and Helm**: every AWS resource is a CloudFormation stack. The workload and the load balancer controller are Helm releases, and the EKS core add-ons come from CloudFormation. No console step.
 - **Approval gate before spend**: the planner prints a cost estimate and the run waits for a y/N answer. A no ends it with nothing deployed.
 - **Teardown on every path**: every failure edge of the agent graph ends in teardown, which deletes the run's stacks and reports any leftover resource.
 - **TTL tags and a budget alarm**: every benchmark stack carries a `ttl-hours` tag, and the bootstrap stack holds a monthly AWS Budgets alarm.
@@ -348,7 +348,7 @@ any resource still tagged with the run id.
 
 From the safety rules section of [`docs/SPEC.md`](docs/SPEC.md):
 
-- All AWS resources are CloudFormation and all Kubernetes objects are Helm. No console step.
+- Every AWS resource is a CloudFormation stack. The workload and the load balancer controller are Helm releases, and the EKS core add-ons come from CloudFormation. No console step.
 - No IAM access keys and no root user.
 - The bootstrap stack holds a monthly AWS Budgets alarm.
 - Every benchmark stack carries a `ttl-hours` tag, and teardown runs in a `finally` path.

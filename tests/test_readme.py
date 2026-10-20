@@ -349,3 +349,19 @@ def test_readme_aws_services_are_found_in_the_templates():
     assert "bedrock" in cfn.lower() and "ssm" in (ROOT / "scripts" / "deploy_eks.py").read_text()
     assert "pricing" in (ROOT / "advisor" / "pricing.py").read_text().lower()
     assert "resourcegroupstaggingapi" in (ROOT / "scripts" / "delete_run.py").read_text() + (ROOT / "advisor" / "teardown.py").read_text()
+
+
+def test_readme_helm_and_cloudformation_claim_is_exact():
+    # Issue #173: the EKS core add-ons come from CloudFormation, so not every Kubernetes object is Helm.
+    text = " ".join(README.read_text().split())
+    assert "all Kubernetes objects are Helm" not in text
+    bullet = " ".join(_section("Why this is production-grade").split("\n- ", 2)[1].split())
+    assert "add-ons" in bullet and "CloudFormation" in bullet and "Helm" in bullet
+
+
+def test_readme_claims_no_automatic_janitor():
+    # Issue #173: no janitor workflow exists in .github/workflows; the TTL tag only marks stacks.
+    text = " ".join(README.read_text().split())
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if "janitor" in sentence.lower():
+            assert "next step" in sentence and "docs/SPEC.md" in sentence, sentence

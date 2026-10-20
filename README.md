@@ -346,7 +346,7 @@ any resource still tagged with the run id.
 
 ### Safety rules
 
-From the safety rules section of [`docs/SPEC.md`](docs/SPEC.md):
+From the safety rules section of [`docs/SPEC.md`](docs/SPEC.md), with the first rule made exact:
 
 - Every AWS resource is a CloudFormation stack. The workload and the load balancer controller are Helm releases, and the EKS core add-ons come from CloudFormation. No console step.
 - No IAM access keys and no root user.

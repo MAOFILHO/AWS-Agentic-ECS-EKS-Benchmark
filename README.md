@@ -269,3 +269,7 @@ From the safety rules section of [`docs/SPEC.md`](docs/SPEC.md):
 - [`docs/METHOD.md`](docs/METHOD.md): how the comparison was run, so you can judge whether it is fair.
 - [`docs/SPEC.md`](docs/SPEC.md): the question, matrix, metric definitions and cost model.
 - [`docs/architecture.md`](docs/architecture.md): how the advisor and the cells fit together.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

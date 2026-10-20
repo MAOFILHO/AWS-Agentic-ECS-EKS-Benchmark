@@ -25,6 +25,22 @@ FACTS = json.loads((PUBLISHED / "readme-facts.json").read_text())
 CHARTS = ("chart-burst-scaling.svg", "chart-burst-latency.svg", "chart-cost.svg", "chart-deploy.svg")
 
 
+AUTHOR_LINE = "**Marcos Oliveira** \u2014 [LinkedIn](https://www.linkedin.com/in/mfilho1/) | [GitHub](https://github.com/MAOFILHO)"
+REQUIRED_SECTIONS = ("Project description", "Why this is production-grade", "The Problem", "The Solution",
+                     "Results and Impact", "Limits", "Architecture", "Tech stack", "AWS services used", "AWS region", "Cost estimate",
+                     "Key engineering decisions", "License", "Author")
+BADGE_RE = re.compile(r"^!?\[.*?\]\(https://(?:img\.shields\.io|github\.com)/\S+?\)(?:\]\(\S+\))?$", re.MULTILINE)
+
+
+def _section(title: str, level: str = "##") -> str:
+    """Body of a heading, with or without a leading emoji, up to the next heading of the same level."""
+    head = re.search(rf"^{level} (?:[^\w\s]+\s+)?{re.escape(title)}[ \t]*$", README.read_text(), re.MULTILINE)
+    assert head, f"no '{level} {title}' heading"
+    rest = README.read_text()[head.end():]
+    nxt = re.search(rf"^{level} ", rest, re.MULTILINE)
+    return rest[: nxt.start()] if nxt else rest
+
+
 def _cost_values() -> list[float]:
     loads = []
     for path in sorted((SAMPLE / "raw").glob("*/cost.json")):
@@ -60,7 +76,11 @@ def _readme_metrics_and_text() -> tuple[Metrics, str]:
     extra += [SharedCost(item="add-on date", usd=int(part), source="readme-facts.json")
               for part in FACTS["addon_date"].split() if part.isdigit()]
     metrics = Metrics(run_id=sample.run_id, figures=figures, shared_costs=sample.shared_costs + extra)
-    text = README.read_text()
+    text = README.read_text().replace(AUTHOR_LINE, "")  # the owner's public profile line
+    # Issue #171: badge rows and the divider image hold versions and ids, not measured figures. The badge
+    # versions are checked against the repo files by test_readme_badges_match_the_repo_versions.
+    text = BADGE_RE.sub("", text)
+    text = re.sub(r"<img [^>]*>", "", text)
     for run_id in [*agg.runs, *CROSS_CHECK_RUNS]:  # run ids are names, not figures
         text = text.replace(run_id, "")
     return metrics, text
@@ -112,10 +132,9 @@ def test_readme_embeds_the_four_published_charts():
 def test_readme_shows_verdict_cost_and_limits():
     text = README.read_text()
     assert re.search(r"^\| *Metric", text, re.MULTILINE)
-    assert "## Verdict" in text
-    assert "## Which one should I pick?" in text
-    assert "## Cost of one run" in text
-    limits = text.split("## Limits", 1)[1].split("\n## ", 1)[0].lower()
+    assert "### Which one should I pick?" in text
+    assert "## Cost estimate" in text
+    limits = _section("Limits").lower()
     for phrase in ("3 runs", "`spike`", "`scale-from-min`", "mock", "eks-fargate", "two gaps", "logged no scale-out"):
         assert phrase in limits, phrase
     # Issue #161: eks-fargate rests on 2 runs, and its spike scale-out on 1.
@@ -126,7 +145,8 @@ def test_readme_shows_verdict_cost_and_limits():
 
 
 def test_readme_claims_no_cause_for_the_ec2_spike_latency():
-    verdict = " ".join(README.read_text().split("## Verdict", 1)[1].split("\n## ", 1)[0].split())
+    results = _section("Results and Impact").split("### Which one should I pick?", 1)[0]
+    verdict = " ".join(results.split())
     assert "cause is not proven" in verdict
     assert not re.search(r"\b(because|caused by|due to)\b", verdict, re.IGNORECASE)
 
@@ -194,16 +214,16 @@ def test_kf4_cross_check_quotes_its_two_eks_fargate_figures():
 
 def test_readme_reads_fargate_spend_and_addon_date_from_their_source():
     spend = FACTS["fargate_run_usd"]
-    assert f"USD {spend['min']:g} to {spend['max']:g}" in README.read_text().split("## Cost of one run", 1)[1]
-    limits = README.read_text().split("## Limits", 1)[1].split("\n## ", 1)[0]
+    assert f"USD {spend['min']:g} to {spend['max']:g}" in _section("Cost estimate")
+    limits = _section("Limits")
     assert FACTS["addon_date"] in " ".join(limits.split())
 
 
 def test_readme_tech_stack_names_only_tools_found_in_the_repo():
     # Issue #165: each tool named in the section is read back from the repo file that uses it.
-    section = README.read_text().split("## Tech stack", 1)[1].split("\n## ", 1)[0]
+    section = _section("Tech stack")
     assert len(section.strip().splitlines()) < 25
-    assert "—" not in section
+    assert "\u2014" not in section
     assert not re.search(r"\b\d{12}\b|@", section)
     pyproject = (ROOT / "pyproject.toml").read_text()
     for dep in ("langgraph", "boto3", "fastapi", "uvicorn", "pydantic", "pytest", "httpx", "ruff"):
@@ -218,7 +238,7 @@ def test_readme_tech_stack_names_only_tools_found_in_the_repo():
 
 
 def _how_it_works() -> str:
-    return README.read_text().split("## How it works", 1)[1].split("\n## ", 1)[0]
+    return _section("Architecture")
 
 
 def _mermaid_nodes(block: str) -> set[str]:
@@ -236,12 +256,12 @@ def test_readme_agent_graph_names_exactly_the_graph_nodes():
 
     section = _how_it_works()
     block = re.search(r"```mermaid\n(.*?)```", section, re.DOTALL)
-    assert block, "no mermaid block in How it works"
+    assert block, "no mermaid block in Architecture"
     nodes = {"planner", "gate", *STEPS, "teardown"}
     assert _mermaid_nodes(block.group(1)) == {"START", "END", *nodes}
     listed = re.findall(r"^\d+\. `(\w+)`", section, re.MULTILINE)
     assert listed == ["planner", "gate", *STEPS, "teardown"]
-    assert "—" not in section and "<" not in section
+    assert "\u2014" not in section and "<" not in section
     assert not re.search(r"\b\d{12}\b|@", section)
 
 
@@ -249,3 +269,83 @@ def test_mermaid_node_parser_sees_a_missing_or_extra_node():
     block = "flowchart LR\n    START --> planner\n    planner --> gate{\"gate: y/N\"}\n    gate -->|no| END\n"
     assert _mermaid_nodes(block) == {"START", "planner", "gate", "END"}
     assert _mermaid_nodes(block.replace("planner", "plan")) != {"START", "planner", "gate", "END"}
+
+
+def _locked_version(name: str) -> str:
+    block = re.search(rf'^name = "{re.escape(name)}"\nversion = "([^"]+)"', (ROOT / "uv.lock").read_text(), re.MULTILINE)
+    assert block, name
+    return block.group(1)
+
+
+def _badge_versions() -> dict[str, str]:
+    """Badge name -> version text, from the shields.io badge rows between the H1 and the first heading."""
+    head = README.read_text().split("\n## ", 1)[0]
+    assert head.startswith("# "), "README must open with an H1"
+    return dict(re.findall(r"!\[([^\]]+)\]\(https://img\.shields\.io/badge/[^-)]+-([^-)]+)-", head))
+
+
+def _minor(version: str) -> str:
+    return ".".join(version.split(".")[:2])
+
+
+def test_readme_badges_match_the_repo_versions():
+    # Issue #171: the badge row sits under the H1, and each version is read back from the file that pins it.
+    badges = _badge_versions()
+    for name in ("Python", "LangGraph", "FastAPI", "Pydantic", "boto3", "AWS", "Amazon EKS", "Helm",
+                 "CloudFormation", "k6", "Docker", "License"):
+        assert name in badges, name
+    assert badges["Python"] == (ROOT / ".python-version").read_text().strip()
+    assert 'requires-python = ">=3.12,<3.13"' in (ROOT / "pyproject.toml").read_text()
+    assert badges["LangGraph"] == _minor(_locked_version("langgraph"))
+    assert badges["FastAPI"] == _minor(_locked_version("fastapi"))
+    assert badges["boto3"] == _minor(_locked_version("boto3"))
+    assert badges["Pydantic"] == "v" + _locked_version("pydantic").split(".")[0]
+    assert f"grafana/k6:{badges['k6']}" in (ROOT / "loadtests" / "Dockerfile").read_text()
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    assert re.search(rf"version: v{re.escape(badges['Helm'])}\.\d+", ci)
+    assert badges["License"] == "MIT" and "MIT License" in (ROOT / "LICENSE").read_text()
+    assert "github.com/MAOFILHO/agentic-platform-advisor/actions/workflows/ci.yml/badge.svg" in README.read_text()
+    assert re.search(r"^name: ci$", ci, re.MULTILINE)
+
+
+def test_readme_has_the_portfolio_sections_in_order():
+    text = README.read_text()
+    positions = []
+    for title in REQUIRED_SECTIONS:
+        head = re.search(rf"^## (?:[^\w\s]+\s+)?{re.escape(title)}[ \t]*$", text, re.MULTILINE)
+        assert head, title
+        positions.append(head.start())
+    assert positions == sorted(positions)
+    assert "AWS services used" in text and "| Service | Purpose |" in _section("AWS services used")
+    assert "| Challenge | Solution |" in _section("Key engineering decisions")
+    assert text.rstrip().endswith(AUTHOR_LINE)
+
+
+def test_readme_has_no_em_dash_except_the_authors_line():
+    lines = [line for line in README.read_text().splitlines() if "—" in line]
+    assert lines == [AUTHOR_LINE]
+
+
+def test_readme_project_structure_lists_real_folders():
+    block = re.search(r"```\n(.*?)```", _section("Project structure"), re.DOTALL)
+    assert block
+    paths = [line.split()[0] for line in block.group(1).splitlines() if line.strip()]
+    assert paths
+    for path in paths:
+        assert (ROOT / path).is_dir(), path
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
+    tops = {name.split("/", 1)[0] for name in tracked if "/" in name} - {".claude", "web"}
+    assert tops <= {path.split("/", 1)[0] for path in paths}, tops
+
+
+def test_readme_aws_services_are_found_in_the_templates():
+    cfn = "\n".join(path.read_text() for path in sorted((ROOT / "infra" / "cfn").glob("*.yaml")))
+    for resource in ("AWS::ECS::Cluster", "AWS::EKS::Cluster", "AWS::EKS::FargateProfile", "AWS::EKS::Nodegroup",
+                     "AWS::ElasticLoadBalancingV2::LoadBalancer", "AWS::EC2::NatGateway", "AWS::EC2::VPCEndpoint",
+                     "AWS::ECR::Repository", "AWS::IAM::OIDCProvider", "AWS::EKS::PodIdentityAssociation",
+                     "AWS::Budgets::Budget", "AWS::AutoScaling::AutoScalingGroup", "AWS::Logs::LogGroup",
+                     "AWS::ApplicationAutoScaling::ScalableTarget", "containerInsights"):
+        assert resource in cfn, resource
+    assert "bedrock" in cfn.lower() and "ssm" in (ROOT / "scripts" / "deploy_eks.py").read_text()
+    assert "pricing" in (ROOT / "advisor" / "pricing.py").read_text().lower()
+    assert "resourcegroupstaggingapi" in (ROOT / "scripts" / "delete_run.py").read_text() + (ROOT / "advisor" / "teardown.py").read_text()

@@ -304,7 +304,7 @@ def test_readme_badges_match_the_repo_versions():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
     assert re.search(rf"version: v{re.escape(badges['Helm'])}\.\d+", ci)
     assert badges["License"] == "MIT" and "MIT License" in (ROOT / "LICENSE").read_text()
-    assert "github.com/MAOFILHO/agentic-platform-advisor/actions/workflows/ci.yml/badge.svg" in README.read_text()
+    assert "github.com/MAOFILHO/AWS-Agentic-ECS-EKS-Benchmark/actions/workflows/ci.yml/badge.svg" in README.read_text()
     assert re.search(r"^name: ci$", ci, re.MULTILINE)
 
 

@@ -13,7 +13,7 @@
 ![Docker](https://img.shields.io/badge/Docker-workload_image-2496ED?style=flat&logo=docker&logoColor=white&labelColor=1a1a2e)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat&labelColor=1a1a2e)
 
-[![CI](https://github.com/MAOFILHO/agentic-platform-advisor/actions/workflows/ci.yml/badge.svg)](https://github.com/MAOFILHO/agentic-platform-advisor/actions/workflows/ci.yml)
+[![CI](https://github.com/MAOFILHO/AWS-Agentic-ECS-EKS-Benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/MAOFILHO/AWS-Agentic-ECS-EKS-Benchmark/actions/workflows/ci.yml)
 
 ## Project description
 
@@ -311,8 +311,8 @@ The image targets build Intel/AMD Linux images by default, even on an Apple sili
 ## Setup
 
 ```bash
-git clone https://github.com/MAOFILHO/agentic-platform-advisor.git
-cd agentic-platform-advisor
+git clone https://github.com/MAOFILHO/AWS-Agentic-ECS-EKS-Benchmark.git
+cd AWS-Agentic-ECS-EKS-Benchmark
 uv sync --locked
 
 export AWS_PROFILE=<your-profile>
